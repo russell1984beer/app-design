@@ -1,4 +1,4 @@
-// Flight planning: a lawn-mower or criss-cross grid for mapping, and an angled orbit for walls and roofs.
+// Flight planning: a lawn-mower grid for mapping, and an angled orbit for walls and roofs.
 
 import { MINI_4_PRO, footprintM, gsdCm, type CameraSpec } from "./camera.ts";
 import {
@@ -27,8 +27,6 @@ export type GridSettings = {
   lineSpacingM?: number;
   /** Passes run across the area (at right angles to its longest side) or along it. */
   direction: "across" | "along";
-  /** One set of passes, or a criss-cross: the set above, then a second set at right angles to it. */
-  pattern: "single" | "crisscross";
   speedMs: number;
   /** Exact compass direction of the passes; overrides `direction`. */
   lineBearingDeg?: number;
@@ -47,7 +45,6 @@ export const DEFAULT_GRID: GridSettings = {
   // Passes across the garden, about 10 ft apart.
   lineSpacingM: 3,
   direction: "across",
-  pattern: "crisscross",
   speedMs: 4,
   camera: MINI_4_PRO,
 };
@@ -62,40 +59,13 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
     throw new Error(`Passes must be at least ${MIN_LINE_SPACING_M} m apart`);
   }
 
-  const fp = footprintM(s.camera, s.altitudeM);
-  const firstBearing =
-    s.lineBearingDeg ?? normaliseDeg(longestEdgeBearing(boundary) + (s.direction === "across" ? 90 : 0));
-  const bearings = s.pattern === "crisscross" ? [firstBearing, normaliseDeg(firstBearing + 90)] : [firstBearing];
-
-  const waypoints: Waypoint[] = [];
-  let passCount = 0;
-  let spacing = 0;
-  for (const bearing of bearings) {
-    const set = planPasses(boundary, bearing, s);
-    passCount += set.passes.length;
-    spacing = Math.max(spacing, set.spacing);
-    // Join each set on from wherever the last one finished, by the shortest route.
-    const last = waypoints[waypoints.length - 1]?.position;
-    for (const { position, headingDeg } of snake(set.passes, bearing, last)) {
-      waypoints.push({ index: waypoints.length, position, altitudeM: s.altitudeM, photo: true, gimbalPitchDeg: -90, headingDeg });
-    }
-  }
-
-  const estimate = estimateMission(waypoints, s.speedMs);
-  estimate.gsdCm = gsdCm(s.camera, s.altitudeM);
-  estimate.passCount = passCount;
-  estimate.lineSpacingM = spacing;
-  estimate.sideOverlap = passCount > bearings.length ? 1 - spacing / fp.width : 1;
-  estimate.maxLineSpacingM = fp.width * (1 - MIN_SIDE_OVERLAP);
-  return { id: missionId("grid", waypoints), kind: "grid", speedMs: s.speedMs, waypoints, estimate };
-}
-
-/** Parallel passes over the area along one compass bearing. Each pass's photo points run in that direction. */
-function planPasses(boundary: LatLng[], bearing: number, s: GridSettings): { passes: LatLng[][]; spacing: number } {
   const origin = boundary[0];
-  // Rotate the boundary so that the passes run along +x.
+  const bearing =
+    s.lineBearingDeg ?? normaliseDeg(longestEdgeBearing(boundary) + (s.direction === "across" ? 90 : 0));
+  // Rotate the boundary so that flight lines run along +x.
   const alpha = Math.atan2(Math.cos(bearing * (Math.PI / 180)), Math.sin(bearing * (Math.PI / 180)));
   const pts = boundary.map((p) => rotate(toLocal(origin, p), -alpha));
+
   const fp = footprintM(s.camera, s.altitudeM);
   const photoSpacing = fp.height * (1 - s.frontOverlap);
 
@@ -117,42 +87,37 @@ function planPasses(boundary: LatLng[], bearing: number, s: GridSettings): { pas
     lineYs = Array.from({ length: count }, (_, i) => minY + (i + 0.5) * spacing);
   }
 
-  const passes: LatLng[][] = [];
-  for (const y of lineYs) {
+  const waypoints: Waypoint[] = [];
+  for (let i = 0; i < lineYs.length; i++) {
+    const y = lineYs[i];
     const xs = crossings(pts, y);
     if (xs.length < 2) continue;
     const x0 = Math.min(...xs);
     const x1 = Math.max(...xs);
     const shots = Math.max(1, Math.ceil((x1 - x0) / photoSpacing));
-    const pass: LatLng[] = [];
-    for (let k = 0; k <= shots; k++) pass.push(fromLocal(origin, rotate({ x: x0 + ((x1 - x0) * k) / shots, y }, alpha)));
-    passes.push(pass);
-  }
-  return { passes, spacing };
-}
-
-/**
- * Fly the passes back and forth (lawn-mower). Of the four ways to do that, start at the corner
- * nearest `from`, so a second set of passes joins on without a long trip.
- */
-function snake(passes: LatLng[][], bearing: number, from?: LatLng): { position: LatLng; headingDeg: number }[] {
-  const options: { position: LatLng; headingDeg: number }[][] = [];
-  for (const reverseOrder of [false, true]) {
-    for (const flipFirst of [false, true]) {
-      const ordered = reverseOrder ? [...passes].reverse() : passes;
-      const route: { position: LatLng; headingDeg: number }[] = [];
-      ordered.forEach((pass, i) => {
-        const backwards = (i % 2 === 1) !== flipFirst;
-        const headingDeg = backwards ? normaliseDeg(bearing + 180) : bearing;
-        for (const position of backwards ? [...pass].reverse() : pass) route.push({ position, headingDeg });
+    const line: Vec2[] = [];
+    for (let k = 0; k <= shots; k++) line.push({ x: x0 + ((x1 - x0) * k) / shots, y });
+    if (i % 2 === 1) line.reverse();
+    const heading = i % 2 === 1 ? normaliseDeg(bearing + 180) : bearing;
+    for (const v of line) {
+      waypoints.push({
+        index: waypoints.length,
+        position: fromLocal(origin, rotate(v, alpha)),
+        altitudeM: s.altitudeM,
+        photo: true,
+        gimbalPitchDeg: -90,
+        headingDeg: heading,
       });
-      options.push(route);
     }
   }
-  if (!from) return options[0];
-  return options.reduce((best, r) =>
-    r.length && distanceM(from, r[0].position) < distanceM(from, best[0].position) ? r : best,
-  );
+
+  const estimate = estimateMission(waypoints, s.speedMs);
+  estimate.gsdCm = gsdCm(s.camera, s.altitudeM);
+  estimate.passCount = lineYs.length;
+  estimate.lineSpacingM = spacing;
+  estimate.sideOverlap = lineYs.length > 1 ? 1 - spacing / fp.width : 1;
+  estimate.maxLineSpacingM = fp.width * (1 - MIN_SIDE_OVERLAP);
+  return { id: missionId("grid", waypoints), kind: "grid", speedMs: s.speedMs, waypoints, estimate };
 }
 
 export type OrbitSettings = {

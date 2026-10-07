@@ -40,7 +40,7 @@ test("grid over the plot: every photo point is inside the boundary, spaced for t
 });
 
 test("grid over a wide field: several lines, flown back and forth", () => {
-  const m = planGrid(FIELD, { altitudeM: 20, direction: "along", lineSpacingM: undefined, pattern: "single" });
+  const m = planGrid(FIELD, { altitudeM: 20, direction: "along", lineSpacingM: undefined });
   const lineSpacing = footprintM(MINI_4_PRO, 20).width * (1 - 0.7);
   const lines = Math.ceil(40 / lineSpacing);
   const headings = new Set(m.waypoints.map((w) => w.headingDeg));
@@ -51,46 +51,30 @@ test("grid over a wide field: several lines, flown back and forth", () => {
   for (const w of m.waypoints) assert.ok(distanceToPolygonM(w.position, FIELD) < 0.01);
 });
 
-test("default: criss-cross, passes across the garden then along it, 3 m (about 10 ft) apart", () => {
+test("default: passes run across the garden, 3 m (about 10 ft) apart", () => {
   const m = planGrid(PLOT);
-  // 43 m long: 15 passes across. 7 m wide: 3 passes along. All 3 m apart.
-  assert.equal(m.estimate.passCount, 18);
+  // The plot is 43 m long, so passes 3 m apart: 15 of them, each spanning the 7 m width.
+  assert.equal(m.estimate.passCount, 15);
   assert.equal(m.estimate.lineSpacingM, 3);
-  const heading = (i: number) => Math.round(m.waypoints[i].headingDeg!);
-  const across = m.waypoints.filter((w) => [45, 225].includes(Math.round(w.headingDeg!)));
-  const along = m.waypoints.filter((w) => [135, 315].includes(Math.round(w.headingDeg!)));
-  assert.equal(across.length + along.length, m.waypoints.length);
-  assert.ok([45, 225].includes(heading(0)), "starts with the passes across");
-  assert.ok([135, 315].includes(heading(m.waypoints.length - 1)), "finishes with the passes along");
-  const firstAlong = m.waypoints.findIndex((w) => [135, 315].includes(Math.round(w.headingDeg!)));
-  assert.ok(across.every((w) => w.index < firstAlong), "one set, then the other");
-  // The second set starts near where the first finished: no long trip between them.
-  assert.ok(distanceM(m.waypoints[firstAlong - 1].position, m.waypoints[firstAlong].position) < 6);
+  const headings = new Set(m.waypoints.map((w) => Math.round(w.headingDeg!)));
+  assert.deepEqual([...headings].sort((a, b) => a - b), [45, 225], "at right angles to the 135° plot");
+  const firstPass = m.waypoints.filter((w) => w.headingDeg === m.waypoints[0].headingDeg).slice(0, 2);
+  assert.ok(Math.abs(distanceM(firstPass[0].position, firstPass[1].position)) <= 7.01, "a pass spans the width");
   for (const w of m.waypoints) assert.ok(distanceToPolygonM(w.position, PLOT) < 0.01);
 });
 
-test("single pattern: one set of passes across the garden", () => {
-  const m = planGrid(PLOT, { pattern: "single" });
-  assert.equal(m.estimate.passCount, 15);
-  const headings = new Set(m.waypoints.map((w) => Math.round(w.headingDeg!)));
-  assert.deepEqual([...headings].sort((a, b) => a - b), [45, 225], "at right angles to the 135° plot");
-});
-
 test("pass spacing is adjustable", () => {
-  const close = planGrid(PLOT, { lineSpacingM: 1.5, pattern: "single" });
-  const wide = planGrid(PLOT, { lineSpacingM: 6, pattern: "single" });
+  const close = planGrid(PLOT, { lineSpacingM: 1.5 });
+  const wide = planGrid(PLOT, { lineSpacingM: 6 });
   assert.equal(close.estimate.passCount, 29);
   assert.equal(wide.estimate.passCount, 8);
-  // Criss-cross adds the passes along the 7 m width: 5 at 1.5 m apart, 2 at 6 m.
-  assert.equal(planGrid(PLOT, { lineSpacingM: 1.5 }).estimate.passCount, 29 + 5);
-  assert.equal(planGrid(PLOT, { lineSpacingM: 6 }).estimate.passCount, 8 + 2);
   assert.ok(close.estimate.photoCount > wide.estimate.photoCount);
   assert.ok(close.estimate.durationS > wide.estimate.durationS);
   assert.throws(() => planGrid(PLOT, { lineSpacingM: 0.5 }), /at least 1 m/);
 });
 
 test("passes can run along the garden instead", () => {
-  const m = planGrid(PLOT, { direction: "along", pattern: "single" });
+  const m = planGrid(PLOT, { direction: "along" });
   // 7 m wide with passes 3 m apart: 3 passes down the length.
   assert.equal(m.estimate.passCount, 3);
   assert.deepEqual([...new Set(m.waypoints.map((w) => Math.round(w.headingDeg!)))].sort((a, b) => a - b), [135, 315]);
