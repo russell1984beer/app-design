@@ -53,8 +53,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 
 ## Code so far
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
-  - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. Default passes run
-    across the garden 3 m (~10 ft) apart (`lineSpacingM`, `direction`); pre-flight warns if too wide.
+  - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. Default is a criss-cross:
+    passes across the garden, then along it, 3 m (~10 ft) apart (`pattern`, `lineSpacingM`,
+    `direction`); pre-flight warns if the spacing is too wide for the photos to overlap.
   - `roof.ts`: roof scan, a half-orbit round the open side of the owner's half of the roof,
     keeping a set distance from the roof and height above the ridge, with its own flight area.
   - `safety.ts`: safety settings and defaults, pre-flight checks, return-home battery maths.
