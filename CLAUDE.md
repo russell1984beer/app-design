@@ -8,7 +8,7 @@ measured survey (dimensions, levels, contours), and gives the owner a garden des
 roof inspection and material quantities. The owner (non-developer) supervises flights and
 tests builds on real devices.
 
-The clickable prototype (`prototype/`, to be added) shows the
+The clickable prototype (`prototype/plotwise-prototype.html`, open it in a browser) shows the
 intended screens and behaviour. Treat it as the UX reference, not as production code.
 Note: "TerraScan" clashes with existing Terrasolid software, so do not use that name.
 
@@ -80,7 +80,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     Google's Maven Central mirror. Release app is ~200 MB and contains the DJI key: never publish it.
   - Not yet run on the phone or in DJI's simulator.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
-- The clickable prototype is not in this repo yet. Rename it without the address before adding.
+- The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
 - Next: owner builds the app and runs the 8 simulator tests; then the phone's Plan/Checks/Fly
   screens, Met Office forecast, DJI FlySafe no-fly zones, saving progress.
