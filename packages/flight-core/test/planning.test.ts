@@ -85,23 +85,30 @@ test("default flying height is 20 m with 75% overlap, as in the prototype", () =
   assert.equal(DEFAULT_GRID.frontOverlap, 0.75);
 });
 
-test("survey: the grid, then a lap round the edge looking in, all inside the plot", () => {
-  const grid = planGrid(PLOT);
+test("survey follows the prototype's plan: passes across, edge to edge, inside the plot", () => {
   const m = planSurvey(PLOT);
-  assert.equal(m.waypoints.length, grid.waypoints.length + 24);
-  assert.deepEqual(m.waypoints.slice(0, grid.waypoints.length), grid.waypoints);
-  assert.equal(m.estimate.passCount, 15);
-  const lap = m.waypoints.slice(grid.waypoints.length);
-  for (const w of lap) {
-    assert.ok(distanceToPolygonM(w.position, PLOT) < 0.01, "inside the plot");
-    assert.equal(w.gimbalPitchDeg, -60);
+  // 20 m and 75% overlap: passes at most 3.75 m apart over 43 m, so 13 passes about 3.6 m apart.
+  assert.equal(m.estimate.passCount, 13);
+  assert.ok(Math.abs(m.estimate.lineSpacingM! - 42.9 / 12) < 0.01);
+  for (const w of m.waypoints) {
+    assert.ok(distanceToPolygonM(w.position, PLOT) < 1e-6, `waypoint ${w.index} is outside the plot`);
     assert.equal(w.altitudeM, 20);
+    assert.equal(w.gimbalPitchDeg, -90);
   }
-  // Evenly spread: 43 + 7 + 43 + 7 = 100 m of edge, so about 4.2 m between photos.
-  for (let i = 1; i < lap.length; i++) assert.ok(distanceM(lap[i - 1].position, lap[i].position) < 4.3);
-  // Starts near where the grid ends.
-  assert.ok(distanceM(grid.waypoints[grid.waypoints.length - 1].position, lap[0].position) < 8);
+  // Each pass spans the 7 m width with a photo every 2.5 m or less: 4 photos.
+  assert.equal(m.waypoints.length, 13 * 4);
+  // First and last passes run along the two ends of the plot.
+  const ends = [m.waypoints[0], m.waypoints[m.waypoints.length - 1]].map((w) => distanceM(w.position, PLOT[0]) < distanceM(w.position, PLOT[1]));
+  assert.notEqual(ends[0], ends[1], "starts at one end, finishes at the other");
+  // Back and forth.
+  const headings = m.waypoints.map((w) => Math.round(w.headingDeg!));
+  assert.deepEqual([...new Set(headings)].sort((a, b) => a - b), [45, 225]);
   m.waypoints.forEach((w, i) => assert.equal(w.index, i));
+});
+
+test("survey: higher or with less overlap means fewer passes", () => {
+  assert.ok(planSurvey(PLOT, { altitudeM: 30 }).estimate.passCount! < planSurvey(PLOT).estimate.passCount!);
+  assert.ok(planSurvey(PLOT, { overlap: 0.65 }).estimate.passCount! < planSurvey(PLOT).estimate.passCount!);
 });
 
 test("same plan always gets the same id, different plans different ids", () => {

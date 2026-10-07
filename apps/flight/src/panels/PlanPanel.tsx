@@ -26,7 +26,6 @@ export function surveyStatItems(): [string, string][] {
 export function PlanPanel() {
   const s = useApp();
   const st = surveyStats(s);
-  const tooWide = (st.mission.estimate.lineSpacingM ?? 0) > (st.mission.estimate.maxLineSpacingM ?? Infinity);
   const settingIssues = validateSettings(s.safety).filter((i) => i.status !== "pass");
   const set = (fn: () => void) => {
     fn();
@@ -36,13 +35,12 @@ export function PlanPanel() {
     <View>
       <H2>Flight plan</H2>
       <Lead>
-        The drone flies {st.passes} passes across the plot, front to back, then a lap round the edge with the camera tilted, to capture the house,
-        walls, steps and tree heights. Tap the map to move the take-off point.
+        The drone takes off from the yellow point, flies {st.passes} passes across the plot from one end to the other, about{" "}
+        {(st.mission.estimate.lineSpacingM ?? 0).toFixed(1)} m apart, then comes back and lands where it started. It never crosses the property
+        boundary. Tap the map to move the take-off point.
       </Lead>
       <Stepper label="Flying height" value={s.alt} min={12} max={40} step={1} format={(v) => `${v} m`} onChange={(v) => set(() => (s.alt = v))} />
       <Stepper label="Photo overlap" value={s.ov} min={65} max={85} step={5} format={(v) => `${v}%`} onChange={(v) => set(() => (s.ov = v))} />
-      <Stepper label="Distance between passes" value={s.spacing} min={1} max={10} step={0.5} format={(v) => `${v} m`} onChange={(v) => set(() => (s.spacing = v))} />
-      {tooWide && <Status status="warn" text={`Passes this far apart leave gaps at ${s.alt} m. Use ${Math.floor((st.mission.estimate.maxLineSpacingM ?? 0) * 10) / 10} m or less, or fly higher.`} />}
       <Check checked={false} disabled title="RTK positioning" detail="Centimetre-level GPS for contractor-grade levels. Needs the Matrice 4E; the Mini 4 Pro does not have it" />
       <Stats items={surveyStatItems()} />
 

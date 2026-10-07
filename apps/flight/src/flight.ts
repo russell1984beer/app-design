@@ -38,12 +38,7 @@ export function roofPlan(s: AppState): Pt[] {
 }
 
 export function surveyMission(s: AppState, anchor: LatLng): Mission {
-  return planSurvey(plotGps(s, anchor), {
-    altitudeM: s.alt,
-    frontOverlap: s.ov / 100,
-    sideOverlap: s.ov / 100,
-    lineSpacingM: s.spacing,
-  });
+  return planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100 });
 }
 
 export function roofScan(s: AppState, anchor: LatLng): RoofScan {

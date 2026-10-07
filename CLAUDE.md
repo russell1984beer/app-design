@@ -56,10 +56,12 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   model and draft levels, contours, slope, design features and styles, sun and shade, plants,
   material quantities and the example roof report. `npm test` there.
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
-  - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. Defaults match the
-    prototype: 20 m high, 75% overlap; passes run across the garden 3 m (~10 ft) apart
-    (`lineSpacingM`, `direction`); pre-flight warns if too wide. `planSurvey` = the grid plus a lap
-    round the plot's edge with the camera tilted (-60°), staying inside the boundary.
+  - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. `planSurvey` is
+    the garden scan, fixed to the owner's chosen plan (the prototype's): passes straight across the
+    plot, front to back, first and last along the end boundaries, about 0.75 x height x (1 - overlap)
+    apart (3.6 m at the default 20 m and 75%), flown back and forth. It never crosses the property
+    boundary. Take-off and landing are at the home point (default: middle of the rear garden,
+    movable on the Plan map); the drone's own Return to Home brings it back there at the end.
   - `roof.ts`: roof scan as in the prototype: two full circles round the house, 6 m then 3 m above
     the ridge, 24 photos each, at least 2 m out from the roof and 2 m above the chimney, with its own
     flight area. The circles pass over next door's half (pre-flight warns about overflight).

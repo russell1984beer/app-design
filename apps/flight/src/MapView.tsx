@@ -538,10 +538,12 @@ function flightLayer(s: AppState, px: (n: number) => number) {
   const h = s.home;
   return (
     <>
-      <Polyline points={ptsStr([h, ...route, h])} fill="none" stroke={C.ink} strokeWidth={px(1.4)} strokeDasharray={[px(4), px(3)]} />
+      {/* Out to the first pass and back home at the end: faint, so the passes stand out. */}
+      <Polyline points={ptsStr([h, route[0], h, route[route.length - 1]])} fill="none" stroke={C.muted} strokeOpacity={0.6} strokeWidth={px(1)} strokeDasharray={[px(1.5), px(3)]} />
+      <Polyline points={ptsStr(route)} fill="none" stroke={C.ink} strokeWidth={px(1.4)} strokeDasharray={[px(4), px(3)]} />
       <Circle cx={h[0]} cy={h[1]} r={0.7} fill={C.hivis} stroke={C.ink} strokeWidth={px(1.5)} />
       <T x={h[0] + 0.9} y={h[1] + 0.4} size={1.1} px={px}>
-        Take-off
+        Take-off and landing
       </T>
     </>
   );

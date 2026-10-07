@@ -6,12 +6,12 @@ import assert from "node:assert/strict";
 
 import type { DroneBridge } from "../src/bridge.ts";
 import { FlightSession, type FlightSessionOptions } from "../src/flight-session.ts";
-import { distanceM } from "../src/geo.ts";
+import { distanceM, distanceToPolygonM } from "../src/geo.ts";
 import type { Mission, ScanProgress } from "../src/mission.ts";
-import { planGrid } from "../src/planner.ts";
+import { planGrid, planSurvey } from "../src/planner.ts";
 import { DEFAULT_SAFETY, insideGeofence, type SafetySettings } from "../src/safety.ts";
 import { SimDrone, type SimOptions } from "../src/sim-drone.ts";
-import { FIELD, FIELD_HOME, PLOT, PLOT_HOME, landed, run } from "./helpers.ts";
+import { FIELD, FIELD_HOME, ORIGIN, PLOT, PLOT_BEARING, PLOT_HOME, alongAxis, landed, run } from "./helpers.ts";
 
 type Setup = {
   boundary?: typeof PLOT;
@@ -294,4 +294,23 @@ test("camera fault: after repeated failed photos the drone comes home", () => {
 test("refuses to take off before the failsafe is configured on the drone", () => {
   const sim = new SimDrone({ home: PLOT_HOME });
   assert.throws(() => sim.takeOff());
+});
+
+test("garden survey: never crosses the property boundary and lands back where it took off", () => {
+  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25); // middle of the rear garden
+  const mission = planSurvey(PLOT);
+  const sim = new SimDrone({ home });
+  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  let furthestOut = 0;
+  session.start();
+  run(sim, session, {
+    until: landed(sim, session),
+    each: () => {
+      furthestOut = Math.max(furthestOut, distanceToPolygonM(sim.telemetry().position, PLOT));
+    },
+  });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(sim.photos.length, mission.waypoints.length);
+  assert.ok(furthestOut < 0.3, `went ${furthestOut.toFixed(2)} m outside the boundary`);
+  assert.ok(distanceM(sim.telemetry().position, home) < 1, "lands at the take-off point");
 });

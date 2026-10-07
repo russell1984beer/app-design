@@ -140,7 +140,7 @@ export function ScanPanel() {
   return (
     <View>
       <H2>Ready to scan</H2>
-      <Lead>Place the drone on the take-off point, clear of people and pets. It will fly {st.passes} passes and the lap round the edge, then return on its own.</Lead>
+      <Lead>Place the drone on the take-off point, clear of people and pets. It will fly {st.passes} passes across the plot, then come back and land there on its own.</Lead>
       <DroneStatus />
       <Stats items={surveyStatItems()} />
       <PreflightList plan={plan} />

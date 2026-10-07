@@ -3,7 +3,6 @@
 import { MINI_4_PRO, footprintM, gsdCm, type CameraSpec } from "./camera.ts";
 import {
   bearingDeg,
-  centroid,
   distanceM,
   fromLocal,
   normaliseDeg,
@@ -31,6 +30,10 @@ export type GridSettings = {
   speedMs: number;
   /** Exact compass direction of the passes; overrides `direction`. */
   lineBearingDeg?: number;
+  /** First and last passes run along the boundary edges, the rest evenly between, at most lineSpacingM apart. */
+  edgeToEdge?: boolean;
+  /** Distance between photos along a pass. Defaults to what frontOverlap needs. */
+  photoSpacingM?: number;
   camera: CameraSpec;
 };
 
@@ -68,7 +71,7 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
   const pts = boundary.map((p) => rotate(toLocal(origin, p), -alpha));
 
   const fp = footprintM(s.camera, s.altitudeM);
-  const photoSpacing = fp.height * (1 - s.frontOverlap);
+  const photoSpacing = s.photoSpacingM ?? fp.height * (1 - s.frontOverlap);
 
   const minY = Math.min(...pts.map((p) => p.y));
   const maxY = Math.max(...pts.map((p) => p.y));
@@ -76,7 +79,14 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
   // Where each pass runs, measured across the area.
   let lineYs: number[];
   let spacing: number;
-  if (s.lineSpacingM !== undefined) {
+  if (s.lineSpacingM !== undefined && s.edgeToEdge) {
+    // Passes on both edges and evenly between. Kept a few centimetres inside so they never cross it.
+    const inset = 0.05;
+    const span = Math.max(0, width - 2 * inset);
+    const count = Math.ceil(span / s.lineSpacingM) + 1;
+    spacing = count > 1 ? span / (count - 1) : 0;
+    lineYs = Array.from({ length: count }, (_, i) => minY + inset + i * spacing);
+  } else if (s.lineSpacingM !== undefined) {
     // Exactly the requested distance apart, centred on the area.
     spacing = s.lineSpacingM;
     const count = Math.floor(width / spacing) + 1;
@@ -121,50 +131,42 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
   return { id: missionId("grid", waypoints), kind: "grid", speedMs: s.speedMs, waypoints, estimate };
 }
 
-export type SurveySettings = GridSettings & {
-  /** Angled photos taken round the edge of the area after the grid, looking in. */
-  edgePhotoCount: number;
-  edgeGimbalPitchDeg: number;
+export type SurveySettings = {
+  altitudeM: number;
+  /** Photo overlap, 0–1. Sets both the gap between passes and between photos. */
+  overlap: number;
+  speedMs: number;
 };
 
-export const DEFAULT_SURVEY: Omit<SurveySettings, keyof GridSettings> = { edgePhotoCount: 24, edgeGimbalPitchDeg: -60 };
+export const DEFAULT_SURVEY: SurveySettings = { altitudeM: 20, overlap: 0.75, speedMs: 4 };
+
+/** The garden survey's fixed pattern, from the prototype: gaps between passes and between photos. */
+export function surveySpacing(altitudeM: number, overlap: number): { passM: number; photoM: number } {
+  return {
+    passM: Math.max(MIN_LINE_SPACING_M, 0.75 * altitudeM * (1 - overlap)),
+    photoM: Math.max(0.5, 0.5 * altitudeM * (1 - overlap)),
+  };
+}
 
 /**
- * The garden survey: the grid over the whole plot, then a lap round its edge with the camera
- * tilted to look inwards, to capture the house walls, steps and tree heights. Stays inside the boundary.
+ * The garden survey, fixed to the prototype's flight plan: passes straight across the plot,
+ * front to back, the first and last along the end boundaries and the rest evenly between,
+ * flown back and forth. Every point stays inside the boundary. The drone takes off from the
+ * home point and, when the scan is done, its own Return to Home lands it back there.
  */
 export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings> = {}): Mission {
-  const s = { ...DEFAULT_GRID, ...DEFAULT_SURVEY, ...overrides };
-  const grid = planGrid(boundary, s);
-  const middle = centroid(boundary);
-  const edges = boundary.map((a, i) => ({ a, b: boundary[(i + 1) % boundary.length], len: distanceM(a, boundary[(i + 1) % boundary.length]) }));
-  const perimeter = edges.reduce((t, e) => t + e.len, 0);
-  // Start the lap at the boundary corner nearest the end of the grid, so there is no long transit.
-  const last = grid.waypoints[grid.waypoints.length - 1].position;
-  const first = boundary.reduce((best, p, i) => (distanceM(p, last) < distanceM(boundary[best], last) ? i : best), 0);
-  const waypoints = [...grid.waypoints];
-  for (let k = 0; k < s.edgePhotoCount; k++) {
-    let d = (perimeter * k) / s.edgePhotoCount;
-    let i = first;
-    while (d > edges[i % edges.length].len) {
-      d -= edges[i % edges.length].len;
-      i++;
-    }
-    const e = edges[i % edges.length];
-    const a = toLocal(e.a, e.b);
-    const position = fromLocal(e.a, { x: (a.x * d) / e.len, y: (a.y * d) / e.len });
-    waypoints.push({
-      index: waypoints.length,
-      position,
-      altitudeM: s.altitudeM,
-      photo: true,
-      gimbalPitchDeg: s.edgeGimbalPitchDeg,
-      headingDeg: bearingDeg(position, middle),
-    });
-  }
-  const mission = buildMission("grid", waypoints, s.speedMs);
-  mission.estimate = { ...grid.estimate, ...mission.estimate };
-  return mission;
+  const s = { ...DEFAULT_SURVEY, ...overrides };
+  const gap = surveySpacing(s.altitudeM, s.overlap);
+  return planGrid(boundary, {
+    altitudeM: s.altitudeM,
+    frontOverlap: s.overlap,
+    sideOverlap: s.overlap,
+    lineSpacingM: gap.passM,
+    photoSpacingM: gap.photoM,
+    edgeToEdge: true,
+    direction: "across",
+    speedMs: s.speedMs,
+  });
 }
 
 export type OrbitSettings = {
