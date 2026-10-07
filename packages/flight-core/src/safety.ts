@@ -166,6 +166,18 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
     }
   }
 
+  const e = mission.estimate;
+  if (e.sideOverlap !== undefined && e.lineSpacingM !== undefined && e.maxLineSpacingM !== undefined) {
+    items.push(
+      e.lineSpacingM > e.maxLineSpacingM + 1e-9
+        ? warn(
+            "passSpacing",
+            `Passes are ${e.lineSpacingM.toFixed(1)} m apart: too far for the photos to overlap at this height, so the map may have gaps. Use ${Math.floor(e.maxLineSpacingM * 10) / 10} m or less, or fly higher.`,
+          )
+        : pass("passSpacing", `${e.passCount} passes, ${e.lineSpacingM.toFixed(1)} m apart.`),
+    );
+  }
+
   const tooHigh = mission.waypoints.filter((w) => w.altitudeM > UK_MAX_ALTITUDE_M);
   const tooLow = mission.waypoints.filter((w) => w.altitudeM < s.tallestObstacleM + 2);
   if (tooHigh.length > 0) {

@@ -40,7 +40,7 @@ test("grid over the plot: every photo point is inside the boundary, spaced for t
 });
 
 test("grid over a wide field: several lines, flown back and forth", () => {
-  const m = planGrid(FIELD, { altitudeM: 20 });
+  const m = planGrid(FIELD, { altitudeM: 20, direction: "along", lineSpacingM: undefined });
   const lineSpacing = footprintM(MINI_4_PRO, 20).width * (1 - 0.7);
   const lines = Math.ceil(40 / lineSpacing);
   const headings = new Set(m.waypoints.map((w) => w.headingDeg));
@@ -49,6 +49,35 @@ test("grid over a wide field: several lines, flown back and forth", () => {
   for (let i = 1; i < m.waypoints.length; i++) if (m.waypoints[i].headingDeg !== m.waypoints[i - 1].headingDeg) turns++;
   assert.equal(turns, lines - 1);
   for (const w of m.waypoints) assert.ok(distanceToPolygonM(w.position, FIELD) < 0.01);
+});
+
+test("default: passes run across the garden, 3 m (about 10 ft) apart", () => {
+  const m = planGrid(PLOT);
+  // The plot is 43 m long, so passes 3 m apart: 15 of them, each spanning the 7 m width.
+  assert.equal(m.estimate.passCount, 15);
+  assert.equal(m.estimate.lineSpacingM, 3);
+  const headings = new Set(m.waypoints.map((w) => Math.round(w.headingDeg!)));
+  assert.deepEqual([...headings].sort((a, b) => a - b), [45, 225], "at right angles to the 135° plot");
+  const firstPass = m.waypoints.filter((w) => w.headingDeg === m.waypoints[0].headingDeg).slice(0, 2);
+  assert.ok(Math.abs(distanceM(firstPass[0].position, firstPass[1].position)) <= 7.01, "a pass spans the width");
+  for (const w of m.waypoints) assert.ok(distanceToPolygonM(w.position, PLOT) < 0.01);
+});
+
+test("pass spacing is adjustable", () => {
+  const close = planGrid(PLOT, { lineSpacingM: 1.5 });
+  const wide = planGrid(PLOT, { lineSpacingM: 6 });
+  assert.equal(close.estimate.passCount, 29);
+  assert.equal(wide.estimate.passCount, 8);
+  assert.ok(close.estimate.photoCount > wide.estimate.photoCount);
+  assert.ok(close.estimate.durationS > wide.estimate.durationS);
+  assert.throws(() => planGrid(PLOT, { lineSpacingM: 0.5 }), /at least 1 m/);
+});
+
+test("passes can run along the garden instead", () => {
+  const m = planGrid(PLOT, { direction: "along" });
+  // 7 m wide with passes 3 m apart: 3 passes down the length.
+  assert.equal(m.estimate.passCount, 3);
+  assert.deepEqual([...new Set(m.waypoints.map((w) => Math.round(w.headingDeg!)))].sort((a, b) => a - b), [135, 315]);
 });
 
 test("same plan always gets the same id, different plans different ids", () => {
@@ -163,6 +192,17 @@ test("preflight: no-fly zones", () => {
     alongAxis(ORIGIN, 0, 10, -10),
   ];
   assert.ok(blocked({ ...goodPreflight(), noFlyZones: [{ name: "Square", kind: "restricted", polygon: square }] }, "noFlyZones"));
+});
+
+test("preflight: warns when passes are too far apart for the photos to overlap", () => {
+  const ok = preflightCheck(goodPreflight());
+  assert.equal(ok.items.find((i) => i.id === "passSpacing")?.status, "pass");
+  // At 15 m a photo covers about 21 m across; 60% overlap needs passes 8.5 m apart or closer.
+  const wide = preflightCheck({ ...goodPreflight(), mission: planGrid(PLOT, { altitudeM: 15, lineSpacingM: 10 }) });
+  const item = wide.items.find((i) => i.id === "passSpacing");
+  assert.equal(item?.status, "warn");
+  assert.match(item!.message, /8\.5 m or less/);
+  assert.ok(wide.canTakeOff, "a warning, not a stop");
 });
 
 test("preflight: battery too low to start is blocked; not enough for the whole scan is a warning", () => {

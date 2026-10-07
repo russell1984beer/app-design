@@ -21,18 +21,30 @@ export type GridSettings = {
   altitudeM: number;
   /** Overlap between photos along a line, 0–1. */
   frontOverlap: number;
-  /** Overlap between neighbouring lines, 0–1. */
+  /** Overlap between neighbouring lines, 0–1. Only used when lineSpacingM is not set. */
   sideOverlap: number;
+  /** Distance between neighbouring passes, metres. When set, it decides the spacing instead of sideOverlap. */
+  lineSpacingM?: number;
+  /** Passes run across the area (at right angles to its longest side) or along it. */
+  direction: "across" | "along";
   speedMs: number;
-  /** Compass direction of the flight lines. Defaults to the boundary's longest side. */
+  /** Exact compass direction of the passes; overrides `direction`. */
   lineBearingDeg?: number;
   camera: CameraSpec;
 };
+
+/** Passes closer than this would mean a very long flight for no gain. */
+export const MIN_LINE_SPACING_M = 1;
+/** Side overlap below this leaves gaps that photogrammetry cannot join. */
+export const MIN_SIDE_OVERLAP = 0.6;
 
 export const DEFAULT_GRID: GridSettings = {
   altitudeM: 30,
   frontOverlap: 0.8,
   sideOverlap: 0.7,
+  // Passes across the garden, about 10 ft apart.
+  lineSpacingM: 3,
+  direction: "across",
   speedMs: 4,
   camera: MINI_4_PRO,
 };
@@ -43,25 +55,41 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
   if (s.frontOverlap < 0 || s.frontOverlap >= 1 || s.sideOverlap < 0 || s.sideOverlap >= 1) {
     throw new Error("Overlap must be between 0 and 1");
   }
+  if (s.lineSpacingM !== undefined && !(s.lineSpacingM >= MIN_LINE_SPACING_M)) {
+    throw new Error(`Passes must be at least ${MIN_LINE_SPACING_M} m apart`);
+  }
 
   const origin = boundary[0];
-  const bearing = s.lineBearingDeg ?? longestEdgeBearing(boundary);
+  const bearing =
+    s.lineBearingDeg ?? normaliseDeg(longestEdgeBearing(boundary) + (s.direction === "across" ? 90 : 0));
   // Rotate the boundary so that flight lines run along +x.
   const alpha = Math.atan2(Math.cos(bearing * (Math.PI / 180)), Math.sin(bearing * (Math.PI / 180)));
   const pts = boundary.map((p) => rotate(toLocal(origin, p), -alpha));
 
   const fp = footprintM(s.camera, s.altitudeM);
-  const lineSpacing = fp.width * (1 - s.sideOverlap);
   const photoSpacing = fp.height * (1 - s.frontOverlap);
 
   const minY = Math.min(...pts.map((p) => p.y));
   const maxY = Math.max(...pts.map((p) => p.y));
-  const lineCount = Math.max(1, Math.ceil((maxY - minY) / lineSpacing));
-  const stripWidth = (maxY - minY) / lineCount;
+  const width = maxY - minY;
+  // Where each pass runs, measured across the area.
+  let lineYs: number[];
+  let spacing: number;
+  if (s.lineSpacingM !== undefined) {
+    // Exactly the requested distance apart, centred on the area.
+    spacing = s.lineSpacingM;
+    const count = Math.floor(width / spacing) + 1;
+    const first = minY + (width - (count - 1) * spacing) / 2;
+    lineYs = Array.from({ length: count }, (_, i) => first + i * spacing);
+  } else {
+    const count = Math.max(1, Math.ceil(width / (fp.width * (1 - s.sideOverlap))));
+    spacing = width / count;
+    lineYs = Array.from({ length: count }, (_, i) => minY + (i + 0.5) * spacing);
+  }
 
   const waypoints: Waypoint[] = [];
-  for (let i = 0; i < lineCount; i++) {
-    const y = minY + (i + 0.5) * stripWidth;
+  for (let i = 0; i < lineYs.length; i++) {
+    const y = lineYs[i];
     const xs = crossings(pts, y);
     if (xs.length < 2) continue;
     const x0 = Math.min(...xs);
@@ -85,6 +113,10 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
 
   const estimate = estimateMission(waypoints, s.speedMs);
   estimate.gsdCm = gsdCm(s.camera, s.altitudeM);
+  estimate.passCount = lineYs.length;
+  estimate.lineSpacingM = spacing;
+  estimate.sideOverlap = lineYs.length > 1 ? 1 - spacing / fp.width : 1;
+  estimate.maxLineSpacingM = fp.width * (1 - MIN_SIDE_OVERLAP);
   return { id: missionId("grid", waypoints), kind: "grid", speedMs: s.speedMs, waypoints, estimate };
 }
 

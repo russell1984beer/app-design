@@ -30,6 +30,12 @@ export type MissionEstimate = {
   durationS: number;
   /** Ground sample distance (cm per pixel) at mission height, for grid missions. */
   gsdCm?: number;
+  /** Grid missions: number of passes, distance between them, and the side overlap that gives. */
+  passCount?: number;
+  lineSpacingM?: number;
+  sideOverlap?: number;
+  /** Grid missions: widest pass spacing that still overlaps enough to join the photos. */
+  maxLineSpacingM?: number;
 };
 
 /** Which photos of a mission are already done. Saved after every photo so a scan can resume. */
