@@ -13,6 +13,8 @@ android {
   namespace 'expo.modules.djidrone'
   defaultConfig {
     minSdkVersion 24
+    versionCode 1
+    versionName '0.1.0'
   }
 }
 
