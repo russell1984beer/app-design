@@ -1,0 +1,19 @@
+{
+  "name": "@plotwise/flight-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flight planning, safety rules and the phone-side flight controller for Plotwise. No dependencies.",
+  "type": "module",
+  "main": "src/index.ts",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
+}

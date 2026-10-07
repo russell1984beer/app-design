@@ -1,0 +1,22 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.expo/
+
+# Secrets: DJI App Key and other keys live only on the owner's PC
+local.properties
+.env
+.env.*
+!.env.example
+
+# Private project notes (owner's address etc). Claude Code reads this file automatically.
+CLAUDE.local.md
+
+# Android / IDE
+.gradle/
+*.keystore
+*.jks
+.idea/
+.vscode/
+.DS_Store
