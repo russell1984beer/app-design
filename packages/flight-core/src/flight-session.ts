@@ -13,6 +13,10 @@ export type SessionState =
   | "climbing"
   | "scanning"
   | "returning"
+  /** Stopped by the emergency button: hovering in place, waiting for the pilot's command. */
+  | "holding"
+  /** Landing where it is, on the pilot's command. */
+  | "landing"
   | "pilotControl"
   | "signalLost"
   | "landed";
@@ -25,7 +29,8 @@ export type ReturnReason =
   | "pilotButton"
   | "droneInitiated"
   | "signalLoss"
-  | "cameraFault";
+  | "cameraFault"
+  | "pilotLanded";
 
 export type FlightSessionOptions = {
   mission: Mission;
@@ -58,6 +63,7 @@ export class FlightSession {
   private photoRequested = false;
   private photoAttempts = new Map<number, number>();
   private airborneSince?: { timeS: number; battery: number };
+  private heldFrom?: SessionState;
 
   constructor(options: FlightSessionOptions) {
     this.o = options;
@@ -82,6 +88,35 @@ export class FlightSession {
     });
     bridge.takeOff();
     this.setState("takingOff");
+  }
+
+  /**
+   * The emergency button in the app: stop where it is and hover until the pilot decides what to do.
+   * Safety rules (battery, wind, geofence, signal loss) keep working while it hovers.
+   */
+  pilotHold(): void {
+    if (this.state !== "takingOff" && this.state !== "climbing" && this.state !== "scanning") return;
+    this.o.bridge.hover();
+    // Climbing restarts from the climb command; take-off and scanning carry on where they were.
+    this.heldFrom = this.state === "climbing" ? "takingOff" : this.state;
+    this.commandedIndex = undefined;
+    this.photoRequested = false;
+    this.setState("holding");
+  }
+
+  /** Carry on with the scan after an emergency stop. */
+  pilotResume(): void {
+    if (this.state !== "holding") return;
+    this.setState(this.heldFrom ?? "scanning");
+    this.heldFrom = undefined;
+  }
+
+  /** Land straight down where it is (the pilot has checked the ground below is clear). */
+  pilotLand(): void {
+    if (this.state === "ready" || this.state === "landed") return;
+    this.o.bridge.land();
+    this.returnReason = "pilotLanded";
+    this.setState("landing");
   }
 
   /** The Return button in the app. */
@@ -117,7 +152,7 @@ export class FlightSession {
     }
 
     // Landed while the app was not watching (app closed or phone asleep during the return).
-    if (t.flightMode === "onGround" && (this.state === "climbing" || this.state === "scanning")) {
+    if (t.flightMode === "onGround" && (this.state === "climbing" || this.state === "scanning" || this.state === "holding")) {
       this.returnReason ??= "droneInitiated";
       this.setState("landed");
       return;
@@ -128,7 +163,7 @@ export class FlightSession {
       return;
     }
 
-    if (this.state === "pilotControl" || this.state === "returning") {
+    if (this.state === "pilotControl" || this.state === "returning" || this.state === "landing") {
       if (t.flightMode === "onGround") this.setState("landed");
       return;
     }
@@ -147,6 +182,9 @@ export class FlightSession {
       this.goHome(reason);
       return;
     }
+
+    // Emergency stop: keep hovering, send nothing else, wait for the pilot.
+    if (this.state === "holding") return;
 
     this.flyMission(t);
   }

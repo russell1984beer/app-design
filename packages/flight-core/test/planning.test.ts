@@ -106,6 +106,24 @@ test("survey follows the prototype's plan: passes across, edge to edge, inside t
   m.waypoints.forEach((w, i) => assert.equal(w.index, i));
 });
 
+test("survey with the edge lap: the passes, then 24 tilted photos round the edge, all inside the plot", () => {
+  const plain = planSurvey(PLOT);
+  const m = planSurvey(PLOT, { edgeLap: true });
+  assert.equal(m.waypoints.length, plain.waypoints.length + 24);
+  assert.deepEqual(m.waypoints.slice(0, plain.waypoints.length), plain.waypoints);
+  assert.equal(m.estimate.passCount, plain.estimate.passCount);
+  const lap = m.waypoints.slice(plain.waypoints.length);
+  for (const w of lap) {
+    assert.ok(distanceToPolygonM(w.position, PLOT) < 1e-6, "inside the plot");
+    assert.equal(w.gimbalPitchDeg, -60);
+  }
+  // 100 m of edge, so about 4.2 m between photos; starts near where the passes end.
+  for (let i = 1; i < lap.length; i++) assert.ok(distanceM(lap[i - 1].position, lap[i].position) < 4.3);
+  assert.ok(distanceM(plain.waypoints[plain.waypoints.length - 1].position, lap[0].position) < 1);
+  m.waypoints.forEach((w, i) => assert.equal(w.index, i));
+  assert.notEqual(m.id, plain.id);
+});
+
 test("survey: higher or with less overlap means fewer passes", () => {
   assert.ok(planSurvey(PLOT, { altitudeM: 30 }).estimate.passCount! < planSurvey(PLOT).estimate.passCount!);
   assert.ok(planSurvey(PLOT, { overlap: 0.65 }).estimate.passCount! < planSurvey(PLOT).estimate.passCount!);

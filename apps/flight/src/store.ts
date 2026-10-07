@@ -20,6 +20,8 @@ export type AppState = {
   alt: number;
   /** Photo overlap along each pass, percent. */
   ov: number;
+  /** Add a lap round the plot's edge with the camera tilted, after the passes. */
+  edgeLap: boolean;
   safety: SafetySettings;
   /** Operator ID, airspace, neighbours. Ticked again before every flight. */
   checks: boolean[];
@@ -62,6 +64,7 @@ export const S: AppState = {
   home: [TEST_PLOT.widthM / 2, TEST_PLOT.rearGardenM / 2],
   alt: 20,
   ov: 75,
+  edgeLap: false,
   safety: DEFAULT_SAFETY,
   checks: [false, false, false],
   mode: "sim",
@@ -105,7 +108,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "testsPassed"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "testsPassed"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();

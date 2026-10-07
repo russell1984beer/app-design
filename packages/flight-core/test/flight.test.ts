@@ -296,9 +296,9 @@ test("refuses to take off before the failsafe is configured on the drone", () =>
   assert.throws(() => sim.takeOff());
 });
 
-test("garden survey: never crosses the property boundary and lands back where it took off", () => {
+for (const edgeLap of [false, true]) test(`garden survey${edgeLap ? " with the edge lap" : ""}: never crosses the property boundary and lands back where it took off`, () => {
   const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25); // middle of the rear garden
-  const mission = planSurvey(PLOT);
+  const mission = planSurvey(PLOT, { edgeLap });
   const sim = new SimDrone({ home });
   const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
   let furthestOut = 0;
@@ -313,4 +313,83 @@ test("garden survey: never crosses the property boundary and lands back where it
   assert.equal(sim.photos.length, mission.waypoints.length);
   assert.ok(furthestOut < 0.3, `went ${furthestOut.toFixed(2)} m outside the boundary`);
   assert.ok(distanceM(sim.telemetry().position, home) < 1, "lands at the take-off point");
+});
+
+/** Fly until a few photos are taken, then press the emergency stop. */
+function stopMidScan(o: Setup = {}) {
+  const s = setup(o);
+  s.session.start();
+  run(s.sim, s.session, { until: () => s.sim.photos.length >= 4 && s.session.state === "scanning" });
+  s.session.pilotHold();
+  assert.equal(s.session.state, "holding");
+  return s;
+}
+
+test("emergency stop: the drone stops and hovers in place, taking no more photos, until told what to do", () => {
+  const { sim, session } = stopMidScan();
+  // Let it brake to a stop first.
+  for (let i = 0; i < 30; i++) {
+    sim.step(0.1);
+    session.update();
+  }
+  const stoppedAt = sim.telemetry().position;
+  const photos = sim.photos.length;
+  const until = sim.timeS + 30;
+  let moved = 0;
+  while (sim.timeS < until) {
+    sim.step(0.1);
+    session.update();
+    moved = Math.max(moved, distanceM(sim.telemetry().position, stoppedAt));
+  }
+  assert.equal(session.state, "holding");
+  assert.ok(moved < 0.5, `drifted ${moved.toFixed(2)} m while holding`);
+  assert.equal(sim.photos.length, photos, "no photos while holding");
+});
+
+test("emergency stop, then Resume: the scan carries on and finishes as normal", () => {
+  const { sim, session, mission, home } = stopMidScan();
+  for (let i = 0; i < 100; i++) {
+    sim.step(0.1);
+    session.update();
+  }
+  session.pilotResume();
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(new Set(sim.photos.map((p) => p.waypointIndex)).size, mission.waypoints.length);
+  assert.ok(distanceM(sim.telemetry().position, home) < 1);
+});
+
+test("emergency stop, then Return home or Land here", () => {
+  const a = stopMidScan();
+  a.session.pilotReturnHome();
+  run(a.sim, a.session, { until: landed(a.sim, a.session) });
+  assert.equal(a.session.returnReason, "pilotButton");
+  assert.ok(distanceM(a.sim.telemetry().position, a.home) < 1);
+
+  const b = stopMidScan();
+  const here = b.sim.telemetry().position;
+  b.session.pilotLand();
+  run(b.sim, b.session, { until: landed(b.sim, b.session) });
+  assert.equal(b.session.returnReason, "pilotLanded");
+  assert.ok(distanceM(b.sim.telemetry().position, here) < 1, "landed where it stopped");
+});
+
+test("emergency stop: safety rules still work while it hovers", () => {
+  const { sim, session, settings } = stopMidScan({ boundary: FIELD, home: FIELD_HOME, mission: LONG_SCAN, sim: { batteryPercent: 35 } });
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "lowBattery", "came home on its own when the battery ran low");
+  assert.ok(sim.battery >= settings.landingReservePercent);
+
+  const w = stopMidScan();
+  w.sim.setWind({ speedMs: 9, fromDeg: 270 });
+  run(w.sim, w.session, { until: landed(w.sim, w.session) });
+  assert.equal(w.session.returnReason, "wind");
+});
+
+test("emergency stop: the pilot can still take the sticks", () => {
+  const { sim, session } = stopMidScan();
+  sim.pilotTakesControl();
+  sim.step(0.1);
+  session.update();
+  assert.equal(session.state, "pilotControl");
 });

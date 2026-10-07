@@ -62,6 +62,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     apart (3.6 m at the default 20 m and 75%), flown back and forth. It never crosses the property
     boundary. Take-off and landing are at the home point (default: middle of the rear garden,
     movable on the Plan map); the drone's own Return to Home brings it back there at the end.
+    Optional (Plan tab switch, off by default): a lap round the plot's edge after the passes, camera
+    tilted -60° looking in, also inside the boundary.
   - `roof.ts`: roof scan as in the prototype: two full circles round the house, 6 m then 3 m above
     the ridge, 24 photos each, at least 2 m out from the roof and 2 m above the chimney, with its own
     flight area. The circles pass over next door's half (pre-flight warns about overflight).
@@ -85,8 +87,12 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     point (the drone's position in real mode, a made-up field in simulator mode) and the garden's
     compass direction, and runs flights through one shared drone connection (`src/drone.ts`).
     Scan and Roof have a DJI simulator / Real flight switch; real flights stay blocked until all
-    8 simulator tests pass and the Met Office forecast is connected. State and scan progress are
+    9 simulator tests pass and the Met Office forecast is connected. State and scan progress are
     saved on the phone (AsyncStorage), so a stopped scan can resume.
+  - `src/EmergencyBar.tsx`: big red STOP button on every tab while the app flies the drone.
+    `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
+    Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
+    can still take the sticks.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
@@ -100,7 +106,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
-- Next: owner builds the app and runs the 8 simulator tests; then Met Office forecast, DJI FlySafe
+- Next: owner builds the app and runs the 9 simulator tests; then Met Office forecast, DJI FlySafe
   no-fly zones, photo upload and survey processing, and an iOS build of the non-flight tabs.
 
 ## Build phases

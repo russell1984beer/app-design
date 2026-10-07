@@ -8,6 +8,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 import { drone } from "./src/drone";
+import { EmergencyBar } from "./src/EmergencyBar";
 import { MapView } from "./src/MapView";
 import { DesignPanel } from "./src/panels/DesignPanel";
 import { MaterialsPanel } from "./src/panels/MaterialsPanel";
@@ -43,6 +44,7 @@ function Shell() {
       <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: "#e9eee9" }}>
         <StatusBar style="dark" />
         <TestBench />
+        <EmergencyBar />
       </View>
     );
   }
@@ -66,6 +68,7 @@ function Shell() {
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
+      <EmergencyBar />
       <Nav tab={s.tab} bottom={insets.bottom} />
     </View>
   );

@@ -13,7 +13,7 @@ import { eastNorthToPlan, planToEastNorth, type Pt } from "../../../packages/gar
 import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
 
-export const SIM_TEST_COUNT = 8;
+export const SIM_TEST_COUNT = 9;
 
 /** A plan point as a GPS position, given the GPS position of the home point. */
 export function planToGps(s: AppState, anchor: LatLng, p: Pt): LatLng {
@@ -38,7 +38,7 @@ export function roofPlan(s: AppState): Pt[] {
 }
 
 export function surveyMission(s: AppState, anchor: LatLng): Mission {
-  return planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100 });
+  return planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap });
 }
 
 export function roofScan(s: AppState, anchor: LatLng): RoofScan {
@@ -159,6 +159,7 @@ export const RETURN_REASON: Record<string, string> = {
   droneInitiated: "The drone returned by itself (Return to Home on the controller, or its own failsafe).",
   signalLoss: "The signal was lost, so the drone came home.",
   cameraFault: "The camera stopped taking photos, so the drone came home.",
+  pilotLanded: "You told it to land where it was.",
 };
 
 export const STATE_TEXT: Record<string, string> = {
@@ -167,6 +168,8 @@ export const STATE_TEXT: Record<string, string> = {
   climbing: "Climbing to scan height",
   scanning: "Scanning",
   returning: "Returning home",
+  holding: "Stopped. Hovering in place, waiting for you.",
+  landing: "Landing where it is",
   pilotControl: "Pilot has control. The app has stopped sending commands.",
   signalLost: "Signal lost. The drone is following its own failsafe.",
   landed: "Landed",

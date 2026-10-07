@@ -96,6 +96,14 @@ const SCENARIOS: Scenario[] = [
     pass: (s) =>
       (s.state === "landed" || s.state === "returning") && (s.returnReason === "signalLoss" || s.returnReason === "droneInitiated"),
   },
+  {
+    id: "emergencyStop",
+    title: "9. Emergency STOP button",
+    instructions:
+      "After a few photos, tap the red STOP button at the bottom of the screen. Watch the simulator for 10 seconds, then tap Resume scan.",
+    expect: "Stops and hovers in place (no drifting, no photos) until Resume, then finishes the scan and lands at home.",
+    pass: (s) => s.state === "landed" && s.returnReason === "complete" && s.log.some((l) => l.includes("-> holding")),
+  },
 ];
 
 export function TestBench() {

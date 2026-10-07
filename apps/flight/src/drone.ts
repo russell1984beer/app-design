@@ -111,6 +111,23 @@ class DroneHub {
     return session;
   }
 
+  /** The emergency STOP button: hover in place and wait. */
+  hold(): void {
+    this.job?.session.pilotHold();
+    this.addLog("Emergency stop: hovering, waiting for the pilot.");
+    this.emit();
+  }
+
+  resume(): void {
+    this.job?.session.pilotResume();
+    this.emit();
+  }
+
+  landHere(): void {
+    this.job?.session.pilotLand();
+    this.emit();
+  }
+
   /** The pilot's Return home button in the app. */
   returnHome(): void {
     this.job?.session.pilotReturnHome();

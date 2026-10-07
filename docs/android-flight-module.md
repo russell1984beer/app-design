@@ -43,9 +43,13 @@ sticks work. To take over:
 1. Press the **Pause button** on the RC-N2 once. The drone stops and hovers, and you have the
    sticks.
 2. Or press and hold the **Return to Home button** until it beeps. The drone flies home.
+3. Or tap the big red **STOP** button at the bottom of the app screen. The drone stops and
+   hovers where it is, then waits for you: **Resume scan**, **Return home**, or **Land here**
+   (tap twice, only if the ground below is clear). The sticks still do nothing until you press
+   Pause. Low battery, strong wind and the geofence still bring it home by itself while it waits.
 
-The app sees either one straight away and stops sending commands. Test 4 and test 5 below check
-this. Practise both until they are automatic before any real flight.
+The app sees the controller buttons straight away and stops sending commands. Tests 4, 5 and 9 below check
+this. Practise all three until they are automatic before any real flight.
 
 ## Files
 
@@ -187,7 +191,7 @@ App Key in them).
 
 Run them in order from the app. Each one says what to do and what should happen, and shows
 **PASS** or **CHECK** at the end. The app remembers each pass; the *Real flight* switch on the
-Scan and Roof tabs stays blocked until all 8 have passed. Fill in this table and send it back, along with anything that
+Scan and Roof tabs stays blocked until all 9 have passed. Fill in this table and send it back, along with anything that
 looked wrong.
 
 | Test | What it checks | Result | Notes |
@@ -200,6 +204,7 @@ looked wrong.
 | 6. Gust | Wind limit. Note the wind speed the app shows, for U2–U4. | | |
 | 7. Phone loses the controller | Phone cable unplugged mid-scan. Settles U8. | | |
 | 8. Controller switched off | The drone's own signal-loss failsafe. | | |
+| 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. | | |
 
 **Not tested in the simulator:**
 
@@ -207,7 +212,7 @@ looked wrong.
   cover it (normal, headwind and worn battery).
 - **The geofence.** The test plan stays inside the area. It is covered by the automatic tests.
 
-## After all 8 pass
+## After all 9 pass
 
 Only then plan the first real flight. Keep it low (10 m) and short, in the garden, with the
 propellers on and you holding the controller ready to press Pause. That flight needs its own
