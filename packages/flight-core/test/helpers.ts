@@ -1,4 +1,4 @@
-import { fromLocal, type LatLng } from "../src/geo.ts";
+import { fromLocal, toLocal, type LatLng } from "../src/geo.ts";
 import { FlightSession } from "../src/flight-session.ts";
 import type { SimDrone } from "../src/sim-drone.ts";
 
@@ -59,3 +59,21 @@ export function run(sim: SimDrone, session: FlightSession, o: RunOptions): numbe
 
 export const landed = (sim: SimDrone, session: FlightSession) => () =>
   sim.mode === "onGround" && session.state === "landed";
+
+/** The owner's half of the roof (7 m wide, 8 m deep), joined to next door along one side. */
+export const ROOF = [
+  alongAxis(ORIGIN, PLOT_BEARING, 5.5, -3.5),
+  alongAxis(ORIGIN, PLOT_BEARING, 13.5, -3.5),
+  alongAxis(ORIGIN, PLOT_BEARING, 13.5, 3.5),
+  alongAxis(ORIGIN, PLOT_BEARING, 5.5, 3.5),
+];
+export const RIDGE_HEIGHT_M = 8.5;
+/** The open (not joined) side of the house faces south-west in this layout: the +across direction. */
+export const ROOF_OPEN_SIDE = 225;
+
+/** How far a point is across the plot from its centre line; negative is the neighbour's side. */
+export function acrossM(p: LatLng): number {
+  const b = (PLOT_BEARING * Math.PI) / 180;
+  const v = toLocal(ORIGIN, p);
+  return v.x * Math.cos(b) - v.y * Math.sin(b);
+}

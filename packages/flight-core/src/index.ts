@@ -2,6 +2,7 @@ export * from "./geo.ts";
 export * from "./camera.ts";
 export * from "./mission.ts";
 export * from "./planner.ts";
+export * from "./roof.ts";
 export * from "./safety.ts";
 export * from "./bridge.ts";
 export * from "./flight-session.ts";

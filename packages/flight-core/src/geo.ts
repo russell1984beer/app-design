@@ -116,3 +116,23 @@ export function rotate(v: Vec2, angleRad: number): Vec2 {
   const s = Math.sin(angleRad);
   return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
 }
+
+/** Smallest convex polygon around the points (anticlockwise). */
+export function convexHull(points: LatLng[]): LatLng[] {
+  if (points.length < 3) return [...points];
+  const o = points[0];
+  const pts = points
+    .map((p) => ({ p, v: toLocal(o, p) }))
+    .sort((a, b) => a.v.x - b.v.x || a.v.y - b.v.y);
+  const cross = (a: Vec2, b: Vec2, c: Vec2) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  const half = (list: typeof pts) => {
+    const out: typeof pts = [];
+    for (const q of list) {
+      while (out.length >= 2 && cross(out[out.length - 2].v, out[out.length - 1].v, q.v) <= 0) out.pop();
+      out.push(q);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(pts), ...half([...pts].reverse())].map((q) => q.p);
+}

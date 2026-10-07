@@ -122,7 +122,10 @@ export function insideGeofence(p: LatLng, boundary: LatLng[], marginM: number): 
 
 export type PreflightInput = {
   settings: SafetySettings;
+  /** Where the drone may fly: the property for a garden scan, the roof scan's flight area for a roof scan. */
   boundary: LatLng[];
+  /** The owner's land, when the flight area reaches beyond it. Photos taken from outside it get a warning. */
+  property?: LatLng[];
   home?: LatLng;
   mission: Mission;
   /** Latest forecast for the site; missing means it could not be fetched. */
@@ -147,8 +150,21 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
   items.push(
     outside.length > 0
       ? block("geofence", `${outside.length} waypoint(s) are outside the property plus ${s.geofenceMarginM} m.`)
-      : pass("geofence", "Whole flight stays over the property."),
+      : pass("geofence", "Whole flight stays inside the allowed area."),
   );
+
+  if (input.property) {
+    const property = input.property;
+    const over = mission.waypoints.filter((w) => distanceToPolygonM(w.position, property) > 0.5);
+    if (over.length > 0) {
+      items.push(
+        warn(
+          "overflight",
+          `${over.length} of ${mission.waypoints.length} photos are taken from above the street or a neighbour's land. Let the neighbours know and keep clear of people.`,
+        ),
+      );
+    }
+  }
 
   const tooHigh = mission.waypoints.filter((w) => w.altitudeM > UK_MAX_ALTITUDE_M);
   const tooLow = mission.waypoints.filter((w) => w.altitudeM < s.tallestObstacleM + 2);

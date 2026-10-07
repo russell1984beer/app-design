@@ -54,6 +54,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 ## Code so far
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
   - `planner.ts`: grid mission over a drawn boundary (height/overlap), angled orbit for walls/roof.
+  - `roof.ts`: roof scan, a half-orbit round the open side of the owner's half of the roof,
+    keeping a set distance from the roof and height above the ridge, with its own flight area.
   - `safety.ts`: safety settings and defaults, pre-flight checks, return-home battery maths.
   - `bridge.ts`: the `DroneBridge` interface the Android module must implement.
   - `flight-session.ts`: `FlightSession`, the phone-side flight controller.
@@ -62,6 +64,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - End-to-end tests in `test/flight.test.ts` cover normal scans, signal loss, gusts,
     low battery (incl. headwind and a fast-draining battery), resume, the pilot's return
     button, the RC return button, pilot takeover, geofence and camera faults.
+    `test/roof.test.ts` covers the roof scan. Damage detection is not built yet.
   - All planning and safety logic belongs here, not in the Android module.
 - The clickable prototype is not in this repo yet. Rename it without the address before adding.
 - The Android module and app screens must be built on the owner's Windows PC (Android SDK,
