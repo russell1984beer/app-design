@@ -5,6 +5,15 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "../../packages/flight-core/src/**/*.ts"],
-  "exclude": ["node_modules", "android", "**/*.test.ts"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "../../packages/flight-core/src/**/*.ts",
+    "../../packages/garden-core/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "**/*.test.ts"
+  ]
 }

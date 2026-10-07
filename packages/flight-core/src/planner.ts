@@ -3,6 +3,7 @@
 import { MINI_4_PRO, footprintM, gsdCm, type CameraSpec } from "./camera.ts";
 import {
   bearingDeg,
+  centroid,
   distanceM,
   fromLocal,
   normaliseDeg,
@@ -39,9 +40,9 @@ export const MIN_LINE_SPACING_M = 1;
 export const MIN_SIDE_OVERLAP = 0.6;
 
 export const DEFAULT_GRID: GridSettings = {
-  altitudeM: 30,
-  frontOverlap: 0.8,
-  sideOverlap: 0.7,
+  altitudeM: 20,
+  frontOverlap: 0.75,
+  sideOverlap: 0.75,
   // Passes across the garden, about 10 ft apart.
   lineSpacingM: 3,
   direction: "across",
@@ -120,6 +121,52 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
   return { id: missionId("grid", waypoints), kind: "grid", speedMs: s.speedMs, waypoints, estimate };
 }
 
+export type SurveySettings = GridSettings & {
+  /** Angled photos taken round the edge of the area after the grid, looking in. */
+  edgePhotoCount: number;
+  edgeGimbalPitchDeg: number;
+};
+
+export const DEFAULT_SURVEY: Omit<SurveySettings, keyof GridSettings> = { edgePhotoCount: 24, edgeGimbalPitchDeg: -60 };
+
+/**
+ * The garden survey: the grid over the whole plot, then a lap round its edge with the camera
+ * tilted to look inwards, to capture the house walls, steps and tree heights. Stays inside the boundary.
+ */
+export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings> = {}): Mission {
+  const s = { ...DEFAULT_GRID, ...DEFAULT_SURVEY, ...overrides };
+  const grid = planGrid(boundary, s);
+  const middle = centroid(boundary);
+  const edges = boundary.map((a, i) => ({ a, b: boundary[(i + 1) % boundary.length], len: distanceM(a, boundary[(i + 1) % boundary.length]) }));
+  const perimeter = edges.reduce((t, e) => t + e.len, 0);
+  // Start the lap at the boundary corner nearest the end of the grid, so there is no long transit.
+  const last = grid.waypoints[grid.waypoints.length - 1].position;
+  const first = boundary.reduce((best, p, i) => (distanceM(p, last) < distanceM(boundary[best], last) ? i : best), 0);
+  const waypoints = [...grid.waypoints];
+  for (let k = 0; k < s.edgePhotoCount; k++) {
+    let d = (perimeter * k) / s.edgePhotoCount;
+    let i = first;
+    while (d > edges[i % edges.length].len) {
+      d -= edges[i % edges.length].len;
+      i++;
+    }
+    const e = edges[i % edges.length];
+    const a = toLocal(e.a, e.b);
+    const position = fromLocal(e.a, { x: (a.x * d) / e.len, y: (a.y * d) / e.len });
+    waypoints.push({
+      index: waypoints.length,
+      position,
+      altitudeM: s.altitudeM,
+      photo: true,
+      gimbalPitchDeg: s.edgeGimbalPitchDeg,
+      headingDeg: bearingDeg(position, middle),
+    });
+  }
+  const mission = buildMission("grid", waypoints, s.speedMs);
+  mission.estimate = { ...grid.estimate, ...mission.estimate };
+  return mission;
+}
+
 export type OrbitSettings = {
   center: LatLng;
   radiusM: number;
@@ -160,19 +207,20 @@ export function planOrbit(o: Partial<OrbitSettings> & Pick<OrbitSettings, "cente
       headingDeg: normaliseDeg(b + 180), // face the centre
     });
   }
-  return {
-    id: missionId("orbit", waypoints),
-    kind: "orbit",
-    speedMs: s.speedMs,
-    waypoints,
-    estimate: estimateMission(waypoints, s.speedMs),
-  };
+  return buildMission("orbit", waypoints, s.speedMs);
+}
+
+/** A mission from a list of waypoints, with its id and time estimate. */
+export function buildMission(kind: Mission["kind"], waypoints: Waypoint[], speedMs: number): Mission {
+  return { id: missionId(kind, waypoints), kind, speedMs, waypoints, estimate: estimateMission(waypoints, speedMs) };
 }
 
 function estimateMission(waypoints: Waypoint[], speedMs: number): MissionEstimate {
   let pathLengthM = 0;
   for (let i = 1; i < waypoints.length; i++) {
-    pathLengthM += distanceM(waypoints[i - 1].position, waypoints[i].position);
+    const a = waypoints[i - 1];
+    const b = waypoints[i];
+    pathLengthM += Math.hypot(distanceM(a.position, b.position), a.altitudeM - b.altitudeM);
   }
   const photoCount = waypoints.filter((w) => w.photo).length;
   return { photoCount, pathLengthM, durationS: pathLengthM / speedMs + photoCount * PHOTO_PAUSE_S };

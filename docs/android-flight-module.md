@@ -52,7 +52,8 @@ this. Practise both until they are automatic before any real flight.
 | Path | What it is |
 | --- | --- |
 | `apps/flight/` | The Expo app. |
-| `apps/flight/App.tsx` | The simulator test bench screen. |
+| `apps/flight/App.tsx`, `apps/flight/src/` | The app: Plan, Scan, Survey, Design, Roof and Materials tabs, laid out like the prototype. |
+| `apps/flight/src/TestBench.tsx` | The simulator test bench (Scan tab > *Simulator tests*). |
 | `apps/flight/modules/dji-drone/` | The drone module (Kotlin + TypeScript). |
 | `apps/flight/plugins/withDji.js` | Adds the DJI App Key and start-up code to the Android project. |
 | `apps/flight/modules/dji-drone/control-tests/` | Runs the Kotlin flight-control tests without Android. |
@@ -63,7 +64,8 @@ DJI Mobile SDK version: **5.18.0** (`modules/dji-drone/android/build.gradle`).
 
 Checked in the cloud workspace:
 
-- **flight-core tests:** 42 passing.
+- **flight-core tests:** 47 passing.
+- **garden-core tests:** 13 passing.
 - **JavaScript adapter tests:** 7 passing. These fly the full FlightSession through the adapter
   against a fake drone.
 - **Setup plugin tests:** 4 passing.
@@ -159,7 +161,8 @@ npm run phone
 
 - **`git pull`** gets the latest fixes.
 - **`npm run phone`** builds the standalone app and installs it on the phone. The first build
-  takes 10–30 minutes. It ends with the app opening on the phone, titled "Simulator test bench".
+  takes 10–30 minutes. It ends with the app opening on the phone at the Plan tab. The simulator tests are under
+  the **Scan** tab: tap *Simulator tests*.
 - The standalone app runs on its own, so the PC is not needed after this.
 
 If the build fails, copy the **last 40 lines** of the output into the chat (check there is no
@@ -174,7 +177,7 @@ App Key in them).
 4. **Connect:** switch on the controller, then the drone. Plug the phone into the RC-N2 (not
    the PC).
 5. **Open Plotwise Flight.** If Android asks which app to open for the USB device, choose
-   Plotwise Flight.
+   Plotwise Flight. Go to the **Scan** tab and tap **Simulator tests**.
 6. **Check the top card** shows "DJI SDK registered" then "Drone connected". The first time,
    registration needs internet.
 7. **Tap *Start simulator*.** The motors do not spin in the simulator, but take the propellers
@@ -183,7 +186,8 @@ App Key in them).
 ## Simulator tests
 
 Run them in order from the app. Each one says what to do and what should happen, and shows
-**PASS** or **CHECK** at the end. Fill in this table and send it back, along with anything that
+**PASS** or **CHECK** at the end. The app remembers each pass; the *Real flight* switch on the
+Scan and Roof tabs stays blocked until all 8 have passed. Fill in this table and send it back, along with anything that
 looked wrong.
 
 | Test | What it checks | Result | Notes |
@@ -211,9 +215,12 @@ checklist, which comes next.
 
 ## Not built yet
 
-- **The full Plan, Checks and Fly screens on the phone.** They are in the browser preview; the
-  phone only has the test bench so far.
-- **Fetching the Met Office forecast.** The test bench uses "calm" for the simulator.
-- **DJI no-fly-zone data.** The FlySafe check is not wired in yet.
-- **Saving scan progress** so it survives the app closing. It is kept in memory for now.
-- **Uploading photos to the cloud.**
+- **Fetching the Met Office forecast.** The simulator uses "calm"; real flights are blocked
+  until the forecast is connected.
+- **DJI no-fly-zone data.** The FlySafe check is not wired in yet; check DJI Fly yourself.
+- **Uploading photos to the cloud and processing them into a survey.** The Survey tab uses a
+  draft of the garden from the title plan with estimated levels.
+- **Roof damage detection.** The Roof tab shows a labelled example report.
+- **Placing the plot from a satellite map.** For a real flight the plot is lined up from the
+  take-off point (set on the Plan map, with the drone sitting on it) and the garden's compass
+  direction on the Plan tab. A wrong direction shifts the whole plan, so check it carefully.

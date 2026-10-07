@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { MINI_4_PRO, footprintM, gsdCm } from "../src/camera.ts";
 import { areaM2, distanceM, distanceToPolygonM } from "../src/geo.ts";
-import { planGrid, planOrbit } from "../src/planner.ts";
+import { DEFAULT_GRID, planGrid, planOrbit, planSurvey } from "../src/planner.ts";
 import {
   DEFAULT_SAFETY,
   batteryNeededToReturn,
@@ -29,10 +29,10 @@ test("grid over the plot: every photo point is inside the boundary, spaced for t
   assert.ok(m.waypoints.length >= 2);
   for (const w of m.waypoints) {
     assert.ok(distanceToPolygonM(w.position, PLOT) < 0.01, "inside the plot");
-    assert.equal(w.altitudeM, 30);
+    assert.equal(w.altitudeM, 20);
     assert.equal(w.gimbalPitchDeg, -90);
   }
-  const spacing = footprintM(MINI_4_PRO, 30).height * (1 - 0.8);
+  const spacing = footprintM(MINI_4_PRO, 20).height * (1 - 0.75);
   for (let i = 1; i < m.waypoints.length; i++) {
     assert.ok(distanceM(m.waypoints[i - 1].position, m.waypoints[i].position) <= spacing + 0.01);
   }
@@ -40,7 +40,7 @@ test("grid over the plot: every photo point is inside the boundary, spaced for t
 });
 
 test("grid over a wide field: several lines, flown back and forth", () => {
-  const m = planGrid(FIELD, { altitudeM: 20, direction: "along", lineSpacingM: undefined });
+  const m = planGrid(FIELD, { altitudeM: 20, direction: "along", lineSpacingM: undefined, sideOverlap: 0.7 });
   const lineSpacing = footprintM(MINI_4_PRO, 20).width * (1 - 0.7);
   const lines = Math.ceil(40 / lineSpacing);
   const headings = new Set(m.waypoints.map((w) => w.headingDeg));
@@ -78,6 +78,30 @@ test("passes can run along the garden instead", () => {
   // 7 m wide with passes 3 m apart: 3 passes down the length.
   assert.equal(m.estimate.passCount, 3);
   assert.deepEqual([...new Set(m.waypoints.map((w) => Math.round(w.headingDeg!)))].sort((a, b) => a - b), [135, 315]);
+});
+
+test("default flying height is 20 m with 75% overlap, as in the prototype", () => {
+  assert.equal(DEFAULT_GRID.altitudeM, 20);
+  assert.equal(DEFAULT_GRID.frontOverlap, 0.75);
+});
+
+test("survey: the grid, then a lap round the edge looking in, all inside the plot", () => {
+  const grid = planGrid(PLOT);
+  const m = planSurvey(PLOT);
+  assert.equal(m.waypoints.length, grid.waypoints.length + 24);
+  assert.deepEqual(m.waypoints.slice(0, grid.waypoints.length), grid.waypoints);
+  assert.equal(m.estimate.passCount, 15);
+  const lap = m.waypoints.slice(grid.waypoints.length);
+  for (const w of lap) {
+    assert.ok(distanceToPolygonM(w.position, PLOT) < 0.01, "inside the plot");
+    assert.equal(w.gimbalPitchDeg, -60);
+    assert.equal(w.altitudeM, 20);
+  }
+  // Evenly spread: 43 + 7 + 43 + 7 = 100 m of edge, so about 4.2 m between photos.
+  for (let i = 1; i < lap.length; i++) assert.ok(distanceM(lap[i - 1].position, lap[i].position) < 4.3);
+  // Starts near where the grid ends.
+  assert.ok(distanceM(grid.waypoints[grid.waypoints.length - 1].position, lap[0].position) < 8);
+  m.waypoints.forEach((w, i) => assert.equal(w.index, i));
 });
 
 test("same plan always gets the same id, different plans different ids", () => {

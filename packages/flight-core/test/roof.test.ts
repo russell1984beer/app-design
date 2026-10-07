@@ -10,42 +10,46 @@ import { PLOT, PLOT_HOME, RIDGE_HEIGHT_M, ROOF, ROOF_OPEN_SIDE, acrossM, landed,
 
 const INPUT: RoofScanInput = { roof: ROOF, ridgeHeightM: RIDGE_HEIGHT_M, home: PLOT_HOME, openSideBearingDeg: ROOF_OPEN_SIDE };
 
-test("roof plan: keeps its distance from the roof and flies above the ridge", () => {
+test("roof plan: two full circles, 6 m then 3 m above the ridge, 24 photos each", () => {
   const scan = planRoofScan(INPUT);
-  assert.equal(scan.mission.waypoints.length, 15);
-  assert.equal(scan.altitudeM, RIDGE_HEIGHT_M + 5);
-  for (const w of scan.mission.waypoints) {
-    assert.ok(distanceToPolygonM(w.position, ROOF) >= 6 - 0.01, "at least 6 m from the roof");
-    assert.equal(w.altitudeM, scan.altitudeM);
-  }
+  assert.equal(scan.mission.waypoints.length, 48);
+  assert.deepEqual(scan.orbits.map((o) => o.altitudeM), [RIDGE_HEIGHT_M + 6, RIDGE_HEIGHT_M + 3]);
+  scan.mission.waypoints.forEach((w, i) => {
+    assert.equal(w.index, i);
+    assert.equal(w.altitudeM, i < 24 ? RIDGE_HEIGHT_M + 6 : RIDGE_HEIGHT_M + 3);
+    assert.ok(distanceToPolygonM(w.position, ROOF) >= 2 - 0.01, "at least 2 m from the roof");
+    assert.ok(Math.abs(distanceM(w.position, scan.center) - scan.radiusM) < 0.01);
+  });
+  // The circles go all the way round, so they pass over next door's half too.
+  assert.ok(scan.mission.waypoints.some((w) => acrossM(w.position) < -3.5));
+  // A few minutes of circling, plus take-off and landing.
+  assert.ok(scan.mission.estimate.durationS > 100 && scan.mission.estimate.durationS < 330, `${scan.mission.estimate.durationS}`);
 });
 
-test("roof plan: stays on the open side, never over the neighbour's half", () => {
+test("roof plan: camera faces the roof, tilted down more on the higher circle", () => {
   const scan = planRoofScan(INPUT);
-  for (const w of scan.mission.waypoints) assert.ok(acrossM(w.position) > -0.01, `waypoint ${w.index} crosses to the neighbour's side`);
-});
-
-test("roof plan: camera faces the roof, tilted down", () => {
-  const scan = planRoofScan(INPUT);
-  assert.ok(scan.gimbalPitchDeg < -10 && scan.gimbalPitchDeg > -60, `tilt ${scan.gimbalPitchDeg}`);
+  const [high, low] = scan.orbits;
+  assert.ok(high.gimbalPitchDeg < low.gimbalPitchDeg, "steeper from higher up");
+  for (const o of scan.orbits) assert.ok(o.gimbalPitchDeg < -10 && o.gimbalPitchDeg > -70, `tilt ${o.gimbalPitchDeg}`);
   for (const w of scan.mission.waypoints) {
     const toCentre = bearingDeg(w.position, scan.center);
     const diff = Math.abs(((w.headingDeg! - toCentre + 540) % 360) - 180);
     assert.ok(diff < 0.5);
-    assert.equal(w.gimbalPitchDeg, scan.gimbalPitchDeg);
   }
 });
 
-test("roof plan: the flight area covers the arc, the house and the home point", () => {
+test("roof plan: the flight area covers the circles, the house and the home point", () => {
   const scan = planRoofScan(INPUT);
   for (const p of [...scan.mission.waypoints.map((w) => w.position), ...ROOF, PLOT_HOME]) {
     assert.ok(distanceToPolygonM(p, scan.flightArea) < 0.01);
   }
 });
 
-test("roof plan: refuses to fly too close to the roof or too low", () => {
-  assert.throws(() => planRoofScan({ ...INPUT, distanceFromRoofM: 2 }));
-  assert.throws(() => planRoofScan({ ...INPUT, heightAboveRidgeM: 1 }));
+test("roof plan: refuses to fly too close to the roof, too low, or near the chimney", () => {
+  assert.throws(() => planRoofScan({ ...INPUT, distanceFromRoofM: 1 }), /at least 2 m from the roof/);
+  assert.throws(() => planRoofScan({ ...INPUT, heightsAboveRidgeM: [6, 1] }), /above the ridge/);
+  assert.throws(() => planRoofScan({ ...INPUT, chimneyTopM: RIDGE_HEIGHT_M + 2 }), /above the chimney/);
+  assert.throws(() => planRoofScan({ ...INPUT, heightsAboveRidgeM: [] }));
 });
 
 test("roof pre-flight: allowed, with a warning about flying over the street and next door", () => {
@@ -86,7 +90,7 @@ test("roof flight: takes every photo, never comes close to the roof below ridge 
     until: landed(sim, session),
     each: () => {
       const t = sim.telemetry();
-      if (distanceToPolygonM(t.position, ROOF) < 4 && t.altitudeM < RIDGE_HEIGHT_M + 3) unsafe = true;
+      if (distanceToPolygonM(t.position, ROOF) < 2 - 0.3 && t.altitudeM < RIDGE_HEIGHT_M + 3 - 0.3) unsafe = true;
       if (!insideGeofence(t.position, scan.flightArea, DEFAULT_SAFETY.geofenceMarginM)) leftArea = true;
     },
   });

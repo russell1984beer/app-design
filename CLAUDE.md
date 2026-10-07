@@ -52,11 +52,17 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   and short in the owner's garden.
 
 ## Code so far
+- `packages/garden-core/` (TypeScript, no dependencies; for iOS and Android): the prototype's plot
+  model and draft levels, contours, slope, design features and styles, sun and shade, plants,
+  material quantities and the example roof report. `npm test` there.
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
-  - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. Default passes run
-    across the garden 3 m (~10 ft) apart (`lineSpacingM`, `direction`); pre-flight warns if too wide.
-  - `roof.ts`: roof scan, a half-orbit round the open side of the owner's half of the roof,
-    keeping a set distance from the roof and height above the ridge, with its own flight area.
+  - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. Defaults match the
+    prototype: 20 m high, 75% overlap; passes run across the garden 3 m (~10 ft) apart
+    (`lineSpacingM`, `direction`); pre-flight warns if too wide. `planSurvey` = the grid plus a lap
+    round the plot's edge with the camera tilted (-60°), staying inside the boundary.
+  - `roof.ts`: roof scan as in the prototype: two full circles round the house, 6 m then 3 m above
+    the ridge, 24 photos each, at least 2 m out from the roof and 2 m above the chimney, with its own
+    flight area. The circles pass over next door's half (pre-flight warns about overflight).
   - `safety.ts`: safety settings and defaults, pre-flight checks, return-home battery maths.
   - `bridge.ts`: the `DroneBridge` interface the Android module must implement.
   - `flight-session.ts`: `FlightSession`, the phone-side flight controller.
@@ -72,18 +78,28 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     DJI MSDK 5.18.0 (virtual sticks for movement, the drone's own failsafes stay on);
     `NativeDroneBridge.ts` implements flight-core's `DroneBridge` on top of it.
   - `plugins/withDji.js`: config plugin adding the App Key (from `.env`), USB filter and SDK start-up.
-  - `App.tsx`: simulator test bench running the same scenarios as `test/flight.test.ts`.
+  - `App.tsx` + `src/`: the app, laid out like the prototype: map on top, panel below, tabs Plan,
+    Scan, Survey, Design, Roof, Materials. `src/flight.ts` places the plot on GPS from the home
+    point (the drone's position in real mode, a made-up field in simulator mode) and the garden's
+    compass direction, and runs flights through one shared drone connection (`src/drone.ts`).
+    Scan and Roof have a DJI simulator / Real flight switch; real flights stay blocked until all
+    8 simulator tests pass and the Met Office forecast is connected. State and scan progress are
+    saved on the phone (AsyncStorage), so a stopped scan can resume.
+  - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
+    `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
     control tests with Gradle.
   - Builds in the cloud workspace (dl.google.com allowed; Android SDK at /opt/android-sdk, Java 17
     needed). Maven Central rate-limits this machine, so a local Gradle init script points it at
     Google's Maven Central mirror. Release app is ~200 MB and contains the DJI key: never publish it.
-  - Not yet run on the phone or in DJI's simulator.
+  - Not yet run on the phone or in DJI's simulator. Survey processing (photogrammetry) and roof
+    damage detection are not built: the Survey uses a draft of the garden from the title plan with
+    estimated levels, and the roof report is a labelled example.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
-- Next: owner builds the app and runs the 8 simulator tests; then the phone's Plan/Checks/Fly
-  screens, Met Office forecast, DJI FlySafe no-fly zones, saving progress.
+- Next: owner builds the app and runs the 8 simulator tests; then Met Office forecast, DJI FlySafe
+  no-fly zones, photo upload and survey processing, and an iOS build of the non-flight tabs.
 
 ## Build phases
 1. **Flight app (Android)**: connect via MSDK, home point, automatic grid mission over a
