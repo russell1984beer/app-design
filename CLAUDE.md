@@ -23,8 +23,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - DJI Mobile SDK v5 is **Android only**, so flight control (Plan and Scan) runs on Android only.
 - Everything else (survey viewing, measuring, design, sun/shade, plants, roof reports,
   materials) must work on **both iOS and Android**.
-- Use one cross-platform codebase (React Native with Expo, or Flutter) with a native
-  Android module wrapping DJI MSDK v5.
+- One cross-platform codebase: **React Native with Expo** (chosen, because flight-core is
+  TypeScript and runs in the app unchanged) with a native Android module wrapping DJI MSDK v5.
 - iOS builds happen in the cloud (e.g. Expo EAS Build) and go to the iPad via TestFlight.
 - Scans flown on Android sync to the cloud and appear on iOS.
 
@@ -66,11 +66,21 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     button, the RC return button, pilot takeover, geofence and camera faults.
     `test/roof.test.ts` covers the roof scan. Damage detection is not built yet.
   - All planning and safety logic belongs here, not in the Android module.
+- `apps/flight/` (Expo SDK 57, Android only): the flight app. See `docs/android-flight-module.md`.
+  - `modules/dji-drone/`: local Expo module. Kotlin `DroneController` drives the drone through
+    DJI MSDK 5.18.0 (virtual sticks for movement, the drone's own failsafes stay on);
+    `NativeDroneBridge.ts` implements flight-core's `DroneBridge` on top of it.
+  - `plugins/withDji.js`: config plugin adding the App Key (from `.env`), USB filter and SDK start-up.
+  - `App.tsx`: simulator test bench running the same scenarios as `test/flight.test.ts`.
+  - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
+    control tests with Gradle.
+  - Not built or run on Android yet; the cloud workspace cannot download the Android SDK
+    (dl.google.com is blocked). DJI artifacts come from Maven Central and can be inspected here.
+  - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is not in this repo yet. Rename it without the address before adding.
-- The Android module and app screens must be built on the owner's Windows PC (Android SDK,
-  Gradle and the DJI SDK are not set up in the cloud workspace).
-- Next: the Android flight module, see `docs/android-flight-module.md` (to be written). It
-  must pass the same scenarios as `test/flight.test.ts` in DJI's simulator.
+- The app must be built on the owner's Windows PC.
+- Next: owner builds the app and runs the 8 simulator tests; then the phone's Plan/Checks/Fly
+  screens, Met Office forecast, DJI FlySafe no-fly zones, saving progress.
 
 ## Build phases
 1. **Flight app (Android)**: connect via MSDK, home point, automatic grid mission over a
