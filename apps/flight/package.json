@@ -8,7 +8,8 @@
     "prebuild": "expo prebuild --platform android --clean",
     "android": "expo run:android",
     "test": "node --test modules/dji-drone/src/*.test.ts plugins/*.test.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "phone": "expo run:android --variant release"
   },
   "dependencies": {
     "expo": "~57.0.27",

@@ -74,9 +74,11 @@ Checked in the cloud workspace:
 - **Expo project generation:** with the plugin, it produces the right Android project (App Key,
   USB controller filter, DJI start-up calls, packaging settings).
 
-Not checked, because the cloud workspace cannot download the Android SDK:
+- **Full Android build:** debug and standalone release builds succeed, including
+  `DjiDroneModule.kt`. The build needs Java 17 (Gradle finds or downloads it).
 
-- **The full Android build.** `DjiDroneModule.kt` (the thin Expo wrapper) has not been compiled.
+Not checked yet:
+
 - **Anything with the real drone or DJI's simulator.**
 
 **Unknowns the simulator tests must settle.** The DJI SDK's published files do not document these:
@@ -142,26 +144,26 @@ Do these in order. Each step says how to check it worked.
 
 ## Build and install the app
 
-From `app-design\apps\flight`, with the phone plugged into the **PC**:
+The full Android build has been run successfully in the cloud workspace (debug and standalone
+release builds, DJI SDK 5.18.0 included). The app file is about 200 MB, too big to send through
+the chat, so the PC builds the same thing and installs it on the phone.
+
+From `app-design\apps\flight` in Git Bash, with the phone plugged into the **PC**:
 
 ```
+git pull
 npm install
-npm test
 npm run prebuild
-npm run android
+npm run phone
 ```
 
-- **`npm test`** runs the JavaScript and plugin tests. It should say `pass 11, fail 0`.
-- **`npm run prebuild`** creates the `android` folder.
-- **`npm run android`** builds the app and installs it on the phone. The first build takes a
-  while, often 10–20 minutes.
+- **`git pull`** gets the latest fixes.
+- **`npm run phone`** builds the standalone app and installs it on the phone. The first build
+  takes 10–30 minutes. It ends with the app opening on the phone, titled "Simulator test bench".
+- The standalone app runs on its own, so the PC is not needed after this.
 
 If the build fails, copy the **last 40 lines** of the output into the chat (check there is no
 App Key in them).
-
-After this, `npm start` on the PC serves the app's JavaScript over Wi-Fi. The phone and PC must
-be on the same Wi-Fi. You only need to rebuild with `npm run android` when Kotlin code or
-settings change.
 
 ## Before every simulator session
 

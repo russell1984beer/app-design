@@ -74,8 +74,10 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - `App.tsx`: simulator test bench running the same scenarios as `test/flight.test.ts`.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
     control tests with Gradle.
-  - Not built or run on Android yet; the cloud workspace cannot download the Android SDK
-    (dl.google.com is blocked). DJI artifacts come from Maven Central and can be inspected here.
+  - Builds in the cloud workspace (dl.google.com allowed; Android SDK at /opt/android-sdk, Java 17
+    needed). Maven Central rate-limits this machine, so a local Gradle init script points it at
+    Google's Maven Central mirror. Release app is ~200 MB and contains the DJI key: never publish it.
+  - Not yet run on the phone or in DJI's simulator.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is not in this repo yet. Rename it without the address before adding.
 - The app must be built on the owner's Windows PC.
