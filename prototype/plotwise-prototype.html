@@ -1,0 +1,739 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Plotwise prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{--ground:#E3E9DF;--paper:#F6F8F3;--ink:#1E3436;--muted:#5B6E6C;--line:#CBD5C7;--contour:#9A6A3F;--hivis:#F0C419;--water:#3D7EA6;--leaf:#5E7F4E}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:Archivo,system-ui,sans-serif;background:var(--ground);color:var(--ink);display:flex;flex-direction:column;height:100dvh;-webkit-tap-highlight-color:transparent}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:14px 16px 6px}
+.brand{font-weight:800;font-stretch:118%;font-size:22px;letter-spacing:-.01em}
+.proj{font-size:13px;color:var(--muted);text-align:right}
+main{flex:1;display:flex;flex-direction:column;min-height:0}
+#mapWrap{flex:1;min-height:0;padding:0 8px}
+#map{width:100%;height:100%;display:block;touch-action:none;user-select:none}
+#map *{vector-effect:non-scaling-stroke}
+#map text{font-family:Archivo,system-ui,sans-serif;paint-order:stroke;stroke:#F6F8F3;stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+#panel{background:var(--paper);border-radius:20px 20px 0 0;padding:16px 18px 18px;max-height:46vh;overflow:auto;box-shadow:0 -1px 0 var(--line)}
+h2{font-size:19px;font-stretch:112%;font-weight:750;margin:0 0 4px}
+.lead{margin:0 0 14px;color:var(--muted);font-size:14px;line-height:1.45;max-width:60ch}
+nav{display:flex;background:var(--paper);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:9px 0 11px;font:inherit;font-size:11px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;min-width:0}
+nav button[aria-current=page]{color:var(--ink);font-weight:700}
+nav button[aria-current=page] svg{background:var(--hivis);border-radius:8px}
+nav svg{width:34px;height:24px;padding:2px 6px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--water);outline-offset:2px}
+.field{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;margin-bottom:12px;font-size:14px}
+.field input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--ink)}
+.field output{font-weight:700;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:14px 0}
+.stats div{background:#fff;padding:9px 12px}
+.stats b{display:block;font-size:20px;font-stretch:110%;font-variant-numeric:tabular-nums}
+.stats span{font-size:12px;color:var(--muted)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;padding:6px 0;line-height:1.35}
+.check input{margin-top:2px;accent-color:var(--leaf);width:18px;height:18px}
+.check small{display:block;color:var(--muted)}
+.btn{display:block;width:100%;border:0;border-radius:12px;background:var(--ink);color:#fff;padding:13px 16px;font-weight:700;font-size:15px;margin-top:12px;cursor:pointer}
+.btn.alt{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.seg{display:flex;background:#E4EAE0;border-radius:999px;padding:3px;margin-bottom:10px}
+.seg button{flex:1;border:0;background:none;border-radius:999px;padding:7px 4px;font-size:13px;cursor:pointer}
+.seg button[aria-pressed=true]{background:#fff;font-weight:700;box-shadow:0 1px 2px rgba(30,52,54,.18)}
+.readout{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px;line-height:1.5}
+.readout .big{font-size:26px;font-weight:800;font-stretch:112%;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px 7px 9px;font-size:13px;display:flex;gap:7px;align-items:center;cursor:pointer}
+.chip i{width:14px;height:14px;border-radius:4px}
+.chip[aria-pressed=true]{border-color:var(--ink);background:var(--hivis)}
+.row{display:flex;gap:8px}.row .btn{margin-top:8px}
+.step{display:flex;align-items:center;justify-content:space-between;font-size:14px;padding:5px 0}
+.step div{display:flex;align-items:center;gap:6px}
+.step button{width:34px;height:34px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:18px;cursor:pointer}
+.step b{min-width:52px;text-align:center;font-variant-numeric:tabular-nums}
+.bar{height:8px;background:#E4EAE0;border-radius:99px;overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;background:var(--ink);width:0}
+.phases{list-style:none;padding:0;margin:10px 0 0;font-size:14px}
+.phases li{padding:4px 0;color:var(--muted)}
+.phases li.done{color:var(--ink)}.phases li.done::before{content:"✓ ";color:var(--leaf);font-weight:800}
+.phases li.now{color:var(--ink);font-weight:700}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 6px;font-size:15px}
+.line{display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:3px 0;border-top:1px dashed #E1E7DD}
+.line:first-of-type{border-top:0}
+.line span:last-child{font-weight:650;text-align:right;font-variant-numeric:tabular-nums}
+.total{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;margin:6px 0 2px}
+.total b{font-size:24px;font-stretch:112%}
+.note{font-size:12px;color:var(--muted);line-height:1.4}
+.fi{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.fi input,.fi select{font-size:16px;color:var(--ink);padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:#fff;width:100%}
+.fgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tools{display:flex;gap:8px;align-items:center;margin-bottom:10px;font-size:13px}
+.tools button{border:1.5px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+.tools button:disabled{opacity:.4;cursor:default}
+.tools label{margin-left:auto;display:flex;gap:6px;align-items:center}
+@media (min-width:820px){main{flex-direction:row}#mapWrap{padding:8px 16px}#panel{width:390px;max-height:none;border-radius:20px 0 0 0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Plotwise</div>
+  <div class="proj">Test property, whole plot</div>
+</header>
+<main>
+  <div id="mapWrap"><svg id="map" viewBox="-2.4 -2.2 12.8 51" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Garden map"></svg></div>
+  <section id="panel" aria-live="polite"></section>
+</main>
+<nav id="nav"></nav>
+
+<script>
+const W=7.0,GH=29.5,HD=8,H=43; // rear garden, house depth, whole plot
+const HW=W-1.2; // house width (side passage on right)
+const zg=(x,y)=>1.9-0.055*y+0.35*Math.exp(-((x-5)**2+(y-12)**2)/10)-0.25*Math.exp(-((x-2.5)**2+(y-20)**2)/5)+(y>GH-6?0.055*(y-(GH-6)):0);
+const z=(x,y)=>y<=GH?zg(x,y):y<=GH+HD?zg(x,GH):zg(x,GH)-0.11*(y-GH-HD);
+const inHouse=p=>p.x<=HW&&p.y>=GH&&p.y<=GH+HD;
+const fmt=v=>(v>=0?"+":"−")+Math.abs(v).toFixed(2);
+const DATUM=z(3,GH); // patio door threshold
+const lvl=(x,y)=>z(x,y)-DATUM;
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $=s=>document.querySelector(s);
+const svg=$('#map'),panel=$('#panel');
+const S={undo:[],redo:[],snap:true,drawing:null,vsel:null,dmode:'layout',month:'jun',time:15,hours:false,style:null,styleNote:'',existInit:false,roof:{phase:'idle',t:0,sel:null},tab:'plan',alt:20,ov:75,rtk:true,scanned:false,scan:{phase:'idle',t:0,step:0},layer:'contours',tool:'dist',pts:[],closed:false,items:[],placing:null,sel:null,nextId:1,checks:[false,true,false,true]};
+let drag=null;
+
+const KINDS={
+  patio:{label:'Patio',w:4.2,h:3.6,fill:'#CFC6B3',stroke:'#7D7462'},
+  lawn:{label:'Lawn',w:6,h:5,fill:'#9CC077',stroke:'#5E7F4E'},
+  bed:{label:'Planting bed',w:3,h:1.2,fill:'#86644A',stroke:'#4F3826'},
+  raised:{label:'Raised bed',w:2.4,h:1.2,fill:'#8A6A4C',stroke:'#5A3F28'},
+  path:{label:'Gravel path',w:1,h:6,fill:'#DCD4C0',stroke:'#9C927B'},
+  deck:{label:'Decking',w:4,h:3,fill:'#B88B5E',stroke:'#7A5733'},
+  pond:{label:'Pond',w:2.4,h:1.6,fill:'#5D97BC',stroke:'#2F6688'},
+  meadow:{label:'Wildflower meadow',w:5,h:4,fill:'#C3CC86',stroke:'#7E8C45'},
+  shed:{label:'Shed',w:2.4,h:1.8,fill:'#7D8A80',stroke:'#4C5750'},
+  tree:{label:'Tree',w:3.2,h:3.2,fill:'#5C8A50',stroke:'#2F4D2A'},
+  greenhouse:{label:'Greenhouse',w:2.2,h:3,fill:'#DCE6E4',stroke:'#7E9296'},
+  hottub:{label:'Hot tub',w:2.1,h:2.1,fill:'#4B6670',stroke:'#2E3F45'}
+};
+const MAT={
+ patio:[['porcelain','Porcelain slabs','#D7D3CB',38],['sandstone','Indian sandstone','#D9C7A3',30],['block','Block paving','#B98F7A',28],['brick','Reclaimed brick','#B4624A',45]],
+ path:[['gravel','Gravel','#DCD4C0'],['bark','Bark chips','#8A6444'],['stepping','Stepping stones in gravel','#C9C2B0']],
+ deck:[['composite','Composite boards','#7F7468',95],['softwood','Treated softwood','#C79E6E',45],['hardwood','Hardwood','#8E5B3A',120]],
+ lawn:[['turf','Turf','#9CC077'],['seed','Grass seed','#B3CF8E'],['artificial','Artificial grass','#6FBF5A']],
+ raised:[['sleeper','Timber sleepers','#8A6A4C'],['corten','Corten steel','#9A5B3A']],
+ bed:[['steel','Steel edging','#86644A'],['timber','Timber edging','#86644A'],['none','No edging','#86644A']],
+ shed:[['timber','Timber','#7D8A80'],['metal','Metal','#9AA3A6']]
+};
+const matOf=it=>{const m=MAT[it.kind];return m?(m.find(x=>x[0]===it.mat)||m[0]):null};
+const ROUND=k=>k==='tree'||k==='hottub';
+const rotP=(x,y,a)=>{const c=Math.cos(a*Math.PI/180),s=Math.sin(a*Math.PI/180);return[x*c-y*s,x*s+y*c]};
+function ctr(it){if(it.pts){let A=0,cx=0,cy=0;const P=it.pts;for(let i=0;i<P.length;i++){const[a,b]=P[i],[c,d]=P[(i+1)%P.length],f=a*d-c*b;A+=f;cx+=(a+c)*f;cy+=(b+d)*f}if(Math.abs(A)<1e-6)return[P[0][0],P[0][1]];return[cx/(3*A),cy/(3*A)]}return[it.x,it.y]}
+function corners(it){if(it.pts)return it.pts;const a=it.a||0;return[[-1,-1],[1,-1],[1,1],[-1,1]].map(([sx,sy])=>{const r=rotP(sx*it.w/2,sy*it.h/2,a);return[it.x+r[0],it.y+r[1]]})}
+const localOf=(it,p)=>rotP(p.x-it.x,p.y-it.y,-(it.a||0));
+function inRing(P,x,y){let c=false;for(let i=0,j=P.length-1;i<P.length;j=i++){const[a,b]=P[i],[d,e]=P[j];if((b>y)!==(e>y)&&x<(d-a)*(y-b)/(e-b)+a)c=!c}return c}
+function inItem(it,x,y){if(it.pts)return inRing(it.pts,x,y);const l=localOf(it,{x,y});if(ROUND(it.kind)||it.kind==='pond')return(l[0]/(it.w/2))**2+(l[1]/(it.h/2))**2<=1;return Math.abs(l[0])<=it.w/2&&Math.abs(l[1])<=it.h/2}
+const toXY=P=>P.map(p=>({x:p[0],y:p[1]}));
+function itemArea(it){if(it.pts)return area(toXY(it.pts));if(it.kind==='pond'||ROUND(it.kind))return Math.PI*it.w*it.h/4;return it.w*it.h}
+function itemPer(it){if(it.pts)return perim(toXY(it.pts));return 2*(it.w+it.h)}
+function bbox(it){const P=it.pts||(ROUND(it.kind)?[[it.x-it.w/2,it.y-it.h/2],[it.x+it.w/2,it.y+it.h/2]]:corners(it));const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]);return[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)]}
+const itemName=it=>it.label||(it.exist?'Existing '+KINDS[it.kind].label.toLowerCase():KINDS[it.kind].label);
+const sn=v=>S.snap?Math.round(v*10)/10:v;
+function pushUndo(){S.undo.push(JSON.stringify(S.items));if(S.undo.length>60)S.undo.shift();S.redo=[]}
+function samplePts(it){const c=ctr(it),P=corners(it),k=Math.max(1,Math.floor(P.length/4)),o=[c];for(let i=0;i<P.length&&o.length<5;i+=k)o.push([(P[i][0]+c[0])/2,(P[i][1]+c[1])/2]);return o}
+const PLANTS=[
+ {id:'lav',name:'Lavender Hidcote',sun:'sun',sp:.45,col:'#8E7CC3',note:'Scented and loved by bees'},
+ {id:'sal',name:'Salvia Caradonna',sun:'sun',sp:.4,col:'#5B4B9E',note:'Purple spikes all summer'},
+ {id:'nep',name:"Catmint Walker's Low",sun:'sun',sp:.5,col:'#9AA6D8',note:'Tough, long flowering'},
+ {id:'sti',name:'Mexican feather grass',sun:'sun',sp:.35,col:'#D8C98A',note:'Soft movement, drought tolerant'},
+ {id:'ech',name:'Echinacea',sun:'sun',sp:.4,col:'#D77AA0',note:'Late summer colour'},
+ {id:'ros',name:'Rosemary',sun:'sun',sp:.6,col:'#6E8F6A',note:'Evergreen herb'},
+ {id:'ger',name:'Geranium Rozanne',sun:'part',sp:.5,col:'#6D7FD0',note:'Flowers June to October'},
+ {id:'alc',name:"Lady's mantle",sun:'part',sp:.4,col:'#C8D36A',note:'Easy ground cover'},
+ {id:'ast',name:'Astrantia',sun:'part',sp:.4,col:'#E6B8C8',note:'Good for cutting'},
+ {id:'hyd',name:'Hydrangea Annabelle',sun:'part',sp:1,col:'#EDEFE0',note:'Big white flower heads'},
+ {id:'ane',name:'Japanese anemone',sun:'part',sp:.5,col:'#F1C8D6',note:'Autumn flowers'},
+ {id:'hos',name:'Hosta',sun:'shade',sp:.5,col:'#7FA36A',note:'Bold leaves'},
+ {id:'fer',name:'Male fern',sun:'shade',sp:.6,col:'#5D8A4A',note:'Tough and low upkeep'},
+ {id:'hel',name:'Hellebore',sun:'shade',sp:.45,col:'#B07A9A',note:'Winter flowers'},
+ {id:'bru',name:'Brunnera Jack Frost',sun:'shade',sp:.4,col:'#9DB6D8',note:'Silver leaves, blue flowers'},
+ {id:'sar',name:'Sweet box',sun:'shade',sp:.6,col:'#3F6B45',note:'Winter scent, evergreen'},
+ {id:'tom',name:'Tomatoes',sun:'sun',sp:.5,col:'#D9533B',veg:1,note:'Needs a warm, sunny spot'},
+ {id:'cou',name:'Courgettes',sun:'sun',sp:.9,col:'#E3C34A',veg:1,note:'Very productive'},
+ {id:'her',name:'Mixed herbs',sun:'sun',sp:.3,col:'#7FA35A',veg:1,note:'Thyme, sage, parsley, chives'},
+ {id:'sld',name:'Salad leaves',sun:'part',sp:.2,col:'#9CC36A',veg:1,note:'Copes with some shade'},
+ {id:'chd',name:'Rainbow chard',sun:'part',sp:.3,col:'#C9506B',veg:1,note:'Crops for months'},
+ {id:'rhu',name:'Rhubarb',sun:'shade',sp:.9,col:'#B5455A',veg:1,note:'Happy in shade'}
+];
+const PL=Object.fromEntries(PLANTS.map(p=>[p.id,p]));
+const SUNLAB={sun:'Full sun',part:'Part shade',shade:'Shade'};
+const STYLES={
+ family:{label:'Family garden',desc:'Lawn for play, a patio, veg beds and a shed',items:[['patio',3.5,27.4,6.6,3.8],['lawn',3.8,17.5,4.6,11],['bed',.75,17.5,1.1,11],['path',6.6,14.5,.7,21],['raised',4.6,7,2.4,1.2],['raised',4.6,4.6,2.4,1.2],['shed',1.6,1.3,2.6,2]]},
+ low:{label:'Low maintenance',desc:'Big patio, gravel and shrubs, with no lawn to mow',items:[['patio',3.5,26.9,6.6,4.8],['path',3.5,16,1,16],['bed',1.5,20,2.2,7],['bed',5.5,20,2.2,7],['bed',1.5,12,2.2,6],['bed',5.6,12,2,6],['deck',3.5,3.5,6,3.6]]},
+ wildlife:{label:'Wildlife garden',desc:'A pond in the low spot, meadow and native planting',items:[['patio',3.5,27.8,5,3],['pond',2.6,20.2,2.6,1.8],['meadow',3.5,12,6.6,8],['bed',4.9,21,1.6,4],['path',6.6,14,.7,18],['tree',5.5,3,3,3],['bed',1.6,3,2.6,3]]},
+ party:{label:'Entertaining',desc:'A patio by the house and a deck down the garden for evenings outside',items:[['patio',3.5,27.2,6.6,4.4],['lawn',3.5,19,6.6,7],['deck',3.5,11.5,6,4],['bed',1.2,6,2,5],['bed',5.8,6,2,5],['shed',3.5,1.4,2.4,1.8]]}
+};
+
+/* ---------- terrain ---------- */
+const f2=p=>p[0].toFixed(2)+' '+p[1].toFixed(2);
+let CONT=null;
+function contours(){
+  if(CONT)return CONT;CONT=[];const s=0.4;
+  for(let L=-1;L<2.8;L+=0.25){
+    let d='';const lv=L+DATUM;
+    for(let x=0;x<W-1e-6;x+=s)for(let y=0;y<H-1e-6;y+=s){
+      const x2=Math.min(x+s,W),y2=Math.min(y+s,H);
+      const p=[[x,y],[x2,y],[x2,y2],[x,y2]],v=p.map(q=>z(q[0],q[1])),pts=[];
+      for(let k=0;k<4;k++){const a=v[k],b=v[(k+1)%4];if((a-lv)*(b-lv)<0){const t=(lv-a)/(b-a),P=p[k],Q=p[(k+1)%4];pts.push([P[0]+t*(Q[0]-P[0]),P[1]+t*(Q[1]-P[1])])}}
+      if(pts.length>=2)d+=`M${f2(pts[0])}L${f2(pts[1])}`;
+      if(pts.length===4)d+=`M${f2(pts[2])}L${f2(pts[3])}`;
+    }
+    CONT.push({L:Math.round(L*100)/100,d});
+  }
+  return CONT;
+}
+function slopePct(x,y){const e=.05;return Math.hypot((z(x+e,y)-z(x-e,y))/(2*e),(z(x,y+e)-z(x,y-e))/(2*e))*100}
+const slopeColor=p=>p<4?'#D3E3C6':p<8?'#ECE09C':p<15?'#E9B46B':'#D8784C';
+let SLOPE=null;
+function slopeLayer(){
+  if(SLOPE)return SLOPE;SLOPE='';
+  for(let x=0;x<W;x+=1)for(let y=0;y<H;y+=1){const w=Math.min(1,W-x),h=Math.min(1,H-y);SLOPE+=`<rect x="${x}" y="${y}" width="${w+.02}" height="${h+.02}" fill="${slopeColor(slopePct(x+w/2,y+h/2))}"/>`}
+  return SLOPE;
+}
+
+/* ---------- flight ---------- */
+function flight(){
+  const sp=S.alt*0.75*(1-S.ov/100),lanes=Math.ceil(H/sp)+1,step=S.alt*0.5*(1-S.ov/100);
+  const per=Math.ceil((W+2)/step)+1,photos=lanes*per+24;
+  const len=lanes*(W+2)+(lanes-1)*(H/(lanes-1));
+  const mins=(len/2.5+150)/60,gsd=S.alt*0.027,acc=S.rtk?1.5:3+S.alt/15;
+  const pts=[];for(let i=0;i<lanes;i++){const y=i*H/(lanes-1);pts.push(...(i%2?[[W+1,y],[-1,y]]:[[-1,y],[W+1,y]]))}
+  return{lanes,photos,mins,gsd,acc,pts};
+}
+function along(pts,t){
+  const segs=[];let tot=0;for(let i=1;i<pts.length;i++){const l=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]);segs.push(l);tot+=l}
+  let d=t*tot,flown=[pts[0]];
+  for(let i=0;i<segs.length;i++){if(d<=segs[i]){const r=d/segs[i];const p=[pts[i][0]+r*(pts[i+1][0]-pts[i][0]),pts[i][1]+r*(pts[i+1][1]-pts[i][1])];flown.push(p);return{p,flown}}d-=segs[i];flown.push(pts[i+1])}
+  return{p:pts[pts.length-1],flown};
+}
+
+/* ---------- map layers ---------- */
+const DEFS=`<defs>
+<filter id="grass" x="0" y="0" width="1" height="1"><feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="2" seed="4"/><feColorMatrix values="0 0 0 0 .2  0 0 0 0 .32  0 0 0 0 .16  0 0 0 .7 0"/></filter>
+<pattern id="deckP" width="1" height=".15" patternUnits="userSpaceOnUse"><path d="M0 .15H1" stroke="#000" stroke-opacity=".28" stroke-width=".7"/></pattern><pattern id="meadowP" width=".9" height=".9" patternUnits="userSpaceOnUse"><circle cx=".2" cy=".3" r=".09" fill="#D9533B"/><circle cx=".6" cy=".15" r=".08" fill="#F2CF5B"/><circle cx=".7" cy=".65" r=".09" fill="#8E7CC3"/><circle cx=".3" cy=".75" r=".07" fill="#fff"/></pattern><pattern id="gravelP" width=".4" height=".4" patternUnits="userSpaceOnUse"><circle cx=".1" cy=".1" r=".045" fill="#A99F88"/><circle cx=".3" cy=".27" r=".05" fill="#B9B09A"/></pattern><radialGradient id="canopy"><stop offset="0" stop-color="#5E8A4F"/><stop offset="1" stop-color="#36552E"/></radialGradient>
+<clipPath id="gclip"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath><clipPath id="sclip"><rect x="0" y="0" width="${W}" height="${GH}"/></clipPath></defs>`;
+const house=`<rect x="-1.2" y="${H}" width="${W+2.4}" height="3" fill="#9BA19D"/><text x="${W/2}" y="${H+2}" font-size="1.55" text-anchor="middle" fill="#2E3836">Street</text>`;
+function photoLayer(){
+  return `<g clip-path="url(#gclip)"><rect width="${W}" height="${H}" fill="#7E9C60"/><rect width="${W}" height="${H}" filter="url(#grass)"/>
+  <rect x="0" y="0" width="${W}" height="8" fill="#56743F" opacity=".5"/>
+  <rect x="0" y="${GH-6}" width="${W}" height="6" fill="#C8C0B0"/><path d="M0 ${GH-4}h${W}M0 ${GH-2}h${W}" stroke="#ADA595"/>
+  <circle cx="${W-1.3}" cy="${GH-1.3}" r="1.05" fill="#3B4A4C" stroke="#8A9496" stroke-width="2"/>
+  <rect x="${W-2.8}" y="${GH-10}" width="2.2" height="3" fill="#E6EBEB" stroke="#9AA4A6"/><path d="M${W-2.8} ${GH-8.5}h2.2" stroke="#9AA4A6"/>
+  <rect x="${W-3.6}" y="${GH-12.6}" width="1.8" height="1.6" fill="#F0F0EA"/>
+  <rect x="${W-1.4}" y="8" width="1.2" height="${GH-14}" fill="#CFC8B6"/>
+  <circle cx="3" cy="4" r="1.6" fill="url(#canopy)"/><circle cx="4.8" cy="9.5" r="1.1" fill="url(#canopy)"/><circle cx="2.4" cy="13" r="1.4" fill="url(#canopy)"/><circle cx="1.6" cy="18.5" r=".9" fill="url(#canopy)"/>
+  <circle cx="5.2" cy="16" r=".7" fill="#C9C27A"/>
+  <rect x="0" y="${GH+HD}" width="${W}" height="${H-GH-HD}" fill="#B9B5AC"/><rect x="0" y="${GH+HD+1}" width="2.2" height="${H-GH-HD-1}" fill="#7E9C60"/>
+  <rect x="${HW}" y="${GH}" width="${W-HW}" height="${HD}" fill="#C2BCAE"/>
+  <rect x="0" y="${GH}" width="${HW}" height="${HD}" fill="#A5624F"/><path d="M0 ${GH}L${HW/2} ${GH+HW/2}V${GH+HD-HW/2}L0 ${GH+HD}M${HW} ${GH}L${HW/2} ${GH+HW/2}M${HW} ${GH+HD}L${HW/2} ${GH+HD-HW/2}" stroke="#7E4636" fill="none" stroke-width="1.5"/>
+  </g>`;
+}
+function planBase(){
+  const c=contours().map(k=>`<path d="${k.d}" stroke="#B9A48C" stroke-width="${k.L%0.5===0?1.2:.6}" fill="none"/>`).join('');
+  return `<rect width="${W}" height="${H}" fill="#EEF2EA"/>${c}
+  <rect x="0" y="${GH+HD}" width="${W}" height="${H-GH-HD}" fill="#E2DED4" opacity=".6"/>${houseBox()}`;
+}
+function contourLayer(){
+  const c=contours().map(k=>`<path d="${k.d}" stroke="var(--contour)" stroke-width="${k.L%0.5===0?1.6:.7}" fill="none"/>`).join('');
+  const spots=[[2,3],[5,9],[3,15],[6,20],[2,25],[1.2,40.5],[4.5,42]].map(s=>`<circle cx="${s[0]}" cy="${s[1]}" r=".26" fill="var(--ink)"/><text x="${s[0]+.25}" y="${s[1]-.2}" font-size="1.10" fill="var(--ink)">${fmt(lvl(s[0],s[1]))}</text>`).join('');
+  return `<g opacity=".35">${photoLayer()}</g><rect width="${W}" height="${H}" fill="#F3F5EF" opacity=".55"/>${c}${spots}`;
+}
+const houseBox=()=>`<rect x="0" y="${GH}" width="${HW}" height="${HD}" fill="#D3D7D2" stroke="#6D7772" stroke-width="1.5"/><text x="${HW/2}" y="${GH+HD/2}" font-size="1.23" font-weight="700" text-anchor="middle" fill="#3E4A47">House</text><text x="${HW/2}" y="${GH+HD/2+1.3}" font-size="0.91" text-anchor="middle" fill="#3E4A47">roof ridge about 8.5 m</text>`;
+const boundary=()=>`<rect x="0" y="0" width="${W}" height="${H}" fill="none" stroke="var(--ink)" stroke-width="2"/>`;
+function dims(){
+  return `<g fill="var(--ink)" font-size="1.22" font-weight="700"><path d="M0 -0.7H${W}M0 -0.95V-0.45M${W} -0.95V-0.45" stroke="var(--ink)"/><text x="${W/2}" y="-0.95" text-anchor="middle">about ${W.toFixed(1)} m</text>
+  <path d="M-0.7 0V${H}M-0.95 0H-0.45M-0.95 ${H}H-0.45" stroke="var(--ink)"/><text transform="translate(-0.95 ${H/2}) rotate(-90)" text-anchor="middle">about ${H.toFixed(1)} m</text>
+  <path d="M${W+.7} 0V${GH}M${W+.45} 0H${W+.95}M${W+.45} ${GH}H${W+.95}M${W+.7} ${GH+HD}V${H}M${W+.45} ${GH+HD}H${W+.95}M${W+.45} ${H}H${W+.95}" stroke="var(--ink)"/>
+  <text transform="translate(${W+1.9} ${GH/2}) rotate(90)" text-anchor="middle">rear garden about ${GH.toFixed(1)} m</text>
+  <text transform="translate(${W+1.9} ${(GH+HD+H)/2}) rotate(90)" text-anchor="middle" font-size="0.91">front ${(H-GH-HD).toFixed(1)} m</text></g>`;
+}
+function flightLayer(t){
+  const F=flight();const all=`<polyline points="${F.pts.map(f2).join(' ')}" fill="none" stroke="var(--ink)" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  let out=all+`<circle cx="${F.pts[0][0]}" cy="${F.pts[0][1]}" r=".7" fill="var(--hivis)" stroke="var(--ink)" stroke-width="1.5"/><text x="${F.pts[0][0]+.5}" y="${F.pts[0][1]+.8}" font-size="1.10" fill="var(--ink)">Take-off</text>`;
+  if(t!=null){
+    const a=along(F.pts,t),fp=S.alt*0.4;
+    out+=`<polyline points="${a.flown.map(f2).join(' ')}" fill="none" stroke="var(--hivis)" stroke-width="3.5"/>
+    <rect x="${a.p[0]-fp/2}" y="${a.p[1]-fp*.375}" width="${fp}" height="${fp*.75}" fill="var(--hivis)" opacity=".18" stroke="var(--hivis)"/>
+    <g transform="translate(${a.p[0]} ${a.p[1]}) scale(2.1)"><circle r=".55" fill="var(--ink)"/><circle r=".22" fill="var(--hivis)"/>${[[-.6,-.6],[.6,-.6],[.6,.6],[-.6,.6]].map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r=".28" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`).join('')}</g>`;
+  }
+  return out;
+}
+function measureLayer(){
+  const P=S.pts;if(!P.length)return'';
+  let o='';
+  if(S.tool==='dist'&&P.length===2){
+    const d=Math.hypot(P[1].x-P[0].x,P[1].y-P[0].y),mx=(P[0].x+P[1].x)/2,my=(P[0].y+P[1].y)/2;
+    o+=`<line x1="${P[0].x}" y1="${P[0].y}" x2="${P[1].x}" y2="${P[1].y}" stroke="var(--ink)" stroke-width="5"/><line x1="${P[0].x}" y1="${P[0].y}" x2="${P[1].x}" y2="${P[1].y}" stroke="var(--hivis)" stroke-width="2.5"/><text x="${mx}" y="${my-.4}" font-size="1.55" font-weight="800" text-anchor="middle" fill="var(--ink)">${d.toFixed(2)} m</text>`;
+  }
+  if(S.tool==='area'&&P.length>1){
+    o+=`<polygon points="${P.map(p=>p.x+','+p.y).join(' ')}" fill="${S.closed?'rgba(240,196,25,.35)':'none'}" stroke="var(--ink)" stroke-width="2.5" ${S.closed?'':'stroke-dasharray="5 3"'}/>`;
+    if(S.closed){const c=P.reduce((a,p)=>({x:a.x+p.x/P.length,y:a.y+p.y/P.length}),{x:0,y:0});o+=`<text x="${c.x}" y="${c.y}" font-size="1.65" font-weight="800" text-anchor="middle" fill="var(--ink)">${area(P).toFixed(1)} m²</text>`}
+  }
+  P.forEach((p,i)=>o+=`<circle cx="${p.x}" cy="${p.y}" r=".55" fill="var(--hivis)" stroke="var(--ink)" stroke-width="2"/><text x="${p.x+.4}" y="${p.y+.6}" font-size="1.10" fill="var(--ink)">${fmt(lvl(p.x,p.y))}</text>`);
+  return o;
+}
+function itemShape(it,fill,ring,op){
+  if(it.pts)return `<polygon points="${it.pts.map(p=>p[0].toFixed(2)+','+p[1].toFixed(2)).join(' ')}" fill="${fill}" ${op||''} ${ring}/>`;
+  const tr=`transform="translate(${it.x.toFixed(2)} ${it.y.toFixed(2)}) rotate(${it.a||0})"`;
+  if(ROUND(it.kind)||it.kind==='pond')return `<ellipse ${tr} rx="${it.w/2}" ry="${it.h/2}" fill="${fill}" ${op||''} ${ring}/>`;
+  return `<rect ${tr} x="${-it.w/2}" y="${-it.h/2}" width="${it.w}" height="${it.h}" rx=".12" fill="${fill}" ${op||''} ${ring}/>`;
+}
+function itemsLayer(){
+  return S.items.map(it=>{
+    const K=KINDS[it.kind],m=matOf(it),fill=m?m[2]:K.fill,sel=it.id===S.sel;
+    const ring=sel?`stroke="var(--ink)" stroke-width="3" stroke-dasharray="6 3"`:it.exist?`stroke="${K.stroke}" stroke-width="1.5" stroke-dasharray="3 2"`:`stroke="${K.stroke}" stroke-width="1.5"`;
+    let o=itemShape(it,fill,ring,it.kind==='tree'?`fill-opacity="${it.exist?.55:.85}"`:'');
+    const tex=it.kind==='deck'?'deckP':it.kind==='meadow'?'meadowP':(it.kind==='path'&&(!m||m[0]!=='bark'))?'gravelP':null;
+    if(tex)o+=itemShape(it,`url(#${tex})`,'stroke="none"','pointer-events="none"');
+    if(it.kind==='tree')o+=`<circle cx="${it.x}" cy="${it.y}" r=".18" fill="${K.stroke}"/>`;
+    if(it.kind==='hottub')o+=`<circle cx="${it.x}" cy="${it.y}" r="${Math.max(.1,it.w/2-.25)}" fill="#6FA3B5"/>`;
+    if((it.kind==='shed'||it.kind==='greenhouse')&&!it.pts){const c=corners(it);o+=`<path d="M${c[0]}L${c[2]}M${c[1]}L${c[3]}" stroke="${K.stroke}" stroke-width="1" fill="none"/>`}
+    if((it.kind==='bed'||it.kind==='raised')&&it.plants&&it.plants.length){const[x0,y0,x1,y1]=bbox(it);let k=0;for(let px=x0+.25;px<x1;px+=.45)for(let py=y0+.25;py<y1;py+=.45){if(!inItem(it,px,py))continue;const p=PL[it.plants[k++%it.plants.length]];o+=`<circle cx="${px.toFixed(2)}" cy="${py.toFixed(2)}" r=".18" fill="${p.col}" stroke="#2F3B2A" stroke-width=".5"/>`}}
+    const[x0,y0,x1,y1]=bbox(it),c=ctr(it),fs=Math.min(1.15,Math.max(.65,Math.min(x1-x0,y1-y0)/3.5));
+    const lab=it.pts?`${itemArea(it).toFixed(1)} m²`:ROUND(it.kind)?`${it.w.toFixed(1)} m across`:`${it.w.toFixed(1)} × ${it.h.toFixed(1)} m`;
+    return `<g data-id="${it.id}" style="cursor:move">${o}<text x="${c[0]}" y="${c[1]-fs*.15}" font-size="${fs}" font-weight="700" text-anchor="middle" fill="var(--ink)">${itemName(it)}</text><text x="${c[0]}" y="${c[1]+fs*1.05}" font-size="${fs*.85}" text-anchor="middle" fill="var(--ink)">${lab}</text></g>`;
+  }).join('')+handlesLayer()+drawLayer();
+}
+const sq=(x,y,on)=>`<rect x="${x-.3}" y="${y-.3}" width=".6" height=".6" fill="${on?'var(--hivis)':'#fff'}" stroke="var(--ink)" stroke-width="2"/>`;
+function handlesLayer(){
+  if(S.tab!=='design'||S.dmode!=='layout'||S.drawing)return'';const it=S.items.find(i=>i.id===S.sel);if(!it)return'';
+  const Hh=(x,y,id,shape)=>`<g data-h="${id}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r=".9" fill="transparent"/>${shape}</g>`;
+  let o='';
+  if(it.pts){
+    it.pts.forEach((p,i)=>{const q=it.pts[(i+1)%it.pts.length],mx=(p[0]+q[0])/2,my=(p[1]+q[1])/2;o+=Hh(mx,my,'m'+i,`<circle cx="${mx}" cy="${my}" r=".28" fill="#fff" stroke="var(--ink)" stroke-width="1.5"/><path d="M${mx-.15} ${my}h.3M${mx} ${my-.15}v.3" stroke="var(--ink)" stroke-width="1.5"/>`)});
+    it.pts.forEach((p,i)=>{o+=Hh(p[0],p[1],'v'+i,sq(p[0],p[1],S.vsel===i))});return o;
+  }
+  if(ROUND(it.kind)){const x=it.x+it.w/2;return Hh(x,it.y,'rs',sq(x,it.y))}
+  const a=it.a||0,c=rotP(it.w/2,it.h/2,a),r=rotP(0,-it.h/2-1.3,a),t=rotP(0,-it.h/2,a);
+  o+=`<line x1="${it.x+t[0]}" y1="${it.y+t[1]}" x2="${it.x+r[0]}" y2="${it.y+r[1]}" stroke="var(--ink)" stroke-width="1.5"/>`;
+  o+=Hh(it.x+c[0],it.y+c[1],'rs',sq(it.x+c[0],it.y+c[1]));
+  o+=Hh(it.x+r[0],it.y+r[1],'ro',`<circle cx="${it.x+r[0]}" cy="${it.y+r[1]}" r=".34" fill="var(--hivis)" stroke="var(--ink)" stroke-width="2"/>`);
+  return o;
+}
+function drawLayer(){
+  if(S.tab!=='design'||!S.drawing)return'';const P=S.drawing.pts;if(!P.length)return'';
+  return `<polyline points="${P.map(p=>p.join(',')).join(' ')}${P.length>2?' '+P[0].join(','):''}" fill="${P.length>2?'rgba(240,196,25,.3)':'none'}" stroke="var(--ink)" stroke-width="2" stroke-dasharray="5 3"/>`+P.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i?.25:.38}" fill="var(--hivis)" stroke="var(--ink)" stroke-width="2"/>`).join('');
+}
+function renderMap(){
+  ensureExisting();
+  let b='';
+  if(S.tab==='roof'){svg.setAttribute('viewBox',`-1.8 ${GH-1.6} ${W+2.6} ${HD+3.2}`);svg.innerHTML=DEFS+roofLayer();return}
+  svg.setAttribute('viewBox','-2.4 -2.2 12.8 51');
+  if(S.tab==='plan')b=photoLayer()+boundary()+flightLayer(null);
+  else if(S.tab==='scan')b=photoLayer()+boundary()+flightLayer(S.scan.phase==='fly'||S.scan.phase==='process'||S.scan.phase==='done'?S.scan.t:null);
+  else if(!S.scanned)b=`<g opacity=".5">${photoLayer()}</g>`+boundary();
+  else if(S.tab==='survey'){b=(S.layer==='photo'?photoLayer():S.layer==='slope'?`<g opacity=".3">${photoLayer()}</g><g opacity=".85">${slopeLayer()}</g>${houseBox()}`:contourLayer()+houseBox())+boundary()+dims()+measureLayer()}
+  else{const sun=S.tab==='design'&&S.dmode==='sun';b=planBase()+(sun&&S.hours?hoursLayer():'')+itemsLayer()+(sun&&!S.hours?shadowLayer():'')+boundary()+dims()+northArrow()}
+  svg.innerHTML=DEFS+house+b;
+}
+
+
+/* ---------- sun & shade ---------- */
+const AZR=128,RAD=Math.PI/180,LAT=50.86;
+const MONTHS=[['mar','March',79],['jun','June',172],['sep','September',265],['dec','December',355]];
+const pv=az=>[Math.sin((az-AZR)*RAD),-Math.cos((az-AZR)*RAD)];
+const compass=a=>['north','north-east','east','south-east','south','south-west','west','north-west'][Math.round((((a%360)+360)%360)/45)%8];
+function sunPos(N,solar){const d=23.44*Math.sin(2*Math.PI*(284+N)/365)*RAD,h=15*(solar-12)*RAD,f=LAT*RAD;
+ const se=Math.sin(f)*Math.sin(d)+Math.cos(f)*Math.cos(d)*Math.cos(h),el=Math.asin(se);
+ let az=Math.acos(Math.max(-1,Math.min(1,(Math.sin(d)-se*Math.sin(f))/(Math.cos(el)*Math.cos(f)))))/RAD;if(h>0)az=360-az;return{el:el/RAD,az}}
+const monthN=()=>MONTHS.find(m=>m[0]===S.month)[2];
+const solarOf=(N,clock)=>clock-(N>85&&N<300?1:0)+.04;
+const EXIST_TREES=[[3,4,3.2],[4.8,9.5,2.2],[2.4,13,2.8],[1.6,18.5,1.8]];
+function ensureExisting(){if(S.existInit||!S.scanned)return;S.existInit=true;
+ S.items.push({id:S.nextId++,kind:'patio',x:W/2,y:GH-3,w:W,h:6,a:0,mat:'sandstone',exist:true});
+ S.items.push({id:S.nextId++,kind:'hottub',x:W-1.3,y:GH-1.3,w:2.1,h:2.1,a:0,exist:true});
+ S.items.push({id:S.nextId++,kind:'greenhouse',x:W-1.7,y:GH-8.5,w:2.2,h:3,a:0,exist:true});
+ EXIST_TREES.forEach(([x,y,w])=>S.items.push({id:S.nextId++,kind:'tree',x,y,w,h:w,a:0,exist:true}))}
+function casters(){
+ const R=(x,y,w,h)=>[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+ const c=[{P:R(0,GH,HW,HD),h:7},{P:R(-5.8,GH,5.8,HD),h:7},{P:R(W+1,GH,5.8,HD),h:7},{P:R(-.05,0,.1,GH),h:1.8},{P:R(W-.05,0,.1,GH),h:1.8},{P:R(0,-.05,W,.1),h:1.8}];
+ S.items.forEach(i=>{if(i.kind==='shed')c.push({P:corners(i),h:2.3});if(i.kind==='greenhouse')c.push({P:corners(i),h:2.2})});return c;
+}
+function hull(P){P=P.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];for(const p of P){while(lo.length>1&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p)}for(const p of P.slice().reverse()){while(up.length>1&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p)}return lo.slice(0,-1).concat(up.slice(0,-1))}
+function shadows(sun){
+ if(sun.el<=1)return null;const k=1/Math.tan(sun.el*RAD),d=pv(sun.az),v=[-d[0]*k,-d[1]*k];
+ const polys=casters().map(c=>{const P=c.P;return hull(P.concat(P.map(p=>[p[0]+v[0]*c.h,p[1]+v[1]*c.h])))});
+ const trees=S.items.filter(i=>i.kind==='tree').map(i=>({x:i.x+v[0]*4.5,y:i.y+v[1]*4.5,r:i.w/2}));
+ return{polys,trees};
+}
+function inPoly(P,x,y){let s=0;for(let i=0;i<P.length;i++){const a=P[i],b=P[(i+1)%P.length];const c=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);if(c!==0){if(s&&Math.sign(c)!==s)return false;s=Math.sign(c)}}return true}
+const shaded=(sh,x,y)=>sh.polys.some(P=>inPoly(P,x,y))||sh.trees.some(t=>Math.hypot(x-t.x,y-t.y)<t.r);
+function daySteps(N){const st=[];for(let t=4;t<=21;t+=.5){const s=sunPos(N,t);if(s.el>=3)st.push(shadows(s))}return st}
+function sunHoursAt(N,pts){let h=0;for(const sh of daySteps(N))h+=.5*pts.filter(p=>!shaded(sh,p[0],p[1])).length/pts.length;return h}
+function bedSun(it){const pts=samplePts(it);const h=(sunHoursAt(172,pts)+sunHoursAt(265,pts))/2;return{h,cls:h>=6?'sun':h>=3?'part':'shade'}}
+function suggest(it){const c=bedSun(it).cls,pool=PLANTS.filter(p=>it.kind==='raised'?p.veg:!p.veg);let g=pool.filter(p=>p.sun===c);if(!g.length)g=pool;return g.slice(0,3).map(p=>p.id)}
+let HM={key:'',svg:''};
+function hoursLayer(){
+ const key=S.month+JSON.stringify(S.items.filter(i=>['tree','shed','greenhouse'].includes(i.kind)).map(i=>[i.x,i.y,i.w,i.h,i.a,i.pts]));if(HM.key===key)return HM.svg;
+ const steps=daySteps(monthN());let o='';
+ for(let x=0;x<W-.01;x+=.5)for(let y=0;y<GH-.01;y+=.5){let h=0;for(const sh of steps)if(!shaded(sh,x+.25,y+.25))h+=.5;o+=`<rect x="${x}" y="${y}" width=".52" height=".52" fill="${h>=6?'#F2CF5B':h>=3?'#C9DC9A':'#8FA7A0'}"/>`}
+ HM={key,svg:`<g opacity=".85">${o}</g>`};return HM.svg;
+}
+function shadowLayer(){
+ const N=monthN(),s=sunPos(N,solarOf(N,S.time)),sh=shadows(s);
+ if(!sh)return `<rect x="0" y="0" width="${W}" height="${GH}" fill="#1E3436" opacity=".4"/>`;
+ return `<g clip-path="url(#sclip)" opacity=".32"><g fill="#1E3436">${sh.polys.map(P=>`<polygon points="${P.map(p=>p[0].toFixed(2)+','+p[1].toFixed(2)).join(' ')}"/>`).join('')}${sh.trees.map(t=>`<circle cx="${t.x.toFixed(2)}" cy="${t.y.toFixed(2)}" r="${t.r}"/>`).join('')}</g></g>`;
+}
+function northArrow(){const d=pv(0),cx=W+1.5,cy=GH+HD/2,L=1.1;return `<line x1="${cx-d[0]*L}" y1="${cy-d[1]*L}" x2="${cx+d[0]*L}" y2="${cy+d[1]*L}" stroke="var(--ink)" stroke-width="2"/><circle cx="${cx+d[0]*L}" cy="${cy+d[1]*L}" r=".22" fill="var(--ink)"/><text x="${cx+d[0]*(L+.9)}" y="${cy+d[1]*(L+.9)+.35}" font-size=".9" font-weight="800" text-anchor="middle" fill="var(--ink)">N</text>`}
+function applyStyle(k){
+ pushUndo();S.items=S.items.filter(i=>i.exist);const added=STYLES[k].items.map(([kind,x,y,w,h])=>({id:S.nextId++,kind,x,y,w,h,a:0}));
+ const hard=added.filter(i=>['patio','deck','shed','pond'].includes(i.kind));const before=S.items.length;
+ S.items=S.items.filter(t=>{const c=ctr(t);return !hard.some(i=>inItem(i,c[0],c[1]))});
+ const gone=before-S.items.length;S.items.push(...added);
+ added.forEach(it=>{if(it.kind==='bed'||it.kind==='raised')it.plants=suggest(it)});
+ S.style=k;S.sel=null;S.placing=null;S.styleNote=gone?`${gone} existing feature${gone>1?'s were':' was'} removed to make room.`:'Existing features are kept.';
+}
+
+/* ---------- maths ---------- */
+const area=P=>Math.abs(P.reduce((a,p,i)=>{const q=P[(i+1)%P.length];return a+p.x*q.y-q.x*p.y},0))/2;
+const perim=P=>P.reduce((a,p,i)=>{const q=P[(i+1)%P.length];return a+Math.hypot(q.x-p.x,q.y-p.y)},0);
+function levelling(it){
+  const[x0,y0,x1,y1]=bbox(it),v=[];for(let x=x0+.125;x<x1;x+=.25)for(let y=y0+.125;y<y1;y+=.25)if(inItem(it,x,y))v.push(z(x,y));
+  if(!v.length){const c=ctr(it);v.push(z(c[0],c[1]))}
+  const m=v.reduce((a,b)=>a+b,0)/v.length;let cut=0,fill=0;v.forEach(h=>h>m?cut+=h-m:fill+=m-h);
+  return{cut:cut*.0625,fill:fill*.0625,fall:Math.max(...v)-Math.min(...v)};
+}
+const gbp=n=>'£'+Math.round(n).toLocaleString('en-GB');
+function qty(it){
+  const K=KINDS[it.kind],A=itemArea(it),per=itemPer(it),m=matOf(it);
+  const title=`${itemName(it)}, ${it.pts?'custom shape':ROUND(it.kind)?it.w.toFixed(1)+' m across':it.w.toFixed(1)+' × '+it.h.toFixed(1)+' m'}`;
+  const ar=['Area',A.toFixed(1)+' m²'];
+  switch(it.kind){
+    case'patio':{const L=levelling(it),t1=A*.15*2.1,t2=A*.04*1.9;const unit=m[0]==='block'?['Block paving',Math.ceil(A*50*1.05)+' blocks']:m[0]==='brick'?['Reclaimed bricks',Math.ceil(A*60*1.05)+' bricks']:[m[1]+', 600 × 600',Math.ceil(A/.36*1.05)+' slabs'];return{title,lines:[ar,unit,['MOT Type 1 sub-base, 150 mm',t1.toFixed(1)+' t'],[m[0]==='block'?'Sharp sand bed':'Sand and cement bed',t2.toFixed(1)+' t'],[`Levelling (ground falls ${(L.fall*100).toFixed(0)} cm)`,`${L.cut.toFixed(2)} m³ cut, ${L.fill.toFixed(2)} m³ fill`]],cost:A*m[3]+t1*45+t2*60}}
+    case'lawn':{if(m[0]==='seed')return{title,lines:[ar,['Lawn seed, 35 g/m²',Math.ceil(A*35)+' g'],['Topsoil, 50 mm',(A*.07).toFixed(1)+' t']],cost:A*.6+A*.07*45};if(m[0]==='artificial')return{title,lines:[ar,['Artificial grass',Math.ceil(A*1.1)+' m²'],['Sub-base and sand',(A*.2).toFixed(1)+' t'],['Weed membrane',Math.ceil(A*1.1)+' m²']],cost:A*1.1*20+A*.2*45+A*1.3};const t=A*.05*1.4;return{title,lines:[ar,['Turf rolls (1 m²)',Math.ceil(A*1.05)+' rolls'],['Topsoil, 50 mm',t.toFixed(1)+' t']],cost:A*1.05*4.5+t*45}}
+    case'bed':case'raised':{const r=it.kind==='raised',c=A*(r?.35:.2),ids=it.plants||[];const pl=ids.map(id=>[PL[id].name,Math.max(1,Math.ceil(A/ids.length/(PL[id].sp**2)))]);const nPl=pl.reduce((a,b)=>a+b[1],0),sl=Math.ceil(per/2.4)*2;const lines=[ar,[r?'Topsoil and compost mix':'Compost, 200 mm',c.toFixed(2)+' m³'],...pl.map(p=>[p[0],p[1]+' plants'])];let ec=0;
+      if(r){if(m[0]==='corten'){lines.push(['Corten steel sides, 400 mm',per.toFixed(1)+' m']);ec=per*60}else{lines.push(['Timber sleepers, 2 high',sl+' sleepers']);ec=sl*32}}
+      else if(m[0]!=='none'){lines.push([m[1],per.toFixed(1)+' m']);ec=per*(m[0]==='steel'?4:2.5)}
+      return{title,lines,cost:c*55+nPl*7+ec}}
+    case'path':{if(m[0]==='bark'){const v=A*.075;return{title,lines:[ar,['Bark chips, 75 mm',v.toFixed(2)+' m³'],['Weed membrane',Math.ceil(A*1.1)+' m²']],cost:v*60+A*1.3}}if(m[0]==='stepping'){const n=Math.ceil(A/.7),g=A*.05*1.7;return{title,lines:[ar,['Stepping stones, 450 mm',n+' stones'],['Gravel, 50 mm',g.toFixed(2)+' t']],cost:n*12+g*70}}const g=A*.05*1.7;return{title,lines:[ar,['Gravel, 50 mm',g.toFixed(2)+' t'],['Weed membrane',Math.ceil(A*1.1)+' m²'],['Edging',per.toFixed(1)+' m']],cost:g*70+A*1.3+per*4}}
+    case'deck':return{title,lines:[ar,[m[1]+', 3.6 m',Math.ceil(A*1.1/.53)+' boards'],['Joists at 400 mm centres',Math.ceil(A/.4*1.1)+' m'],['Ground screws',Math.ceil(A/1.2)+' screws']],cost:A*m[3]}
+    case'pond':{const d=.6,[x0,y0,x1,y1]=bbox(it),lw=x1-x0+2*d+.6,lh=y1-y0+2*d+.6;return{title,lines:[['Surface area',A.toFixed(1)+' m²'],['Excavation, 600 mm deep',(A*d*.75).toFixed(2)+' m³'],['EPDM liner',lw.toFixed(1)+' × '+lh.toFixed(1)+' m'],['Underlay',lw.toFixed(1)+' × '+lh.toFixed(1)+' m']],cost:lw*lh*9+80}}
+    case'tree':return{title,lines:[['Semi-mature tree','1'],['Bark mulch ring','0.09 m³'],['Stake and tie kit','1']],cost:140}
+    case'shed':return{title,lines:[[m[1]+' shed','1'],['Paving slab base',A.toFixed(1)+' m²']],cost:(m[0]==='metal'?450:650)+A*30}
+    case'meadow':return{title,lines:[ar,['Wildflower seed mix, 5 g/m²',Math.ceil(A*5)+' g'],['Seedbed preparation',A.toFixed(1)+' m²']],cost:A*3+25}
+    case'greenhouse':return{title,lines:[['Greenhouse','1'],['Paving slab base',A.toFixed(1)+' m²']],cost:600+A*30}
+    case'hottub':return{title,lines:[['Hot tub','1'],['Concrete pad, 100 mm',(A*.1).toFixed(2)+' m³']],cost:3500+A*12}
+  }
+}
+
+
+/* ---------- roof inspection ---------- */
+const ISSUES=[
+ {k:'slip',x:1.6,y:1.4,sev:3,title:'Slipped tiles',where:'Rear slope, left of the skylight',detail:'Two tiles have slid out of line, leaving a gap where rain can get under the roof.',fix:'Refix or replace the tiles soon, before the next spell of heavy rain.',cost:[150,300]},
+ {k:'flash',x:4.75,y:4.3,sev:2,title:'Lead flashing lifting',where:'Where the chimney meets the roof',detail:'The lead seal around the chimney has lifted at one corner. This is a common source of leaks.',fix:'Re-dress and repoint the flashing within the next few months.',cost:[250,500]},
+ {k:'ridge',x:2.9,y:3.4,sev:2,title:'Ridge mortar cracked',where:'Along the main ridge',detail:'The mortar bedding under two ridge tiles is cracked and crumbling.',fix:'Repoint the ridge, or fit a dry ridge system, this year.',cost:[300,600]},
+ {k:'gutter',x:4.4,y:-0.05,sev:2,title:'Gutter blocked',where:'Rear gutter, right-hand end',detail:'Leaves and moss are holding water in the gutter, which can overflow onto the wall.',fix:'Clear the gutter and check the downpipe flows freely.',cost:[80,150]},
+ {k:'moss',x:1.4,y:6.6,sev:1,title:'Moss build-up',where:'Front slope, lower edge',detail:'A patch of moss is growing between tiles. It is not urgent, but it holds damp and can lift tiles over time.',fix:'Remove the moss gently and apply a moss treatment.',cost:[300,600]}
+];
+const SEV={3:['Fix soon','#C8442F'],2:['Plan to fix','#D98A1E'],1:['Keep an eye on','#B8A21A']};
+function roofLayer(){
+  const w=HW,h=HD,r=w/2,y0=GH;
+  let o=`<defs><pattern id="tiles" width=".32" height=".26" patternUnits="userSpaceOnUse"><path d="M0 .26H.32M.16 0V.13M0 .13V.26M.32 .13V.26" stroke="#7E4636" stroke-width=".6" fill="none"/></pattern>
+  <pattern id="hatch" width=".4" height=".4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V.4" stroke="#AAB2AE" stroke-width="1"/></pattern></defs>`;
+  o+=`<rect x="-1.4" y="${y0}" width="1.4" height="${h}" fill="url(#hatch)" stroke="#AAB2AE"/><text transform="translate(-.6 ${y0+h/2}) rotate(-90)" font-size=".38" text-anchor="middle" fill="#55605E">Neighbour's roof, not scanned</text>`;
+  o+=`<rect x="${w}" y="${y0}" width="${W-w}" height="${h}" fill="#C2BCAE"/>`;
+  const P=(pts,fill)=>`<polygon points="${pts.map(p=>p[0]+','+(p[1]+y0)).join(' ')}" fill="${fill}"/>`;
+  o+=P([[0,0],[w,0],[r,r]],'#94553F')+P([[0,h],[w,h],[r,h-r]],'#B5705A')+P([[0,0],[r,r],[r,h-r],[0,h]],'#A5624F')+P([[w,0],[r,r],[r,h-r],[w,h]],'#9B5B47');
+  o+=`<rect x="0" y="${y0}" width="${w}" height="${h}" fill="url(#tiles)" opacity=".55"/>`;
+  o+=`<path d="M0 ${y0}L${r} ${y0+r}V${y0+h-r}L0 ${y0+h}M${w} ${y0}L${r} ${y0+r}M${w} ${y0+h}L${r} ${y0+h-r}" stroke="#5E3024" stroke-width="2.5" fill="none"/>`;
+  o+=`<rect x="1.3" y="${y0+.7}" width=".7" height=".95" fill="#6F8B99" stroke="#E9ECEA" stroke-width="1.5"/><rect x="3.6" y="${y0+.8}" width=".7" height=".95" fill="#6F8B99" stroke="#E9ECEA" stroke-width="1.5"/>`;
+  o+=`<rect x="4.35" y="${y0+4.05}" width=".85" height=".6" fill="#8B5444" stroke="#5E3024"/><circle cx="4.6" cy="${y0+4.35}" r=".14" fill="#3A2A26"/><circle cx="4.95" cy="${y0+4.35}" r=".14" fill="#3A2A26"/>`;
+  o+=`<path d="M0 ${y0-.1}H${w}M0 ${y0+h+.1}H${w}" stroke="#E9ECEA" stroke-width="3"/>`;
+  o+=`<rect x="0" y="${y0}" width="${w}" height="${h}" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`;
+  o+=`<text x="${r}" y="${y0-.55}" font-size=".42" text-anchor="middle" fill="var(--ink)">Rear garden</text><text x="${r}" y="${y0+h+.75}" font-size=".42" text-anchor="middle" fill="var(--ink)">Front, street</text>`;
+  if(S.roof.phase==='fly'){
+    const a=S.roof.t*Math.PI*4,rx=w/2+2,ry=h/2+1.6,cx=r,cy=y0+h/2;
+    o+=`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="var(--ink)" stroke-dasharray="4 3"/>`;
+    const px=cx+rx*Math.cos(a),py=cy+ry*Math.sin(a);
+    o+=`<line x1="${px}" y1="${py}" x2="${cx+(px-cx)*.35}" y2="${cy+(py-cy)*.35}" stroke="var(--hivis)" stroke-width="2" stroke-dasharray="2 2"/><g transform="translate(${px} ${py}) scale(.8)"><circle r=".55" fill="var(--ink)"/><circle r=".22" fill="var(--hivis)"/>${[[-.6,-.6],[.6,-.6],[.6,.6],[-.6,.6]].map(q=>`<circle cx="${q[0]}" cy="${q[1]}" r=".28" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`).join('')}</g>`;
+  }
+  if(S.roof.phase==='done')ISSUES.forEach((it,i)=>{const sel=S.roof.sel===i;o+=`<g data-issue="${i}" style="cursor:pointer">${sel?`<circle cx="${it.x}" cy="${y0+it.y}" r=".6" fill="none" stroke="var(--ink)" stroke-width="2.5"/>`:''}<circle cx="${it.x}" cy="${y0+it.y}" r=".38" fill="${SEV[it.sev][1]}" stroke="#fff" stroke-width="2"/><text x="${it.x}" y="${y0+it.y+.15}" font-size=".42" font-weight="800" text-anchor="middle" fill="#fff" style="stroke:none">${i+1}</text></g>`});
+  return o;
+}
+function closeup(k){
+  let rows='';for(let r=0;r<5;r++)for(let c=0;c<11;c++){const off=r%2?14:0;let dy=0,hide=false;if(k==='slip'&&r===2&&c===5){dy=12}rows+=`<rect x="${c*28-off}" y="${r*26+dy}" width="27" height="25" rx="2" fill="${(r*7+c*3)%5?'#A9614C':'#9A553F'}"/>`}
+  let extra='';
+  if(k==='slip')extra=`<rect x="140" y="52" width="27" height="12" fill="#2B2321"/><rect x="134" y="46" width="40" height="44" fill="none" stroke="#C8442F" stroke-width="3" rx="4"/>`;
+  if(k==='ridge')extra=`<rect x="0" y="0" width="300" height="30" fill="#7E4636"/><path d="M110 8l14 10 10-8 16 12" stroke="#E8E1D2" stroke-width="3" fill="none"/><rect x="100" y="-2" width="60" height="36" fill="none" stroke="#D98A1E" stroke-width="3" rx="4"/>`;
+  if(k==='flash')extra=`<rect x="180" y="10" width="80" height="70" fill="#8B5444"/><path d="M170 80h100v14H170z" fill="#8E9599"/><path d="M250 80l22-10v14z" fill="#B7BEC2"/><rect x="240" y="62" width="40" height="38" fill="none" stroke="#D98A1E" stroke-width="3" rx="4"/>`;
+  if(k==='gutter')extra=`<rect x="0" y="104" width="300" height="22" fill="#E9ECEA"/>${[60,90,115,150,175].map((x,i)=>`<ellipse cx="${x+140}" cy="${110+i%2*5}" rx="10" ry="5" fill="${i%2?'#7A6A2E':'#5E7F4E'}"/>`).join('')}<rect x="186" y="96" width="114" height="34" fill="none" stroke="#D98A1E" stroke-width="3" rx="4"/>`;
+  if(k==='moss')extra=[[60,70,18],[85,80,12],[40,88,10],[110,62,9]].map(m=>`<circle cx="${m[0]}" cy="${m[1]}" r="${m[2]}" fill="#6E8B3D" opacity=".9"/>`).join('')+`<rect x="22" y="44" width="110" height="60" fill="none" stroke="#B8A21A" stroke-width="3" rx="4"/>`;
+  return `<svg viewBox="0 0 300 130" style="width:100%;border-radius:10px;display:block;margin:8px 0;background:#7E4636" role="img" aria-label="Close-up photo">${rows}${extra}</svg>`;
+}
+function panelRoof(){
+  const R=S.roof;
+  const pitched=HW*HD/Math.cos(35*Math.PI/180);
+  if(R.phase==='idle')return `<h2>Roof inspection</h2><p class="lead">The drone circles the house twice, at about 6 m and 3 m above the ridge, taking angled close-ups of every slope, the ridge, chimney and gutters. The app then flags anything that looks damaged.</p>
+  <div class="stats"><div><b>48</b><span>Close-up photos</span></div><div><b>4 min</b><span>Flight time</span></div><div><b>2 mm</b><span>Detail per pixel</span></div><div><b>${Math.round(pitched)} m²</b><span>Roof area to check</span></div></div>
+  <label class="check"><input type="checkbox" checked disabled><span>Stays over your half of the roof<small>Your house is semi-detached, so the neighbour's side is masked out of the photos</small></span></label>
+  <label class="check"><input type="checkbox" checked disabled><span>Obstacle sensing on<small>Keeps at least 2 m from the chimney, aerials and cables</small></span></label>
+  <button class="btn" id="insp">Inspect roof</button>
+  <p class="note" style="margin-top:8px">With a thermal drone such as the Matrice 4T, the same flight can also show where heat escapes through the roof.</p>`;
+  if(R.phase==='fly')return `<h2>Inspecting roof</h2><p class="lead">Keep the drone in sight. It will return to the take-off point when finished.</p><div class="bar"><i id="rpb" style="width:${R.t*100}%"></i></div><div class="stats"><div><b id="rph">${Math.round(R.t*48)}</b><span>of 48 photos</span></div><div><b>${R.t<.5?'Orbit 1':'Orbit 2'}</b><span>${R.t<.5?'6 m above ridge':'3 m above ridge'}</span></div></div>`;
+  const n=s=>ISSUES.filter(i=>i.sev===s).length,lo=ISSUES.reduce((a,i)=>a+i.cost[0],0),hi=ISSUES.reduce((a,i)=>a+i.cost[1],0);
+  const sel=R.sel!=null?ISSUES[R.sel]:null;
+  const list=ISSUES.map((it,i)=>`<button class="chip" data-issue="${i}" aria-pressed="${R.sel===i}" style="width:100%;justify-content:flex-start;border-radius:12px;margin-bottom:6px"><i style="background:${SEV[it.sev][1]};border-radius:50%;color:#fff;font-style:normal;font-size:10px;width:18px;height:18px;display:grid;place-items:center">${i+1}</i><span style="text-align:left"><b>${it.title}</b><br><small style="color:var(--muted)">${SEV[it.sev][0]}, ${it.where.toLowerCase()}</small></span></button>`).join('');
+  const det=sel?`<div class="card">${closeup(sel.k)}<h3>${sel.title}</h3><p class="note" style="font-size:13px;color:var(--ink)">${sel.detail}</p><div class="line"><span>What to do</span><span style="font-weight:400;max-width:60%">${sel.fix}</span></div><div class="line"><span>Typical repair cost</span><span>£${sel.cost[0]} to £${sel.cost[1]}</span></div></div>`:'';
+  return `<h2>Roof report</h2><p class="lead">Overall condition: fair. ${n(3)} problem to fix soon, ${n(2)} to plan for and ${n(1)} to keep an eye on. Tap a number on the roof or in the list for the close-up.</p>
+  <div class="stats"><div><b>${Math.round(pitched)} m²</b><span>Roof area (35° pitch)</span></div><div><b>£${lo.toLocaleString('en-GB')}–${hi.toLocaleString('en-GB')}</b><span>Typical repairs, all items</span></div></div>
+  ${det}${list}
+  <p class="note">Findings in this prototype are simulated. Repair costs are typical UK ranges; get quotes from a roofer before booking work.</p>
+  <div class="row"><button class="btn alt" id="rexp">Export roof report</button><button class="btn alt" id="rre">Inspect again</button></div>`;
+}
+function inspect(){
+  S.roof={phase:'fly',t:0,sel:null};renderPanel();
+  const dur=RM?1000:7000,t0=performance.now();
+  const tick=now=>{S.roof.t=Math.min(1,(now-t0)/dur);if(S.tab==='roof'){renderMap();const b=$('#rpb');if(b){b.style.width=S.roof.t*100+'%';$('#rph').textContent=Math.round(S.roof.t*48)}}
+    if(S.roof.t<1)requestAnimationFrame(tick);else{S.roof.phase='done';S.roof.sel=0;if(S.tab==='roof'){renderPanel();renderMap()}}};
+  requestAnimationFrame(tick);
+}
+
+/* ---------- panels ---------- */
+function fieldsStats(){const F=flight();return `<div class="stats"><div><b id="sPh">${F.photos}</b><span>Photos</span></div><div><b id="sT">${F.mins.toFixed(1)} min</b><span>Flight time</span></div><div><b id="sG">${F.gsd.toFixed(2)} cm</b><span>Detail per pixel</span></div><div><b id="sA">±${F.acc.toFixed(1)} cm</b><span>Expected accuracy</span></div></div>`}
+function updStats(){const F=flight();$('#sPh').textContent=F.photos;$('#sT').textContent=F.mins.toFixed(1)+' min';$('#sG').textContent=F.gsd.toFixed(2)+' cm';$('#sA').textContent='±'+F.acc.toFixed(1)+' cm';$('#oAlt').textContent=S.alt+' m';$('#oOv').textContent=S.ov+'%'}
+const CHECKS=[['Operator ID and Flyer ID registered','Required by the CAA for drones with a camera'],['Airspace clear','No restrictions within 1 km'],['Neighbours told about the flight','Recommended for privacy'],['Wind 4 m/s, no rain','Safe to fly (limit 10 m/s)']];
+function panelPlan(){
+  return `<h2>Flight plan</h2><p class="lead">The drone flies a grid over the whole plot, front to back, then an angled orbit to capture the house, walls, steps and tree heights.</p>
+  <label class="field">Flying height <output id="oAlt">${S.alt} m</output><input type="range" min="12" max="40" value="${S.alt}" data-k="alt"></label>
+  <label class="field">Photo overlap <output id="oOv">${S.ov}%</output><input type="range" min="65" max="85" step="5" value="${S.ov}" data-k="ov"></label>
+  <label class="check"><input type="checkbox" id="rtk" ${S.rtk?'checked':''}><span>RTK positioning<small>Centimetre-level GPS for contractor-grade levels</small></span></label>
+  ${fieldsStats()}
+  <h2 style="font-size:16px">Before you fly</h2>
+  ${CHECKS.map((c,i)=>`<label class="check"><input type="checkbox" data-c="${i}" ${S.checks[i]?'checked':''}><span>${c[0]}<small>${c[1]}</small></span></label>`).join('')}
+  <button class="btn" id="go" ${S.checks.every(Boolean)?'':'disabled'}>Start scan</button>
+  ${S.checks.every(Boolean)?'':'<p class="note" style="margin-top:8px">Tick every item to enable the scan.</p>'}`;
+}
+const PHASES=['Uploading photos','Aligning photos','Building point cloud','Generating terrain model','Drawing contours and boundary'];
+function panelScan(){
+  const F=flight(),sc=S.scan;
+  if(sc.phase==='idle')return `<h2>Ready to scan</h2><p class="lead">Place the drone on the take-off point, clear of people and pets. It will fly ${F.lanes} passes and return on its own.</p>${fieldsStats()}<button class="btn" id="fly">Take off and scan</button><button class="btn alt" data-tab="plan">Edit flight plan</button>`;
+  if(sc.phase==='fly')return `<h2>Scanning</h2><p class="lead">Keep the drone in sight. Tap Return home to stop the scan safely.</p><div class="bar"><i id="pb" style="width:${sc.t*100}%"></i></div>
+    <div class="stats"><div><b id="ph">${Math.round(sc.t*F.photos)}</b><span>of ${F.photos} photos</span></div><div><b id="bat">${Math.round(100-sc.t*22)}%</b><span>Battery</span></div></div><button class="btn alt" id="rth">Return home</button>`;
+  if(sc.phase==='process')return `<h2>Processing</h2><p class="lead">Turning ${F.photos} photos into a measured 3D model.</p><div class="bar"><i style="width:${(sc.step/PHASES.length)*100}%"></i></div><ul class="phases">${PHASES.map((p,i)=>`<li class="${i<sc.step?'done':i===sc.step?'now':''}">${p}</li>`).join('')}</ul>`;
+  return `<h2>Survey ready</h2><p class="lead">Your plot is roughly ${W.toFixed(1)} × ${H.toFixed(1)} m (about ${Math.round(W*H)} m²): front garden and drive, the house, and a rear garden of about ${GH.toFixed(1)} m. Dimensions are taken from the title plan. Levels are estimated until a real scan is flown.</p><ul class="phases">${PHASES.map(p=>`<li class="done">${p}</li>`).join('')}</ul><button class="btn" data-tab="survey">View survey</button>`;
+}
+function emptyState(what){return `<h2>No survey yet</h2><p class="lead">Fly a scan to measure the garden. ${what} will use the real dimensions and levels.</p><button class="btn" data-tab="plan">Plan a flight</button><button class="btn alt" id="sample">Load draft of your garden</button>`}
+function panelSurvey(){
+  if(!S.scanned)return emptyState('Measurements');
+  const P=S.pts;let r;
+  if(S.tool==='dist'){
+    if(!P.length)r='Tap two points on the map to measure between them.';
+    else if(P.length===1)r=`Point A is at <b>${fmt(lvl(P[0].x,P[0].y))} m</b>. Tap a second point.`;
+    else{const d=Math.hypot(P[1].x-P[0].x,P[1].y-P[0].y),rise=lvl(P[1].x,P[1].y)-lvl(P[0].x,P[0].y),g=Math.abs(rise)/d;
+      r=`<div class="big">${d.toFixed(2)} m</div>${rise>=0?'Rises':'Falls'} ${Math.abs(rise*100).toFixed(0)} cm from A to B<br>Gradient ${g<.005?'level':'1 in '+(1/g).toFixed(1)+' ('+(g*100).toFixed(1)+'%)'}`}
+  }else{
+    if(P.length<3)r=`Tap around the shape you want to measure${P.length?` (${P.length} point${P.length>1?'s':''} so far)`:''}.`;
+    else r=S.closed?`<div class="big">${area(P).toFixed(1)} m²</div>Perimeter ${perim(P).toFixed(2)} m`:`Running area ${area(P).toFixed(1)} m². Add more points or close the shape.`;
+  }
+  const leg=S.layer==='slope'?`<div class="legend"><span><i style="background:#D3E3C6"></i>Under 4%</span><span><i style="background:#ECE09C"></i>4 to 8%</span><span><i style="background:#E9B46B"></i>8 to 15%</span><span><i style="background:#D8784C"></i>Over 15%</span></div>`:S.layer==='contours'?`<p class="note">Contours every 25 cm. Heights are relative to the back door threshold, and the roof is measured by the angled orbit. These levels are estimates until the real drone scan is flown.</p>`:'';
+  return `<h2>Survey</h2>
+  <div class="seg" role="group" aria-label="Map layer">${[['photo','Photo'],['contours','Contours'],['slope','Slope']].map(l=>`<button data-layer="${l[0]}" aria-pressed="${S.layer===l[0]}">${l[1]}</button>`).join('')}</div>${leg}
+  <div class="seg" role="group" aria-label="Measuring tool">${[['dist','Distance'],['area','Area']].map(l=>`<button data-tool="${l[0]}" aria-pressed="${S.tool===l[0]}">${l[1]}</button>`).join('')}</div>
+  <div class="readout">${r}</div>
+  <div class="row">${S.tool==='area'&&P.length>=3&&!S.closed?'<button class="btn" id="close">Close shape</button>':''}${P.length?'<button class="btn alt" id="clear">Clear</button>':''}</div>`;
+}
+const NI=()=>S.items.filter(i=>!i.exist);
+function panelDesign(){
+  if(!S.scanned)return emptyState('Your design');
+  const seg=`<div class="seg" role="group" aria-label="Design mode">${[['layout','Layout'],['sun','Sun and shade'],['plants','Plants']].map(m=>`<button data-dmode="${m[0]}" aria-pressed="${S.dmode===m[0]}">${m[1]}</button>`).join('')}</div>`;
+  const body=S.dmode==='sun'?sunPanel():S.dmode==='plants'?plantsPanel():layoutPanel();
+  return `<h2>Design</h2>${seg}${body}${NI().length?'<button class="btn" data-tab="quote">See materials</button>':''}`;
+}
+function layoutPanel(){
+  const tools=`<div class="tools"><button id="undo" ${S.undo.length?'':'disabled'}>Undo</button><button id="redo" ${S.redo.length?'':'disabled'}>Redo</button><label><input type="checkbox" id="snapT" ${S.snap?'checked':''}>Snap to 10 cm</label></div>`;
+  if(S.drawing){const D=S.drawing,n=D.pts.length;return tools+`<p class="note" style="margin:0 0 6px">What are you drawing?</p><div class="chips">${['lawn','bed','patio','path','deck','meadow','pond'].map(k=>`<button class="chip" data-dkind="${k}" aria-pressed="${D.kind===k}"><i style="background:${(MAT[k]?MAT[k][0][2]:KINDS[k].fill)};border:1px solid ${KINDS[k].stroke}"></i>${KINDS[k].label}</button>`).join('')}</div>
+    <div class="readout">Tap the plan to place each corner of the shape. ${n?`${n} corner${n>1?'s':''} so far${n>2?`, ${area(toXY(D.pts)).toFixed(1)} m²`:''}.`:''} ${n<3?'You need at least 3 corners.':'Tap Finish when the outline is complete.'}</div>
+    <div class="row"><button class="btn" id="drawDone" ${n<3?'disabled':''}>Finish shape</button><button class="btn alt" id="drawBack" ${n?'':'disabled'}>Remove last</button><button class="btn alt" id="drawCancel">Cancel</button></div>`}
+  const styles=`<p class="note" style="margin:0 0 6px">Start from a style</p><div class="chips">${Object.entries(STYLES).map(([k,st])=>`<button class="chip" data-style="${k}" aria-pressed="${S.style===k}">${st.label}</button>`).join('')}</div>${S.style?`<p class="note" style="margin:-4px 0 12px">${STYLES[S.style].desc}. ${S.styleNote} Everything can be edited.</p>`:''}`;
+  const chips=Object.entries(KINDS).map(([k,K])=>`<button class="chip" data-kind="${k}" aria-pressed="${S.placing===k}"><i style="background:${MAT[k]?MAT[k][0][2]:K.fill};border:1px solid ${K.stroke}"></i>${K.label}</button>`).join('')+`<button class="chip" id="drawStart"><i style="background:#fff;border:1.5px dashed var(--ink)"></i>Draw your own shape</button>`;
+  let body;const it=S.items.find(i=>i.id===S.sel);
+  if(S.placing)body=`<div class="readout">Tap the plan to place the ${KINDS[S.placing].label.toLowerCase()}.</div>`;
+  else if(it){
+    const fld=(lab,f,val,step)=>`<label class="fi"><span>${lab}</span><input type="number" inputmode="decimal" step="${step}" data-f="${f}" value="${val}"></label>`;
+    let dims;
+    if(it.pts)dims=`<p class="note" style="margin:0 0 8px">Custom shape, ${itemArea(it).toFixed(1)} m², perimeter ${itemPer(it).toFixed(1)} m. Drag a square corner to reshape it, or drag a + to add a new corner.</p>${S.vsel!=null&&it.pts.length>3?'<button class="btn alt" id="vdel" style="margin:0 0 8px">Remove selected corner</button>':''}`;
+    else if(ROUND(it.kind))dims=fld('Across (m)','w',it.w.toFixed(1),.1);
+    else dims=`<div class="fgrid">${fld('Width (m)','w',it.w.toFixed(1),.1)}${fld('Length (m)','h',it.h.toFixed(1),.1)}${fld('Angle (°)','a',Math.round(it.a||0),5)}</div>`;
+    const ms=MAT[it.kind]?`<label class="fi"><span>Material</span><select data-f="mat">${MAT[it.kind].map(x=>`<option value="${x[0]}" ${matOf(it)[0]===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select></label>`:'';
+    const L=levelling(it);
+    body=`<div class="readout">
+      <label class="fi"><span>Name</span><input type="text" data-f="label" value="${(it.label||'').replace(/"/g,'&quot;')}" placeholder="${KINDS[it.kind].label}"></label>
+      ${ms}${dims}
+      <span class="note">Ground falls ${(L.fall*100).toFixed(0)} cm across it. Drag it to move${it.pts?'':', the white square to resize'}${it.pts||ROUND(it.kind)?'':' and the yellow dot to rotate'}.</span>
+      ${it.exist?`<p class="note" style="margin:8px 0 0">This is an existing feature, so it isn't counted in materials.</p><button class="btn alt" id="mkNew" style="margin-top:6px">Count it as new work</button>`:''}
+    </div>
+    <div class="row"><button class="btn alt" id="dup">Duplicate</button>${ROUND(it.kind)?'':'<button class="btn alt" id="rot">Rotate 90°</button>'}<button class="btn alt" id="del">Remove</button></div>
+    ${(it.kind==='bed'||it.kind==='raised')?'<button class="btn alt" data-dmode="plants">Choose plants</button>':''}`;
+  }else body=`<div class="readout">Tap anything on the plan to edit it, including existing features like the patio, greenhouse and trees. Pick a style for a starting layout, add features one at a time, or draw your own shapes.</div>`;
+  return tools+styles+`<p class="note" style="margin:0 0 6px">Add a feature</p><div class="chips">${chips}</div>${body}`;
+}
+function sunInfo(){const N=monthN(),s=sunPos(N,solarOf(N,S.time));return s.el>1?`The sun is in the ${compass(s.az)}, ${Math.round(s.el)}° above the horizon.`:'The sun is down at this time.'}
+const clockTxt=t=>`${Math.floor(t)}:${t%1?'30':'00'}`;
+function updSun(){const a=$('#sunInfo'),b=$('#oTime');if(a)a.textContent=sunInfo();if(b)b.textContent=clockTxt(S.time)}
+function sunPanel(){
+  return `<p class="lead" style="margin-bottom:10px">Your rear garden faces south-east, going by the north arrow on your title plan. Shadows include your house, the neighbouring houses, 1.8 m fences, trees and any shed you add.</p>
+  <div class="seg" role="group" aria-label="Month">${MONTHS.map(m=>`<button data-month="${m[0]}" aria-pressed="${S.month===m[0]}">${m[1].slice(0,3)}</button>`).join('')}</div>
+  <label class="check"><input type="checkbox" id="hours" ${S.hours?'checked':''}><span>Show hours of sun across the day<small>Colours each part of the garden by how much direct sun it gets in ${MONTHS.find(m=>m[0]===S.month)[1]}</small></span></label>
+  ${S.hours?`<div class="legend"><span><i style="background:#F2CF5B"></i>6 hours or more</span><span><i style="background:#C9DC9A"></i>3 to 6 hours</span><span><i style="background:#8FA7A0"></i>Under 3 hours</span></div>`:`<label class="field">Time of day <output id="oTime">${clockTxt(S.time)}</output><input type="range" min="5" max="21.5" step=".5" value="${S.time}" data-k="time"></label><div class="readout" id="sunInfo">${sunInfo()}</div>`}`;
+}
+function plantsPanel(){
+  const beds=S.items.filter(i=>i.kind==='bed'||i.kind==='raised');
+  if(!beds.length)return `<div class="readout">Add a planting bed or raised bed in Layout, then choose plants for it here.</div><button class="btn alt" data-dmode="layout">Go to layout</button>`;
+  let it=beds.find(i=>i.id===S.sel);
+  const list=beds.map((b,n)=>{const bs=bedSun(b);return `<button class="chip" data-selbed="${b.id}" aria-pressed="${it&&it.id===b.id}">${b.label||KINDS[b.kind].label+' '+(n+1)}, ${SUNLAB[bs.cls].toLowerCase()}</button>`}).join('');
+  if(!it)return `<p class="lead" style="margin-bottom:10px">Plants are matched to how much sun each bed gets on an average day from spring to autumn.</p><div class="chips">${list}</div><div class="readout">Tap a bed on the plan or in the list to choose its plants.</div>`;
+  const bs=bedSun(it),pool=PLANTS.filter(p=>it.kind==='raised'?p.veg:!p.veg),good=pool.filter(p=>p.sun===bs.cls),other=pool.filter(p=>p.sun!==bs.cls);
+  const ids=it.plants||[],A=itemArea(it);
+  const card=p=>{const on=ids.includes(p.id),n=on?Math.max(1,Math.ceil(A/ids.length/(p.sp**2))):0;return `<button class="chip" data-plant="${p.id}" aria-pressed="${on}" style="width:100%;justify-content:flex-start;border-radius:12px;margin-bottom:6px"><i style="background:${p.col};border-radius:50%;border:1px solid #2F3B2A"></i><span style="text-align:left"><b>${p.name}</b>${on?`, ${n} plants`:''}<br><small style="color:var(--muted)">${p.note}. ${SUNLAB[p.sun]}, ${Math.round(p.sp*100)} cm apart</small></span></button>`};
+  return `<div class="chips">${list}</div>
+  <div class="readout" style="margin-bottom:10px"><b>${itemName(it)}, ${itemArea(it).toFixed(1)} m²</b><br>Gets about ${bs.h.toFixed(1)} hours of direct sun a day: <b>${SUNLAB[bs.cls].toLowerCase()}</b>.</div>
+  <p class="note" style="margin:0 0 6px">Good for this spot</p>${good.map(card).join('')||'<p class="note">Nothing in the library suits this spot well.</p>'}
+  <p class="note" style="margin:10px 0 6px">May struggle here</p>${other.map(card).join('')}
+  <p class="note">Plant numbers fill the bed at each plant's recommended spacing, shared equally between the plants you pick.</p>`;
+}
+function panelQuote(){
+  if(!S.scanned)return emptyState('Material quantities');
+  if(!NI().length)return `<h2>Materials</h2><p class="lead">Add a patio, lawn or planting bed in Design to see quantities and costs.</p><button class="btn" data-tab="design">Open design</button>`;
+  const Q=NI().map(qty),tot=Q.reduce((a,q)=>a+q.cost,0);
+  return `<h2>Materials</h2><p class="lead">Quantities come from the measured survey and include 5% waste where it applies.</p>
+  ${Q.map(q=>`<div class="card"><h3>${q.title}</h3>${q.lines.map(l=>`<div class="line"><span>${l[0]}</span><span>${l[1]}</span></div>`).join('')}<div class="line"><span>Materials estimate</span><span>${gbp(q.cost)}</span></div></div>`).join('')}
+  <div class="total"><span>Materials total</span><b>${gbp(tot)}</b></div>
+  <p class="note">Prices are sample supplier rates, excluding labour and VAT. A finished app would let you set your own rates and export a PDF quote or DXF plan.</p>
+  <div class="row"><button class="btn alt" id="pdf">Export PDF</button><button class="btn alt" id="dxf">Export DXF</button></div>`;
+}
+function renderPanel(){
+  ensureExisting();
+  panel.innerHTML={roof:panelRoof,plan:panelPlan,scan:panelScan,survey:panelSurvey,design:panelDesign,quote:panelQuote}[S.tab]();
+}
+
+/* ---------- nav ---------- */
+const TABS=[['plan','Plan','<path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"/><path d="M9 4v14M15 6v14"/>'],['scan','Scan','<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M8 8l1.5 1.5M16 8l-1.5 1.5M8 16l1.5-1.5M16 16l-1.5-1.5"/>'],['survey','Survey','<path d="M3 17c3-4 6-4 9-1s6 3 9-1"/><path d="M3 11c3-4 6-4 9-1s6 3 9-1"/>'],['design','Design','<rect x="4" y="4" width="7" height="7"/><circle cx="17" cy="7.5" r="3.5"/><rect x="4" y="14" width="16" height="6"/>'],['roof','Roof','<path d="M3 12l9-7 9 7"/><path d="M6 10v9h12v-9"/><path d="M14 13l-2 3h3l-2 3"/>'],['quote','Materials','<path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/>']];
+function renderNav(){$('#nav').innerHTML=TABS.map(t=>`<button data-tab="${t[0]}" ${S.tab===t[0]?'aria-current="page"':''}><svg viewBox="0 0 24 24" aria-hidden="true">${t[2]}</svg>${t[1]}</button>`).join('')}
+function go(tab){S.tab=tab;S.placing=null;S.drawing=null;renderNav();renderPanel();renderMap()}
+
+/* ---------- scan animation ---------- */
+let raf=null;
+function fly(){
+  S.scan={phase:'fly',t:0,step:0};renderPanel();
+  const dur=RM?1200:9000,t0=performance.now();
+  const tick=now=>{
+    S.scan.t=Math.min(1,(now-t0)/dur);renderMap();
+    const F=flight();const pb=$('#pb');if(pb){pb.style.width=S.scan.t*100+'%';$('#ph').textContent=Math.round(S.scan.t*F.photos);$('#bat').textContent=Math.round(100-S.scan.t*22)+'%'}
+    if(S.scan.t<1&&S.scan.phase==='fly')raf=requestAnimationFrame(tick);
+    else if(S.scan.phase==='fly')process();
+  };raf=requestAnimationFrame(tick);
+}
+function process(){
+  S.scan.phase='process';S.scan.step=0;renderPanel();
+  const next=()=>{S.scan.step++;if(S.scan.step>=PHASES.length){S.scan.phase='done';S.scanned=true}if(S.tab==='scan')renderPanel();if(S.scan.phase==='process')setTimeout(next,RM?150:900)};
+  setTimeout(next,RM?150:900);
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.tab)return go(b.dataset.tab);
+  if(b.id==='go'){go('scan');return}
+  if(b.id==='insp'||b.id==='rre')return inspect();
+  if(b.dataset.dmode){S.dmode=b.dataset.dmode;S.placing=null;S.drawing=null;renderPanel();renderMap();return}
+  if(b.dataset.style){applyStyle(b.dataset.style);renderPanel();renderMap();return}
+  if(b.dataset.month){S.month=b.dataset.month;renderPanel();renderMap();return}
+  if(b.dataset.selbed){S.sel=+b.dataset.selbed;renderPanel();renderMap();return}
+  if(b.dataset.plant){const it=S.items.find(i=>i.id===S.sel);if(it){pushUndo();it.plants=it.plants||[];const p=b.dataset.plant;it.plants=it.plants.includes(p)?it.plants.filter(x=>x!==p):[...it.plants,p]}renderPanel();renderMap();return}
+  if(b.dataset.issue!=null&&S.tab==='roof'){S.roof.sel=+b.dataset.issue;renderPanel();renderMap();return}
+  if(b.id==='rexp'){b.textContent='Export is not part of this prototype';return}
+  if(b.id==='fly')return fly();
+  if(b.id==='rth'){cancelAnimationFrame(raf);S.scan={phase:'idle',t:0,step:0};renderPanel();renderMap();return}
+  if(b.id==='sample'){S.scanned=true;S.scan={phase:'done',t:1,step:5};renderPanel();renderMap();return}
+  if(b.dataset.layer){S.layer=b.dataset.layer}
+  if(b.dataset.tool){S.tool=b.dataset.tool;S.pts=[];S.closed=false}
+  if(b.id==='clear'){S.pts=[];S.closed=false}
+  if(b.id==='close')S.closed=true;
+  if(b.dataset.kind){S.placing=S.placing===b.dataset.kind?null:b.dataset.kind;S.sel=null}
+  const it=S.items.find(i=>i.id===S.sel);
+  if(false&&it){const k=b.dataset.adj;it[k]=Math.max(.5,Math.min(k==='w'?W:H,it[k]+ +b.dataset.d));if(it.kind==='tree')it.h=it.w;clamp(it)}
+if(b.id==='rot'&&it){pushUndo();if(it.pts){const c=ctr(it);it.pts=it.pts.map(p=>{const r=rotP(p[0]-c[0],p[1]-c[1],90);return[c[0]+r[0],c[1]+r[1]]})}else it.a=((it.a||0)+90)%360;clamp(it)}
+  if(b.id==='dup'&&it){pushUndo();const n=JSON.parse(JSON.stringify(it));n.id=S.nextId++;delete n.exist;if(n.pts)n.pts=n.pts.map(p=>[p[0]+.6,p[1]+.6]);else{n.x+=.6;n.y+=.6}clamp(n);S.items.push(n);S.sel=n.id;S.vsel=null}
+  if(b.id==='vdel'&&it&&it.pts&&S.vsel!=null&&it.pts.length>3){pushUndo();it.pts.splice(S.vsel,1);S.vsel=null}
+  if(b.id==='mkNew'&&it){pushUndo();delete it.exist}
+  if(b.id==='undo'&&S.undo.length){S.redo.push(JSON.stringify(S.items));S.items=JSON.parse(S.undo.pop());if(!S.items.find(i=>i.id===S.sel))S.sel=null;S.vsel=null}
+  if(b.id==='redo'&&S.redo.length){S.undo.push(JSON.stringify(S.items));S.items=JSON.parse(S.redo.pop());if(!S.items.find(i=>i.id===S.sel))S.sel=null;S.vsel=null}
+  if(b.id==='drawStart'){S.drawing={kind:'lawn',pts:[]};S.sel=null;S.placing=null}
+  if(b.dataset.dkind&&S.drawing)S.drawing.kind=b.dataset.dkind;
+  if(b.id==='drawBack'&&S.drawing)S.drawing.pts.pop();
+  if(b.id==='drawCancel')S.drawing=null;
+  if(b.id==='drawDone'&&S.drawing&&S.drawing.pts.length>2){pushUndo();const n={id:S.nextId++,kind:S.drawing.kind,pts:S.drawing.pts};if(n.kind==='bed')n.plants=suggest(n);S.items.push(n);S.sel=n.id;S.drawing=null}
+  if(b.id==='del'&&it){pushUndo();S.items=S.items.filter(i=>i!==it);S.sel=null;S.vsel=null}
+  if(b.id==='pdf'||b.id==='dxf'){b.textContent='Export is not part of this prototype';return}
+  renderPanel();renderMap();
+});
+panel.addEventListener('input',e=>{const k=e.target.dataset.k;if(k){S[k]=+e.target.value;if(k==='time')updSun();else updStats();renderMap()}});
+panel.addEventListener('change',e=>{
+  if(e.target.id==='rtk'){S.rtk=e.target.checked;updStats()}
+  if(e.target.id==='hours'){S.hours=e.target.checked;renderPanel();renderMap()}
+  if(e.target.dataset.c!=null){S.checks[+e.target.dataset.c]=e.target.checked;renderPanel()}
+  if(e.target.id==='snapT'){S.snap=e.target.checked}
+  const fk=e.target.dataset.f;if(fk){const it=S.items.find(i=>i.id===S.sel);if(!it)return;pushUndo();const v=e.target.value;
+    if(fk==='label')it.label=v.trim()||undefined;else if(fk==='mat')it.mat=v;
+    else{const n=parseFloat(v);if(isNaN(n)){renderPanel();return}if(fk==='a')it.a=((n%360)+360)%360;else{const lim=fk==='w'?W:H;it[fk]=Math.max(.3,Math.min(lim,n));if(ROUND(it.kind))it.h=it.w}}
+    clamp(it);renderPanel();renderMap()}
+});
+function toM(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse())}
+const inG=p=>p.x>=0&&p.x<=W&&p.y>=0&&p.y<=H;
+function clamp(it){const[x0,y0,x1,y1]=bbox(it);let dx=0,dy=0;if(x0<0)dx=-x0;else if(x1>W)dx=W-x1;if(y0<0)dy=-y0;else if(y1>H)dy=H-y1;if(it.pts)it.pts=it.pts.map(p=>[p[0]+dx,p[1]+dy]);else{it.x+=dx;it.y+=dy}}
+svg.addEventListener('pointerdown',e=>{
+  if(S.tab==='roof'){const g=e.target.closest('[data-issue]');if(g&&S.roof.phase==='done'){S.roof.sel=+g.dataset.issue;renderMap();renderPanel()}return}
+  if(!S.scanned)return;const p=toM(e);
+  if(S.tab==='survey'){
+    if(!inG(p))return;
+    if(S.tool==='dist'){if(S.pts.length>=2)S.pts=[];S.pts.push({x:p.x,y:p.y})}
+    else{if(S.closed){S.pts=[];S.closed=false}S.pts.push({x:p.x,y:p.y})}
+    renderMap();renderPanel();
+  }else if(S.tab==='design'){
+    const pr={x:sn(p.x),y:sn(p.y)};
+    if(S.drawing){if(!inG(p))return;S.drawing.pts.push([pr.x,pr.y]);renderMap();renderPanel();return}
+    const h=e.target.closest('[data-h]'),g=e.target.closest('[data-id]'),cur=S.items.find(i=>i.id===S.sel);
+    if(h&&cur){const id=h.dataset.h;drag={snap:JSON.stringify(S.items)};
+      if(id[0]==='m'){pushUndo();drag.moved=true;const i=+id.slice(1),P=cur.pts[i],q=cur.pts[(i+1)%cur.pts.length];cur.pts.splice(i+1,0,[(P[0]+q[0])/2,(P[1]+q[1])/2]);drag.t='v';drag.i=i+1;S.vsel=i+1}
+      else if(id[0]==='v'){drag.t='v';drag.i=+id.slice(1);S.vsel=drag.i}
+      else drag.t=id;
+      svg.setPointerCapture(e.pointerId);renderMap();renderPanel();return}
+    if(S.placing){if(!inG(p)||inHouse(p))return;pushUndo();const K=KINDS[S.placing];const it={id:S.nextId++,kind:S.placing,x:pr.x,y:pr.y,w:K.w,h:K.h,a:0};clamp(it);if(it.kind==='bed'||it.kind==='raised')it.plants=suggest(it);S.items.push(it);S.sel=it.id;S.placing=null}
+    else if(g){const it=S.items.find(i=>i.id===+g.dataset.id);if(S.sel!==it.id)S.vsel=null;S.sel=it.id;const c=ctr(it);drag={t:'move',dx:p.x-c[0],dy:p.y-c[1],c0:c,start:it.pts?it.pts.map(q=>q.slice()):null,snap:JSON.stringify(S.items)};svg.setPointerCapture(e.pointerId)}
+    else{S.sel=null;S.vsel=null}
+    renderMap();renderPanel();
+  }
+});
+svg.addEventListener('pointermove',e=>{if(!drag)return;const it=S.items.find(i=>i.id===S.sel);if(!it)return;const p=toM(e);
+  if(!drag.moved){S.undo.push(drag.snap);if(S.undo.length>60)S.undo.shift();S.redo=[];drag.moved=true}
+  if(drag.t==='move'){const nx=sn(p.x-drag.dx),ny=sn(p.y-drag.dy);if(it.pts){const dx=nx-drag.c0[0],dy=ny-drag.c0[1];it.pts=drag.start.map(q=>[q[0]+dx,q[1]+dy])}else{it.x=nx;it.y=ny}clamp(it)}
+  else if(drag.t==='rs'){if(ROUND(it.kind)){it.w=it.h=Math.max(.4,sn(2*Math.hypot(p.x-it.x,p.y-it.y)))}else{const l=localOf(it,p);it.w=Math.max(.3,sn(2*Math.abs(l[0])));it.h=Math.max(.3,sn(2*Math.abs(l[1])))}clamp(it)}
+  else if(drag.t==='ro'){let a=Math.atan2(p.y-it.y,p.x-it.x)*180/Math.PI+90;if(S.snap)a=Math.round(a/5)*5;it.a=((a%360)+360)%360}
+  else if(drag.t==='v'){it.pts[drag.i]=[Math.max(0,Math.min(W,sn(p.x))),Math.max(0,Math.min(H,sn(p.y)))]}
+  renderMap()});
+const endDrag=()=>{if(drag){drag=null;renderPanel()}};
+svg.addEventListener('pointerup',endDrag);svg.addEventListener('pointercancel',endDrag);
+
+renderNav();renderPanel();renderMap();
+</script>
+
+</body>
+</html>

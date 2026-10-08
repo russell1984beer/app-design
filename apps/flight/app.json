@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Plotwise Flight",
+    "slug": "plotwise-flight",
+    "version": "0.1.0",
+    "orientation": "default",
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.plotwise.flight"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "buildArchs": [
+              "arm64-v8a"
+            ],
+            "useLegacyPackaging": true,
+            "packagingOptions": {
+              "doNotStrip": [
+                "*/*/*.so"
+              ],
+              "pickFirst": [
+                "lib/arm64-v8a/libc++_shared.so"
+              ]
+            }
+          }
+        }
+      ],
+      "./plugins/withDji.js"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.plotwise.app",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    }
+  }
+}
