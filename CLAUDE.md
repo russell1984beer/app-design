@@ -119,7 +119,10 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Builds in the cloud workspace (dl.google.com allowed; Android SDK at /opt/android-sdk, Java 17
     needed). Maven Central rate-limits this machine, so a local Gradle init script points it at
     Google's Maven Central mirror. Release app is ~200 MB and contains the DJI key: never publish it.
-  - Not yet run on the phone or in DJI's simulator. Until a survey file is opened, the Survey uses a
+  - Runs on the owner's Galaxy S22 (built on the PC with Temurin JDK 17; Android Studio's newer
+    JBR breaks the CMake step). DJI SDK native code needs its own libc++_shared.so (NDK r28),
+    packaged by the plugin from `modules/dji-drone/android/libcxx/`; nothing may call DJI managers
+    before `DjiSdk.initialized`. Not yet tried in DJI's simulator. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
