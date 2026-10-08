@@ -15,7 +15,9 @@ import { SIM_HOME, drone, useDrone } from "./drone";
 import { S, commit, commitNow } from "./store";
 /** A 20 m x 40 m test area just north of the simulated take-off point. */
 const corner = (north: number, east: number) => fromLocal(SIM_HOME, { x: east, y: north });
-const TEST_AREA = [corner(-5, -10), corner(35, -10), corner(35, 10), corner(-5, 10)];
+// Small on purpose: each test then takes about 2 minutes, so the drone (motors running on a table,
+// with no air flowing over it) does not overheat and fly home by itself part-way through.
+const TEST_AREA = [corner(-5, -6), corner(15, -6), corner(15, 6), corner(-5, 6)];
 const TEST_HEIGHT_M = 15;
 
 type Scenario = {

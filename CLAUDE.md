@@ -130,7 +130,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     renewed on registration and on each drone connection (plus a once-a-second direct read). Connected
     to the drone and DJI's simulator. Test 1: takes off and scans, but twice the drone started its own Return to Home
     (53/84 and 70/84 photos) with battery 69%, low-battery RTH idle and both links up; the app now
-    also shows the drone's own warnings (DeviceHealthManager) to find the cause. The drone refuses a
+    also shows the drone's own warnings (DeviceHealthManager). Third run: "Aircraft temperature high"
+    26 s before the drone's own return, so likely overheating on the table (motors on, no airflow);
+    the test area is now 20 x 12 m (28 photos, about 2 minutes) and the owner cools the drone with a fan. The drone refuses a
     new home point until it has recorded its own, so the app retries for 20 s. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
