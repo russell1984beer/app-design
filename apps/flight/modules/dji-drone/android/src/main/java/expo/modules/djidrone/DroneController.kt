@@ -207,12 +207,16 @@ class DroneController(
     }
     var remaining = 3
     var failed = false
-    val done = { error: IDJIError? ->
+    val done = { what: String -> { error: IDJIError? ->
       scheduler.post {
         if (error != null && !failed) {
           failed = true
           failsafe = Failsafe.FAILED
-          status("error", "Could not store safety settings on the drone: ${error.text()}")
+          status("error", "Could not store the $what on the drone: ${error.text()}")
+          if (takeoffRequestedAtMs != null) {
+            takeoffRequestedAtMs = null
+            status("error", "Take-off refused: the safety settings are not all stored on the drone.")
+          }
         }
         remaining--
         if (remaining == 0 && !failed) {
@@ -221,10 +225,10 @@ class DroneController(
           if (takeoffRequestedAtMs != null) doTakeOff()
         }
       }
-    }
-    set(FlightControllerKey.KeyHomeLocation, LocationCoordinate2D(homeLat, homeLng), done)
-    set(FlightControllerKey.KeyGoHomeHeight, returnHeightM, done)
-    set(FlightControllerKey.KeyFailsafeAction, failsafeAction, done)
+    } }
+    set(FlightControllerKey.KeyHomeLocation, LocationCoordinate2D(homeLat, homeLng), done("home point"))
+    set(FlightControllerKey.KeyGoHomeHeight, returnHeightM, done("return height ($returnHeightM m)"))
+    set(FlightControllerKey.KeyFailsafeAction, failsafeAction, done("signal-loss action"))
     // Photo mode for the scan; a failure here shows up later as failed photos.
     set(CameraKey.KeyCameraMode, CameraMode.PHOTO_NORMAL) { e ->
       if (e != null) status("warning", "Could not switch the camera to photo mode: ${e.text()}")
