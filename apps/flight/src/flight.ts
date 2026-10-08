@@ -12,6 +12,7 @@ import { eastNorthToPlan, planToEastNorth, type Pt } from "../../../packages/gar
 
 import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
+import { recordScan } from "./survey";
 import { currentForecast } from "./weather";
 
 export const SIM_TEST_COUNT = 9;
@@ -147,7 +148,10 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
     onProgress: (p) => {
       S.resume[plan.kind] = { anchor: plan.anchor, progress: p };
       if (plan.kind === "roof") S.roof.photosTaken = p.completedWaypoints.length;
-      if (p.completedWaypoints.length >= plan.mission.waypoints.length) delete S.resume[plan.kind];
+      if (p.completedWaypoints.length >= plan.mission.waypoints.length) {
+        delete S.resume[plan.kind];
+        if (plan.kind === "survey" && S.mode === "real") recordScan(plan.anchor, plan.mission.waypoints.length);
+      }
       commitNow();
     },
   });

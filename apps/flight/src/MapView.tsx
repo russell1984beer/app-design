@@ -2,7 +2,7 @@
 
 import { useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { View, type GestureResponderEvent } from "react-native";
-import Svg, { Circle, ClipPath, Defs, Ellipse, G, Line, Path, Pattern, Polygon, Polyline, RadialGradient, Rect, Stop, Text as SText } from "react-native-svg";
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, Image as SvgImage, Line, Path, Pattern, Polygon, Polyline, RadialGradient, Rect, Stop, Text as SText } from "react-native-svg";
 
 import { footprintM, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
 import {
@@ -16,6 +16,7 @@ import {
   contours,
   corners,
   draftTerrain,
+  terrainFromSurvey,
   fillOf,
   fmtLevel,
   inHouse,
@@ -47,6 +48,7 @@ import {
 import { SIM_HOME, drone, useDrone } from "./drone";
 import { gpsToPlan, missionOnPlan, roofScan, surveyMission } from "./flight";
 import { S, commit, history, nextId, sn, useApp, type AppState } from "./store";
+import { currentSurvey } from "./survey";
 import { C } from "./theme";
 
 type VB = [number, number, number, number];
@@ -60,10 +62,12 @@ const HOURS_COLOUR = { "6plus": "#F2CF5B", "3to6": "#C9DC9A", under3: "#8FA7A0" 
 /** Cached per plot: the terrain and its contour and slope drawings. */
 const terrainCache = new Map<string, { z: ReturnType<typeof draftTerrain>; lvl: (x: number, y: number) => number; contours: ReturnType<typeof contours>; slope: ReturnType<typeof slopeCells> }>();
 export function terrainFor(plot: Plot) {
-  const key = JSON.stringify(plot);
+  const survey = currentSurvey();
+  const key = JSON.stringify(plot) + (survey?.createdAt ?? "draft");
   let t = terrainCache.get(key);
   if (!t) {
-    const z = draftTerrain(plot);
+    // The real survey's ground heights once one is opened; the draft from the title plan until then.
+    const z = survey ? terrainFromSurvey(survey) : draftTerrain(plot);
     t = { z, lvl: levelFn(plot, z), contours: contours(plot, z), slope: slopeCells(plot, z) };
     terrainCache.set(key, t);
   }
@@ -421,6 +425,10 @@ function street(s: AppState, px: (n: number) => number) {
 
 function photoLayer(s: AppState, px: (n: number) => number) {
   const { widthM: W, lengthM: H, rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
+  const photo = currentSurvey()?.photo;
+  if (photo) {
+    return <SvgImage x={0} y={0} width={W} height={H} preserveAspectRatio="none" href={`data:${photo.mime};base64,${photo.base64}`} />;
+  }
   return (
     <G clipPath="url(#gclip)">
       <Rect width={W} height={H} fill="#7E9C60" />

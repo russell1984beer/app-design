@@ -5,6 +5,7 @@ import { useDrone } from "../drone";
 import { anchorFor, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
 import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
+import { shareScanDetails } from "../survey";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
 import { surveyStatItems } from "./PlanPanel";
@@ -149,9 +150,10 @@ export function ScanPanel() {
       <View>
         <H2>Scan complete</H2>
         <Lead>
-          All {job.mission.waypoints.length} photos are on the drone's memory card and the drone is home. Turning them into a measured 3D survey
-          (processing) is the next stage to build. Until then, the Survey shows a draft of your garden from the title plan with estimated levels.
+          All {job.mission.waypoints.length} photos are on the drone's memory card and the drone is home. To turn them into a measured survey: copy the
+          photos to the PC, send the scan details to the PC too, and run the survey tool (docs/survey-processing.md). Then open the survey file on the Survey tab.
         </Lead>
+        {s.lastScan && s.mode === "real" && <Btn label="Send scan details to the PC" onPress={() => shareScanDetails(s.lastScan!).catch(() => {})} />}
         <Btn
           label="View survey"
           onPress={() => {

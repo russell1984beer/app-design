@@ -11,6 +11,7 @@ import { canFly } from "./modules/dji-drone";
 import { drone } from "./src/drone";
 import { EmergencyBar } from "./src/EmergencyBar";
 import { MapView } from "./src/MapView";
+import { loadSavedSurvey } from "./src/survey";
 import { DesignPanel } from "./src/panels/DesignPanel";
 import { MaterialsPanel } from "./src/panels/MaterialsPanel";
 import { PlanPanel } from "./src/panels/PlanPanel";
@@ -37,7 +38,7 @@ function Shell() {
   const wide = width >= 820 || width > height;
 
   useEffect(() => {
-    loadSaved();
+    loadSaved().then(loadSavedSurvey);
     drone.start();
   }, []);
 

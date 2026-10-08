@@ -1,0 +1,23 @@
+{
+  "name": "@plotwise/survey-tool",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turns the drone's photos into a Plotwise survey file on the PC, using OpenDroneMap in Docker.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "survey": "node src/cli.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "geotiff": "3.0.5",
+    "jpeg-js": "0.4.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
+  }
+}

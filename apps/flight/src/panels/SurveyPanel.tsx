@@ -1,10 +1,55 @@
+import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { area, fmtLevel, gradientText, measureLine, perimeter } from "../../../../packages/garden-core/src/index.ts";
 
 import { terrainFor } from "../MapView";
 import { S, commit, go, useApp } from "../store";
-import { Big, Btn, H2, Lead, Legend, Note, P, Readout, Row, Seg } from "../ui";
+import { currentSurvey, openSurveyFile, removeSurvey, shareScanDetails } from "../survey";
+import { Big, Btn, H2, Lead, Legend, Note, P, Readout, Row, Seg, Status } from "../ui";
+
+/** Where the levels come from: the real processed survey, or the draft from the title plan. */
+export function SurveySource() {
+  const s = useApp();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const survey = currentSurvey();
+  const open = async () => {
+    setMsg(null);
+    try {
+      if ((await openSurveyFile()) === "opened") setMsg({ ok: true, text: "Survey opened. Levels, contours, slope and the photo now come from it." });
+    } catch (e) {
+      setMsg({ ok: false, text: (e as Error).message });
+    }
+  };
+  return (
+    <View style={{ marginTop: 14 }}>
+      <H2 small>{survey ? "Drone survey" : "Draft survey"}</H2>
+      {survey ? (
+        <Note>
+          Flown {new Date(survey.flownAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} from {survey.photoCount} photos. It covers{" "}
+          {Math.round(survey.coverage * 100)}% of the plot{survey.coverage < 0.9 ? "; the gaps are filled in from nearby heights" : ""}.
+        </Note>
+      ) : (
+        <Note>
+          These levels are a draft from the title plan. For real ones: fly a scan, process the photos on the PC (see docs/survey-processing.md), then open the survey file here.
+        </Note>
+      )}
+      <Row>
+        <Btn label={survey ? "Open a newer survey" : "Open survey file"} alt style={{ flex: 1 }} onPress={open} />
+        {s.lastScan && (
+          <Btn
+            label="Send scan details to PC"
+            alt
+            style={{ flex: 1 }}
+            onPress={() => shareScanDetails(s.lastScan!).catch((e) => setMsg({ ok: false, text: (e as Error).message }))}
+          />
+        )}
+      </Row>
+      {survey && <Btn label="Remove the survey and use the draft" alt onPress={removeSurvey} />}
+      {msg && <Status status={msg.ok ? "pass" : "block"} text={msg.text} />}
+    </View>
+  );
+}
 
 export function EmptyState({ what }: { what: string }) {
   return (
@@ -20,6 +65,7 @@ export function EmptyState({ what }: { what: string }) {
           commit();
         }}
       />
+      <SurveySource />
     </View>
   );
 }
@@ -75,7 +121,8 @@ export function SurveyPanel() {
       {s.layer === "slope" && <Legend items={[["#D3E3C6", "Under 4%"], ["#ECE09C", "4 to 8%"], ["#E9B46B", "8 to 15%"], ["#D8784C", "Over 15%"]]} />}
       {s.layer === "contours" && (
         <Note style={{ marginBottom: 10 }}>
-          Contours every 25 cm. Heights are relative to the back door threshold, and the roof is measured by the roof scan. These levels are estimates until a real scan is processed.
+          Contours every 25 cm. Heights are relative to the back door threshold.{" "}
+          {currentSurvey() ? "Measured by the drone survey." : "These levels are estimates until a real survey is opened."}
         </Note>
       )}
       <Seg
@@ -113,6 +160,7 @@ export function SurveyPanel() {
           />
         )}
       </Row>
+      <SurveySource />
     </View>
   );
 }

@@ -76,7 +76,17 @@ export function contours(p: Plot, z: Terrain): Contour[] {
   const H = p.lengthM;
   const datum = z(3, p.rearGardenM);
   const out: Contour[] = [];
-  for (let L = -1; L < 2.8; L += 0.25) {
+  // Cover the whole range of levels in the plot, in 25 cm steps.
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let x = 0; x <= W; x += s) {
+    for (let y = 0; y <= H; y += s) {
+      const v = z(x, y) - datum;
+      lo = Math.min(lo, v);
+      hi = Math.max(hi, v);
+    }
+  }
+  for (let L = Math.floor(lo * 4) / 4; L <= hi; L += 0.25) {
     const lv = L + datum;
     const segments: [Pt, Pt][] = [];
     for (let x = 0; x < W - 1e-6; x += s) {

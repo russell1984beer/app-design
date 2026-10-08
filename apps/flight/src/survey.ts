@@ -1,0 +1,80 @@
+// The real survey, once one has been processed on the PC and opened in the app. Kept as a file on
+// the phone or iPad (it is too big for the app's saved settings), and read back when the app starts.
+// Also: sharing the scan details the PC tool needs to line the survey up with the plan.
+
+import * as DocumentPicker from "expo-document-picker";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
+
+import { readSurvey, type ScanDetails, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
+
+import { S, commit } from "./store";
+
+const SURVEY_FILE = "survey.json";
+
+let current: SurveyPackage | null = null;
+
+/** The survey in use, if it matches the plot. */
+export function currentSurvey(): SurveyPackage | null {
+  if (!current) return null;
+  const p = current.plot;
+  const q = S.plot;
+  return p.widthM === q.widthM && p.lengthM === q.lengthM ? current : null;
+}
+
+function surveyFile(): File {
+  return new File(Paths.document, SURVEY_FILE);
+}
+
+/** Read the saved survey when the app starts. */
+export async function loadSavedSurvey(): Promise<void> {
+  try {
+    const f = surveyFile();
+    if (!f.exists) return;
+    current = readSurvey(await f.text());
+    S.scanned = true;
+    commit();
+  } catch {
+    current = null;
+  }
+}
+
+/** Let the user pick a plotwise-survey file (from Downloads, Drive, an email…) and use it. */
+export async function openSurveyFile(): Promise<"opened" | "cancelled"> {
+  const pick = await DocumentPicker.getDocumentAsync({ type: ["application/json", "*/*"], copyToCacheDirectory: true });
+  if (pick.canceled || !pick.assets?.[0]) return "cancelled";
+  const text = await new File(pick.assets[0].uri).text();
+  const survey = readSurvey(text);
+  if (survey.plot.widthM !== S.plot.widthM || survey.plot.lengthM !== S.plot.lengthM) {
+    throw new Error(`This survey is for a ${survey.plot.widthM} × ${survey.plot.lengthM} m plot, but the app is set up for ${S.plot.widthM} × ${S.plot.lengthM} m.`);
+  }
+  const f = surveyFile();
+  if (f.exists) f.delete();
+  f.create();
+  f.write(text);
+  current = survey;
+  S.scanned = true;
+  S.layer = survey.photo ? "photo" : "contours";
+  commit();
+  return "opened";
+}
+
+export function removeSurvey(): void {
+  const f = surveyFile();
+  if (f.exists) f.delete();
+  current = null;
+  commit();
+}
+
+/** Record a finished garden scan, so its details can be sent to the PC for processing. */
+export function recordScan(anchor: { lat: number; lng: number }, photoCount: number): void {
+  S.lastScan = { format: "plotwise-scan", version: 1, flownAt: new Date().toISOString(), plot: S.plot, home: S.home, anchor, photoCount };
+}
+
+export async function shareScanDetails(scan: ScanDetails): Promise<void> {
+  const f = new File(Paths.cache, `plotwise-scan-${scan.flownAt.slice(0, 10)}.json`);
+  if (f.exists) f.delete();
+  f.create();
+  f.write(JSON.stringify(scan, null, 2));
+  await Sharing.shareAsync(f.uri, { mimeType: "application/json", dialogTitle: "Send the scan details to the PC" });
+}
