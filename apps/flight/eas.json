@@ -1,0 +1,20 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "ipad": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "resourceClass": "default"
+      }
+    }
+  },
+  "submit": {
+    "ipad": {
+      "ios": {}
+    }
+  }
+}

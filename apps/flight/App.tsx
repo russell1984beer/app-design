@@ -7,6 +7,7 @@ import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View, us
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
+import { canFly } from "./modules/dji-drone";
 import { drone } from "./src/drone";
 import { EmergencyBar } from "./src/EmergencyBar";
 import { MapView } from "./src/MapView";
@@ -32,7 +33,8 @@ function Shell() {
   const s = useApp();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const wide = width >= 820;
+  // Side by side on tablets, and on the phone turned sideways in the controller.
+  const wide = width >= 820 || width > height;
 
   useEffect(() => {
     loadSaved();
@@ -86,7 +88,7 @@ const TABS: [Tab, string][] = [
 function Nav({ tab, bottom }: { tab: Tab; bottom: number }) {
   return (
     <View style={[styles.nav, { paddingBottom: bottom }]} accessibilityRole="tablist">
-      {TABS.map(([id, label]) => {
+      {TABS.filter(([id]) => canFly || id !== "scan").map(([id, label]) => {
         const on = tab === id;
         return (
           <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => go(id)} style={styles.navBtn}>

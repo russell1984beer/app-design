@@ -80,7 +80,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     button, the RC return button, pilot takeover, geofence and camera faults.
     `test/roof.test.ts` covers the roof scan. Damage detection is not built yet.
   - All planning and safety logic belongs here, not in the Android module.
-- `apps/flight/` (Expo SDK 57, Android only): the flight app. See `docs/android-flight-module.md`.
+- `apps/flight/` (Expo SDK 57; flies on Android, other tabs also on iPad): the app. See `docs/android-flight-module.md`.
   - `modules/dji-drone/`: local Expo module. Kotlin `DroneController` drives the drone through
     DJI MSDK 5.18.0 (virtual sticks for movement, the drone's own failsafes stay on);
     `NativeDroneBridge.ts` implements flight-core's `DroneBridge` on top of it.
@@ -96,6 +96,12 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
     Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
     can still take the sticks.
+  - Materials tab: editable unit prices (saved on the phone), Export PDF quote (expo-print) and
+    Export DXF plan (R12, metres), both through the share sheet. Generators in garden-core `export.ts`.
+  - iPad: `app.json` has iOS (`com.plotwise.app`, tablet); `eas.json` profile `ipad`;
+    `npm run ipad` builds in Expo's cloud and sends it to TestFlight (see `docs/ipad.md`). Off
+    Android the DJI module is replaced by a stand-in (`canFly` false): no Scan tab, no flight buttons.
+    Not built for iOS yet.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
@@ -110,7 +116,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
 - Next: owner builds the app and runs the 9 simulator tests; then the owner adds a Met Office key; DJI FlySafe
-  no-fly zones, photo upload and survey processing, and an iOS build of the non-flight tabs.
+  no-fly zones, photo upload and survey processing, the first iPad build (owner needs Apple Developer + Expo accounts).
 
 ## Build phases
 1. **Flight app (Android)**: connect via MSDK, home point, automatic grid mission over a

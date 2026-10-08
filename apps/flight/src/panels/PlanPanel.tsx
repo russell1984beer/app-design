@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { MINI_4_PRO_MAX_WIND_MS, UK_MAX_ALTITUDE_M, validateSettings, type SignalLossAction } from "../../../../packages/flight-core/src/safety.ts";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
+import { canFly } from "../../modules/dji-drone";
 import { surveyStats } from "../flight";
 import { S, commit, go, useApp } from "../store";
 import { Btn, Check, H2, Lead, Note, Seg, Stats, Status, Stepper } from "../ui";
@@ -100,8 +101,12 @@ export function PlanPanel() {
         status="pass"
         text={s.mode === "sim" ? "Weather: not needed in the DJI simulator" : "Weather: checked against the Met Office forecast on the Scan tab before take-off"}
       />
-      <Btn label="Start scan" onPress={() => go("scan")} disabled={!s.checks.every(Boolean)} />
-      {!s.checks.every(Boolean) && <Note style={{ marginTop: 8 }}>Tick every item to enable the scan.</Note>}
+      {canFly ? (
+        <Btn label="Start scan" onPress={() => go("scan")} disabled={!s.checks.every(Boolean)} />
+      ) : (
+        <Note style={{ marginTop: 8 }}>Scans are flown from the Android phone plugged into the drone controller.</Note>
+      )}
+      {canFly && !s.checks.every(Boolean) && <Note style={{ marginTop: 8 }}>Tick every item to enable the scan.</Note>}
     </View>
   );
 }

@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { gsdCm, MINI_4_PRO } from "../../../../packages/flight-core/src/camera.ts";
 import { EXAMPLE_ROOF_ISSUES, SEVERITY, reportSummary, roofArea } from "../../../../packages/garden-core/src/index.ts";
 
+import { canFly } from "../../modules/dji-drone";
 import { SIM_HOME, useDrone } from "../drone";
 import { launch, prepareFlight, resumable, roofScan } from "../flight";
 import { RoofCloseup } from "../RoofCloseup";
@@ -96,11 +97,17 @@ export function RoofPanel() {
       />
       <Check checked disabled title="Only your half of the roof is reported" detail="Your house is semi-detached, so the circles pass over next door's roof. Tell your neighbours before you fly" />
       <Check checked disabled title="Keeps clear of the roof" detail={`At least 2 m out from the roof edge and 2 m above the chimney and aerials. The drone's obstacle sensing may be off while the app flies it`} />
+      {canFly ? (
+        <>
       <DroneStatus />
       <PreflightList plan={plan} />
       {error && <Status status="block" text={error} />}
       {resume && <Btn label={`Resume roof scan (${resume.done} of ${resume.total} photos)`} onPress={() => inspect(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
       <Btn label="Inspect roof" alt={!!resume} onPress={() => inspect(false)} disabled={"error" in plan || !plan.check.canTakeOff} />
+        </>
+      ) : (
+        <Note style={{ marginTop: 8 }}>Roof scans are flown from the Android phone plugged into the drone controller.</Note>
+      )}
       <Btn
         label="See an example report"
         alt

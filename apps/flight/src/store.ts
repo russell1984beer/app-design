@@ -7,7 +7,7 @@ import { useEffect, useReducer } from "react";
 import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { ScanProgress } from "../../../packages/flight-core/src/mission.ts";
 import { DEFAULT_SAFETY, type SafetySettings } from "../../../packages/flight-core/src/safety.ts";
-import { History, TEST_PLOT, existingFeatures, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
+import { DEFAULT_PRICES, History, TEST_PLOT, existingFeatures, type Prices, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 export type Tab = "plan" | "scan" | "survey" | "design" | "roof" | "quote";
 export type FlightMode = "sim" | "real";
@@ -50,6 +50,8 @@ export type AppState = {
   roof: { photosTaken: number; showExample: boolean; sel: number | null };
   /** A scan that stopped part-way, with where the home point was, so it can resume. */
   resume: Partial<Record<"survey" | "roof", { anchor: LatLng; progress: ScanProgress }>>;
+  /** The owner's own unit prices for the materials estimate. */
+  prices: Prices;
   /** Simulator tests that have passed on this phone. */
   testsPassed: string[];
   showBench: boolean;
@@ -89,6 +91,7 @@ export const S: AppState = {
   existInit: false,
   roof: { photosTaken: 0, showExample: false, sel: null },
   resume: {},
+  prices: DEFAULT_PRICES,
   testsPassed: [],
   showBench: false,
   v: 0,
@@ -108,7 +111,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "testsPassed"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "prices", "testsPassed"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();
@@ -141,6 +144,7 @@ export async function loadSaved(): Promise<void> {
       for (const k of KEEP) if (saved[k] !== undefined) (S as Record<string, unknown>)[k] = saved[k];
       // New safety settings added later keep their defaults.
       S.safety = { ...DEFAULT_SAFETY, ...S.safety };
+      S.prices = { ...DEFAULT_PRICES, ...S.prices };
     }
   } catch {
     // A damaged save starts afresh rather than stopping the app.
