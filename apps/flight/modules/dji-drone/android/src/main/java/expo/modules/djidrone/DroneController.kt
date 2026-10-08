@@ -30,6 +30,8 @@ import dji.sdk.keyvalue.value.gimbal.GimbalAngleRotationMode
 import dji.v5.common.callback.CommonCallbacks
 import dji.v5.common.error.IDJIError
 import dji.v5.manager.KeyManager
+import dji.v5.manager.diagnostic.DJIDeviceHealthInfoChangeListener
+import dji.v5.manager.diagnostic.DeviceHealthManager
 import dji.v5.manager.aircraft.simulator.InitializationSettings
 import dji.v5.manager.aircraft.simulator.SimulatorManager
 import dji.v5.manager.aircraft.simulator.SimulatorWindInfo
@@ -119,6 +121,7 @@ class DroneController(
         Log.i(TAG, "Renewing drone listeners.")
         keys.cancelListen(this)
         sticks.removeVirtualStickStateListener(stickListener)
+        removeHealthListener()
         listening = false
         startListening()
       }
@@ -163,6 +166,11 @@ class DroneController(
     listen(ProductKey.KeyProductType) { productType = it?.name }
     listen(CameraKey.KeyNewlyGeneratedMediaFile) { onMediaFile(it) }
     sticks.setVirtualStickStateListener(stickListener)
+    try {
+      DeviceHealthManager.getInstance().addDJIDeviceHealthInfoChangeListener(healthListener)
+    } catch (e: Exception) {
+      Log.w(TAG, "Drone warnings not available: ${e.message}")
+    }
     Log.i(TAG, "Listening to the drone.")
   }
 
@@ -172,6 +180,7 @@ class DroneController(
     if (listening) {
       keys.cancelListen(this)
       sticks.removeVirtualStickStateListener(stickListener)
+      removeHealthListener()
       listening = false
     }
     scheduler.cancelAll()
@@ -456,6 +465,24 @@ class DroneController(
     sticks.disableVirtualStick(completion { next() })
   }
 
+  // The drone's own warnings (the ones DJI Fly shows at the top of the screen).
+  private var warnings: List<String> = emptyList()
+
+  private val healthListener = DJIDeviceHealthInfoChangeListener { infos ->
+    scheduler.post {
+      val now = infos.orEmpty().map { i ->
+        listOf(i.title(), i.description()).filter { !it.isNullOrBlank() }.distinct().joinToString(": ").ifBlank { "code ${i.informationCode()}" } +
+          " [${i.informationCode()}, ${i.warningLevel()?.name}]"
+      }
+      for (w in now - warnings.toSet()) status("droneWarning", "Drone warning: $w")
+      warnings = now
+    }
+  }
+
+  private fun removeHealthListener() {
+    try { DeviceHealthManager.getInstance().removeDJIDeviceHealthInfoChangeListener(healthListener) } catch (_: Exception) {}
+  }
+
   private fun droneFlyingItself(): Boolean =
     djiFlightMode == FlightMode.GO_HOME || djiFlightMode == FlightMode.AUTO_LANDING || djiFlightMode == FlightMode.FORCE_LANDING
 
@@ -477,6 +504,7 @@ class DroneController(
         b?.remainingFlightTime?.let { append(", ${it}s flight time left") }
         append(", controller ${if (rcConnected) "connected" else "NOT connected"}")
         append(", drone link ${if (aircraftConnected) "up" else "DOWN"}")
+        if (warnings.isNotEmpty()) append("; drone warnings: ${warnings.joinToString("; ")}")
       }
       status("droneReturning", "Return to Home started outside the app, by the drone or the controller button ($why).")
     }
