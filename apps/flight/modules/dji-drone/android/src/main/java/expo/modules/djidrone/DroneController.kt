@@ -150,7 +150,8 @@ class DroneController(
     listening = true
     listen(FlightControllerKey.KeyAircraftLocation3D) { location = it; locationAtMs = scheduler.nowMs() }
     listen(FlightControllerKey.KeyCompassHeading) { compassHeading = it ?: compassHeading }
-    listen(FlightControllerKey.KeyFlightMode) { djiFlightMode = it }
+    listen(FlightControllerKey.KeyFlightMode) { onFlightMode(it) }
+    listen(FlightControllerKey.KeyLowBatteryRTHInfo) { lowBatteryInfo = it }
     listen(FlightControllerKey.KeyIsFlying) { isFlying = it == true }
     listen(FlightControllerKey.KeyAreMotorsOn) { motorsOn = it == true }
     listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
@@ -334,6 +335,7 @@ class DroneController(
   fun returnHome() = scheduler.post {
     if (!sdkReady()) return@post
     target = null
+    appAskedReturnAtMs = scheduler.nowMs()
     releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) status("error", "Return to home failed: ${e.text()}. Use the controller's RTH button.") } }
   }
 
@@ -406,7 +408,9 @@ class DroneController(
   }
 
   private fun sendSticks(now: Long) {
-    if (!appInControl()) {
+    // While the drone flies home or lands by itself, never steer against it.
+    if (droneFlyingItself()) target = null
+    if (!appInControl() || droneFlyingItself()) {
       goTo.reset()
       return
     }
@@ -450,6 +454,32 @@ class DroneController(
   private fun releaseSticksThen(next: () -> Unit) {
     if (!virtualStickEnabled) return next()
     sticks.disableVirtualStick(completion { next() })
+  }
+
+  private fun droneFlyingItself(): Boolean =
+    djiFlightMode == FlightMode.GO_HOME || djiFlightMode == FlightMode.AUTO_LANDING || djiFlightMode == FlightMode.FORCE_LANDING
+
+  private var lowBatteryInfo: dji.sdk.keyvalue.value.flightcontroller.LowBatteryRTHInfo? = null
+  private var appAskedReturnAtMs = 0L
+
+  private fun onFlightMode(mode: FlightMode?) {
+    val was = djiFlightMode
+    djiFlightMode = mode
+    if (mode == was) return
+    Log.i(TAG, "Drone flight mode: ${was?.name} -> ${mode?.name}")
+    // The drone started its own Return to Home: record what it knew, to find out why.
+    if (mode == FlightMode.GO_HOME && scheduler.nowMs() - appAskedReturnAtMs > 5000) {
+      val b = lowBatteryInfo
+      val why = buildString {
+        append("battery ${battery ?: "?"}%")
+        b?.batteryPercentNeededToGoHome?.let { append(", needs $it% to get home") }
+        b?.lowBatteryRTHStatus?.let { append(", low-battery return ${it.name}") }
+        b?.remainingFlightTime?.let { append(", ${it}s flight time left") }
+        append(", controller ${if (rcConnected) "connected" else "NOT connected"}")
+        append(", drone link ${if (aircraftConnected) "up" else "DOWN"}")
+      }
+      status("droneReturning", "Return to Home started outside the app, by the drone or the controller button ($why).")
+    }
   }
 
   private fun appInControl(): Boolean =

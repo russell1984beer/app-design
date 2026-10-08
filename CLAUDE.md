@@ -128,7 +128,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     packaged by the plugin from `modules/dji-drone/android/libcxx/`; nothing may call DJI managers
     before `DjiSdk.initialized`. Key listeners set up before registration never report, so they are
     renewed on registration and on each drone connection (plus a once-a-second direct read). Connected
-    to the drone and DJI's simulator (Link OK, battery shown); the 9 simulator tests are not yet run. Until a survey file is opened, the Survey uses a
+    to the drone and DJI's simulator. Test 1 (first run): took off, flew 53 of 84 photos, then the drone
+    started its own Return to Home (reason now logged by the app; investigating). The drone refuses a
+    new home point until it has recorded its own, so the app retries for 20 s. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
