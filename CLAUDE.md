@@ -67,6 +67,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - `roof.ts`: roof scan as in the prototype: two full circles round the house, 6 m then 3 m above
     the ridge, 24 photos each, at least 2 m out from the roof and 2 m above the chimney, with its own
     flight area. The circles pass over next door's half (pre-flight warns about overflight).
+  - `weather.ts`: Met Office Weather DataHub site-specific hourly forecast (apikey header); worst gust
+    in the next 2 hours feeds the pre-flight wind check. Not yet tried against the live service
+    (blocked from the cloud workspace). Key: `EXPO_PUBLIC_METOFFICE_API_KEY` in `apps/flight/.env`.
   - `safety.ts`: safety settings and defaults, pre-flight checks, return-home battery maths.
   - `bridge.ts`: the `DroneBridge` interface the Android module must implement.
   - `flight-session.ts`: `FlightSession`, the phone-side flight controller.
@@ -87,7 +90,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     point (the drone's position in real mode, a made-up field in simulator mode) and the garden's
     compass direction, and runs flights through one shared drone connection (`src/drone.ts`).
     Scan and Roof have a DJI simulator / Real flight switch; real flights stay blocked until all
-    9 simulator tests pass and the Met Office forecast is connected. State and scan progress are
+    9 simulator tests pass; the Met Office forecast (`src/weather.ts`) gates real take-offs. State and scan progress are
     saved on the phone (AsyncStorage), so a stopped scan can resume.
   - `src/EmergencyBar.tsx`: big red STOP button on every tab while the app flies the drone.
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
@@ -106,7 +109,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
-- Next: owner builds the app and runs the 9 simulator tests; then Met Office forecast, DJI FlySafe
+- Next: owner builds the app and runs the 9 simulator tests; then the owner adds a Met Office key; DJI FlySafe
   no-fly zones, photo upload and survey processing, and an iOS build of the non-flight tabs.
 
 ## Build phases

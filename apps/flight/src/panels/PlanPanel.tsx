@@ -97,8 +97,8 @@ export function PlanPanel() {
         <Check key={c[0]} checked={s.checks[i]} title={c[0]} detail={c[1]} onChange={(v) => set(() => (s.checks[i] = v))} />
       ))}
       <Status
-        status={s.mode === "sim" ? "pass" : "block"}
-        text={s.mode === "sim" ? "Weather: not needed in the DJI simulator" : "Weather: the Met Office forecast is not connected yet, so real flights are blocked"}
+        status="pass"
+        text={s.mode === "sim" ? "Weather: not needed in the DJI simulator" : "Weather: checked against the Met Office forecast on the Scan tab before take-off"}
       />
       <Btn label="Start scan" onPress={() => go("scan")} disabled={!s.checks.every(Boolean)} />
       {!s.checks.every(Boolean) && <Note style={{ marginTop: 8 }}>Tick every item to enable the scan.</Note>}

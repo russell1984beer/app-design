@@ -172,6 +172,24 @@ npm run phone
 If the build fails, copy the **last 40 lines** of the output into the chat (check there is no
 App Key in them).
 
+## Met Office weather key (needed for real flights only)
+
+Before a real flight, the app checks the Met Office wind forecast for the take-off point and
+refuses to take off if gusts in the next 2 hours are over your limit. The simulator does not
+need it. To set it up, once:
+
+1. Go to **datahub.metoffice.gov.uk** and create a free account.
+2. Subscribe to the **Site Specific** forecast, on the free plan (360 requests a day; the app
+   uses about one per flight).
+3. Copy your **API key**.
+4. On the PC, open the `.env` file in `app-design\apps\flight` (the same file as the DJI key) in
+   Notepad and add a new line: `EXPO_PUBLIC_METOFFICE_API_KEY=` followed by the key.
+5. Rebuild the app: `npm run prebuild` then `npm run phone`.
+
+The key stays on your PC and phone; `.env` is never uploaded to GitHub. The forecast code could
+not be tried against the real Met Office service from the cloud workspace, so check the Scan tab
+shows the wind on **Real flight** before the first real flight.
+
 ## Before every simulator session
 
 1. **Update** the drone and the RC-N2 to the latest firmware using the DJI Fly app.
@@ -220,8 +238,6 @@ checklist, which comes next.
 
 ## Not built yet
 
-- **Fetching the Met Office forecast.** The simulator uses "calm"; real flights are blocked
-  until the forecast is connected.
 - **DJI no-fly-zone data.** The FlySafe check is not wired in yet; check DJI Fly yourself.
 - **Uploading photos to the cloud and processing them into a survey.** The Survey tab uses a
   draft of the garden from the title plan with estimated levels.

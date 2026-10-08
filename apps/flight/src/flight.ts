@@ -12,6 +12,7 @@ import { eastNorthToPlan, planToEastNorth, type Pt } from "../../../packages/gar
 
 import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
+import { currentForecast } from "./weather";
 
 export const SIM_TEST_COUNT = 9;
 
@@ -95,14 +96,16 @@ export function prepareFlight(kind: "survey" | "roof", s: AppState, t: Telemetry
     boundary = r.flightArea;
     property = plotGps(s, anchor);
   }
+  // The simulator has no weather. Real flights use the Met Office forecast for the take-off point.
+  const weather = s.mode === "real" ? currentForecast(anchor) : null;
+  const forecast = s.mode === "sim" ? { speedMs: 0, gustMs: 0, fromDeg: 0, source: "DJI simulator" } : weather && "forecast" in weather ? weather.forecast : undefined;
   const check = preflightCheck({
     settings: s.safety,
     boundary,
     property,
     home: anchor,
     mission,
-    // The simulator has no weather. Real flights need the Met Office forecast, which is not connected yet.
-    forecast: s.mode === "sim" ? { speedMs: 0, gustMs: 0, fromDeg: 0, source: "DJI simulator" } : undefined,
+    forecast,
     noFlyZones: [],
     batteryPercent: t?.batteryPercent ?? 0,
   });
@@ -112,6 +115,7 @@ export function prepareFlight(kind: "survey" | "roof", s: AppState, t: Telemetry
     if (s.testsPassed.length < SIM_TEST_COUNT) {
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
     }
+    if (weather && "error" in weather) extra.push({ id: "forecast", status: "block", message: weather.error });
     extra.push({ id: "noFlyZones", status: "warn", message: "DJI FlySafe zones are not checked by the app yet. Check DJI Fly before you fly." });
   }
   if (!s.checks.every(Boolean)) extra.push({ id: "checklist", status: "block", message: "Tick every item in Before you fly (Plan tab)." });

@@ -7,3 +7,4 @@ export * from "./safety.ts";
 export * from "./bridge.ts";
 export * from "./flight-session.ts";
 export * from "./sim-drone.ts";
+export * from "./weather.ts";

@@ -2,8 +2,10 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { useDrone } from "../drone";
-import { RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
+import { anchorFor, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
 import { S, commit, go, useApp, type FlightMode } from "../store";
+import { compass } from "../../../../packages/garden-core/src/index.ts";
+import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
 import { surveyStatItems } from "./PlanPanel";
 
@@ -27,7 +29,7 @@ export function DroneStatus() {
         <Note style={{ marginBottom: 8, color: "#B7791F", fontWeight: "700" }}>Simulator: propellers OFF, drone on a table, phone plugged into the controller.</Note>
       ) : (
         <Note style={{ marginBottom: 8 }}>
-          Real flights unlock after all {SIM_TEST_COUNT} simulator tests pass ({s.testsPassed.length} so far) and the weather check is connected.
+          Real flights unlock after all {SIM_TEST_COUNT} simulator tests pass ({s.testsPassed.length} so far).
         </Note>
       )}
       <Readout>
@@ -35,8 +37,33 @@ export function DroneStatus() {
         <P>
           Link {t?.signalOk ? "OK" : "none"} · Battery {t?.batteryPercent ? `${t.batteryPercent}%` : "–"} · Height {t ? `${t.altitudeM.toFixed(1)} m` : "–"}
         </P>
+        {s.mode === "real" && <WeatherLine />}
       </Readout>
     </View>
+  );
+}
+
+/** The Met Office wind forecast for where the drone is sitting (the take-off point). */
+function WeatherLine() {
+  const s = useApp();
+  const d = useDrone();
+  const pos = anchorFor(s, d.telemetry);
+  const { result, loading } = useForecast(pos);
+  if (!pos) return <P>Weather: waiting for the drone's GPS position.</P>;
+  if (loading && !result) return <P>Weather: checking the Met Office forecast…</P>;
+  if (!result) return null;
+  if ("error" in result)
+    return (
+      <View>
+        <P>Weather: {result.error}</P>
+        {hasForecastKey() && <Btn label="Check the weather again" alt onPress={() => refreshForecast(pos)} />}
+      </View>
+    );
+  const f = result.forecast;
+  return (
+    <P>
+      Weather: wind {f.speedMs.toFixed(1)} m/s from the {compass(f.fromDeg)}, gusts up to {f.gustMs.toFixed(1)} m/s in the next 2 hours (your limit {s.safety.maxGustMs} m/s).
+    </P>
   );
 }
 
