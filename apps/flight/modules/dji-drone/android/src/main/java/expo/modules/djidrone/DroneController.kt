@@ -368,12 +368,30 @@ class DroneController(
 
   // ---- Simulator ---------------------------------------------------------------------------------
 
+  /**
+   * Starts DJI's simulator with the drone on the ground at (lat, lng). If it is still running from
+   * before, it is stopped first (so the drone starts again from there); the drone needs a moment
+   * between the two, so starting is tried a few times.
+   */
   fun enableSimulator(lat: Double, lng: Double, done: (String?) -> Unit) {
     if (!DjiSdk.initialized) return done("The DJI SDK is still starting. Wait a moment and try again.")
-    SimulatorManager.getInstance().enableSimulator(
-      InitializationSettings.createInstance(LocationCoordinate2D(lat, lng), SIMULATOR_SATELLITES),
-      completion { e -> done(e?.text()) },
-    )
+    val sim = SimulatorManager.getInstance()
+    fun start(triesLeft: Int) {
+      sim.enableSimulator(
+        InitializationSettings.createInstance(LocationCoordinate2D(lat, lng), SIMULATOR_SATELLITES),
+        completion { e ->
+          if (e == null) done(null)
+          else if (triesLeft > 1) {
+            Log.w(TAG, "Simulator did not start (${e.text()}), trying again")
+            scheduler.postDelayed(SIMULATOR_RETRY_MS) { start(triesLeft - 1) }
+          } else done(e.text())
+        },
+      )
+    }
+    if (sim.isSimulatorEnabled) {
+      Log.i(TAG, "Simulator still running: restarting it")
+      sim.disableSimulator(completion { scheduler.postDelayed(SIMULATOR_RETRY_MS) { start(3) } })
+    } else start(3)
   }
 
   fun disableSimulator(done: (String?) -> Unit) {
@@ -637,6 +655,7 @@ class DroneController(
     const val HANDOVER_WAIT_MS = 5_000L
     const val HOME_POINT_TRIES = 20
     const val REQUEST_WAIT_MS = 10_000L
+    const val SIMULATOR_RETRY_MS = 2_000L
     const val SIMULATOR_SATELLITES = 15
   }
 }

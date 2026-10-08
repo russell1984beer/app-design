@@ -83,9 +83,8 @@ class DroneHub {
   async setSimulator(on: boolean): Promise<void> {
     try {
       if (on) {
-        // Restart it if it is still running from before (e.g. the app was reopened), so the drone
+        // Restarts it if it is still running from before (done in the drone module), so the drone
         // starts again on the ground at SIM_HOME instead of wherever it last stopped.
-        await DjiDrone.disableSimulator().catch(() => {});
         await DjiDrone.enableSimulator(SIM_HOME.lat, SIM_HOME.lng);
         DjiDrone.setSimulatorWind(0, 0);
         this.addLog("Simulator on. Propellers must be OFF.");
