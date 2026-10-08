@@ -65,7 +65,7 @@ object DjiSdk {
       }
 
       override fun onRegisterFailure(error: IDJIError) {
-        report("registerFailed", "DJI SDK registration failed: ${error.description()}. Check the App Key and internet connection.")
+        report("registerFailed", "DJI SDK registration failed: ${error.text()}. Check the App Key and internet connection.")
       }
 
       override fun onProductConnect(productId: Int) {

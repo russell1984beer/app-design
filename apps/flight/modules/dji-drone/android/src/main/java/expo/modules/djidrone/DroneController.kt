@@ -212,7 +212,7 @@ class DroneController(
         if (error != null && !failed) {
           failed = true
           failsafe = Failsafe.FAILED
-          status("error", "Could not store safety settings on the drone: ${error.description()}")
+          status("error", "Could not store safety settings on the drone: ${error.text()}")
         }
         remaining--
         if (remaining == 0 && !failed) {
@@ -227,7 +227,7 @@ class DroneController(
     set(FlightControllerKey.KeyFailsafeAction, failsafeAction, done)
     // Photo mode for the scan; a failure here shows up later as failed photos.
     set(CameraKey.KeyCameraMode, CameraMode.PHOTO_NORMAL) { e ->
-      if (e != null) status("warning", "Could not switch the camera to photo mode: ${e.description()}")
+      if (e != null) status("warning", "Could not switch the camera to photo mode: ${e.text()}")
     }
   }
 
@@ -245,7 +245,7 @@ class DroneController(
     pilotTookOver = false
     action(FlightControllerKey.KeyStartTakeoff) { e ->
       if (e == null) appTakeoffInProgress = true
-      else status("error", "Take-off failed: ${e.description()}")
+      else status("error", "Take-off failed: ${e.text()}")
     }
   }
 
@@ -272,7 +272,7 @@ class DroneController(
       timeout = 3
     }
     action(GimbalKey.KeyRotateByAngle, rotation) { e ->
-      if (e != null) status("warning", "Gimbal did not move: ${e.description()}")
+      if (e != null) status("warning", "Gimbal did not move: ${e.text()}")
     }
   }
 
@@ -292,7 +292,7 @@ class DroneController(
       if (pendingPhoto !== photo) return@action
       if (e != null) {
         pendingPhoto = null
-        photoFailed(waypointIndex, e.description())
+        photoFailed(waypointIndex, e.text())
       } else {
         photo.shutterFired = true
       }
@@ -302,13 +302,13 @@ class DroneController(
   fun returnHome() = scheduler.post {
     if (!sdkReady()) return@post
     target = null
-    releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) status("error", "Return to home failed: ${e.description()}. Use the controller's RTH button.") } }
+    releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) status("error", "Return to home failed: ${e.text()}. Use the controller's RTH button.") } }
   }
 
   fun land() = scheduler.post {
     if (!sdkReady()) return@post
     target = null
-    releaseSticksThen { action(FlightControllerKey.KeyStartAutoLanding) { e -> if (e != null) status("error", "Landing failed: ${e.description()}") } }
+    releaseSticksThen { action(FlightControllerKey.KeyStartAutoLanding) { e -> if (e != null) status("error", "Landing failed: ${e.text()}") } }
   }
 
   // ---- Simulator ---------------------------------------------------------------------------------
@@ -317,13 +317,13 @@ class DroneController(
     if (!DjiSdk.initialized) return done("The DJI SDK is still starting. Wait a moment and try again.")
     SimulatorManager.getInstance().enableSimulator(
       InitializationSettings.createInstance(LocationCoordinate2D(lat, lng), SIMULATOR_SATELLITES),
-      completion { e -> done(e?.description()) },
+      completion { e -> done(e?.text()) },
     )
   }
 
   fun disableSimulator(done: (String?) -> Unit) {
     if (!DjiSdk.initialized) return done(null)
-    SimulatorManager.getInstance().disableSimulator(completion { e -> done(e?.description()) })
+    SimulatorManager.getInstance().disableSimulator(completion { e -> done(e?.text()) })
   }
 
   /** Simulator wind in m/s. The SDK takes whole numbers; which axis is north is checked in doc step S3. */
@@ -393,7 +393,7 @@ class DroneController(
   private fun enableSticks() {
     if (pilotTookOver) return
     sticks.enableVirtualStick(completion { e ->
-      if (e != null) status("error", "Could not take control after take-off: ${e.description()}. Fly manually or press RTH.")
+      if (e != null) status("error", "Could not take control after take-off: ${e.text()}. Fly manually or press RTH.")
       else sticks.setVirtualStickAdvancedModeEnabled(true)
     })
   }
