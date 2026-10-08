@@ -16,6 +16,18 @@ object DjiSdk {
     private set
   @Volatile var productConnected = false
     private set
+  /** The SDK's native libraries are loaded and its managers can be used. Nothing may touch them before. */
+  @Volatile var initialized = false
+    private set
+  private val waiting = mutableListOf<() -> Unit>()
+
+  /** Run [task] once the SDK has started (straight away if it already has). */
+  fun whenInitialized(task: () -> Unit) {
+    val now = synchronized(waiting) {
+      if (initialized) true else { waiting.add(task); false }
+    }
+    if (now) task()
+  }
 
   /** Receives SDK status changes; the Expo module forwards them to JavaScript. */
   @Volatile var onStatus: ((kind: String, message: String) -> Unit)? = null
@@ -30,7 +42,14 @@ object DjiSdk {
   fun init(context: Context) {
     SDKManager.getInstance().init(context, object : SDKManagerCallback {
       override fun onInitProcess(event: DJISDKInitEvent, totalProcess: Int) {
-        if (event == DJISDKInitEvent.INITIALIZE_COMPLETE) SDKManager.getInstance().registerApp()
+        if (event != DJISDKInitEvent.INITIALIZE_COMPLETE) return
+        val ready = synchronized(waiting) {
+          initialized = true
+          waiting.toList().also { waiting.clear() }
+        }
+        report("initialized", "DJI SDK started. Registering the app…")
+        ready.forEach { it() }
+        SDKManager.getInstance().registerApp()
       }
 
       override fun onRegisterSuccess() {

@@ -101,6 +101,16 @@ class DroneController(
   fun start() = scheduler.post {
     if (running) return@post
     running = true
+    tick()
+    // The DJI SDK's native code is only loaded once it has started; listening earlier crashes the app.
+    DjiSdk.whenInitialized { scheduler.post { if (running) startListening() } }
+  }
+
+  private var listening = false
+
+  private fun startListening() {
+    if (listening) return
+    listening = true
     listen(FlightControllerKey.KeyAircraftLocation3D) { location = it; locationAtMs = scheduler.nowMs() }
     listen(FlightControllerKey.KeyCompassHeading) { compassHeading = it ?: compassHeading }
     listen(FlightControllerKey.KeyFlightMode) { djiFlightMode = it }
@@ -115,14 +125,23 @@ class DroneController(
     listen(ProductKey.KeyProductType) { productType = it?.name }
     listen(CameraKey.KeyNewlyGeneratedMediaFile) { onMediaFile(it) }
     sticks.setVirtualStickStateListener(stickListener)
-    tick()
   }
 
   fun stop() = scheduler.post {
     running = false
-    keys.cancelListen(this)
-    sticks.removeVirtualStickStateListener(stickListener)
+    if (listening) {
+      keys.cancelListen(this)
+      sticks.removeVirtualStickStateListener(stickListener)
+      listening = false
+    }
     scheduler.cancelAll()
+  }
+
+  /** Commands need the SDK running; before that they are refused with a message instead of crashing. */
+  private fun sdkReady(): Boolean {
+    if (DjiSdk.initialized) return true
+    status("error", "The DJI SDK is still starting. Wait a moment and try again.")
+    return false
   }
 
   private val stickListener = object : VirtualStickStateListener {
@@ -143,6 +162,7 @@ class DroneController(
   // ---- Commands from FlightSession ---------------------------------------------------------------
 
   fun configureFailsafe(homeLat: Double, homeLng: Double, returnHeightM: Int, action: String) = scheduler.post {
+    if (!sdkReady()) return@post
     failsafe = Failsafe.PENDING
     val failsafeAction = when (action) {
       "hover" -> FailsafeAction.HOVER
@@ -176,6 +196,7 @@ class DroneController(
   }
 
   fun takeOff() = scheduler.post {
+    if (!sdkReady()) return@post
     when (failsafe) {
       Failsafe.CONFIGURED -> doTakeOff()
       Failsafe.PENDING -> takeoffRequestedAtMs = scheduler.nowMs() // goes when the settings are stored
@@ -193,6 +214,7 @@ class DroneController(
   }
 
   fun goTo(lat: Double, lng: Double, altitudeM: Double, speedMs: Double, headingDeg: Double?) = scheduler.post {
+    if (!sdkReady()) return@post
     if (!appInControl()) return@post
     target = Target(lat, lng, altitudeM, speedMs, headingDeg)
   }
@@ -200,6 +222,7 @@ class DroneController(
   fun hover() = scheduler.post { target = null }
 
   fun setGimbalPitch(deg: Double) = scheduler.post {
+    if (!sdkReady()) return@post
     val rotation = GimbalAngleRotation().apply {
       mode = GimbalAngleRotationMode.ABSOLUTE_ANGLE
       pitch = deg
@@ -218,6 +241,7 @@ class DroneController(
   }
 
   fun takePhoto(waypointIndex: Int) = scheduler.post {
+    if (!sdkReady()) return@post
     if (!appInControl()) {
       photoFailed(waypointIndex, "app does not have control")
       return@post
@@ -240,11 +264,13 @@ class DroneController(
   }
 
   fun returnHome() = scheduler.post {
+    if (!sdkReady()) return@post
     target = null
     releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) status("error", "Return to home failed: ${e.description()}. Use the controller's RTH button.") } }
   }
 
   fun land() = scheduler.post {
+    if (!sdkReady()) return@post
     target = null
     releaseSticksThen { action(FlightControllerKey.KeyStartAutoLanding) { e -> if (e != null) status("error", "Landing failed: ${e.description()}") } }
   }
@@ -252,6 +278,7 @@ class DroneController(
   // ---- Simulator ---------------------------------------------------------------------------------
 
   fun enableSimulator(lat: Double, lng: Double, done: (String?) -> Unit) {
+    if (!DjiSdk.initialized) return done("The DJI SDK is still starting. Wait a moment and try again.")
     SimulatorManager.getInstance().enableSimulator(
       InitializationSettings.createInstance(LocationCoordinate2D(lat, lng), SIMULATOR_SATELLITES),
       completion { e -> done(e?.description()) },
@@ -259,11 +286,13 @@ class DroneController(
   }
 
   fun disableSimulator(done: (String?) -> Unit) {
+    if (!DjiSdk.initialized) return done(null)
     SimulatorManager.getInstance().disableSimulator(completion { e -> done(e?.description()) })
   }
 
   /** Simulator wind in m/s. The SDK takes whole numbers; which axis is north is checked in doc step S3. */
   fun setSimulatorWind(northMs: Double, eastMs: Double) {
+    if (!DjiSdk.initialized) return
     SimulatorManager.getInstance().setWindSpeed(
       SimulatorWindInfo.Builder().windSpeedX(northMs.toInt()).windSpeedY(eastMs.toInt()).windSpeedZ(0).build(),
     )
