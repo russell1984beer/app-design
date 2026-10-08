@@ -566,7 +566,7 @@ class DroneController(
     }
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
-      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} battery=$battery product=$productType")
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} mode=${djiFlightMode?.name}")
     }
     try {
       sendTelemetry(now)

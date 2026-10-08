@@ -82,7 +82,21 @@ const SCENARIOS: Scenario[] = [
     title: "6. Gust",
     instructions: "After 4 photos the app sets the simulator wind to 9 m/s.",
     expect: "Stops the scan and returns home (wind over the 8 m/s limit).",
-    atPhoto: { count: 4, run: () => DjiDrone.setSimulatorWind(-9, 0) },
+    atPhoto: {
+      count: 4,
+      run: () => {
+        DjiDrone.setSimulatorWind(-9, 0);
+        // What the drone reports back settles U2-U4 (wind unit, direction, simulator axes).
+        for (const after of [3, 8, 15]) {
+          setTimeout(() => {
+            const w = drone.telemetry?.wind;
+            drone.addLog(
+              `Wind ${after}s after setting 9 m/s: drone reports ${w ? `${w.speedMs.toFixed(1)} m/s from ${Math.round(w.fromDeg)}°` : "no wind speed"}, warning ${drone.telemetry?.windWarning ?? "?"}`,
+            );
+          }, after * 1000);
+        }
+      },
+    },
     pass: (s) => s.state === "landed" && s.returnReason === "wind",
   },
   {
@@ -234,6 +248,7 @@ export function TestBench() {
             <Stat c={c} k="Mode" v={telemetry?.flightMode ?? "–"} />
             <Stat c={c} k="Height" v={telemetry ? `${telemetry.altitudeM.toFixed(1)} m` : "–"} />
             <Stat c={c} k="Battery" v={telemetry ? `${telemetry.batteryPercent}%` : "–"} />
+            <Stat c={c} k="Wind" v={telemetry?.wind ? `${telemetry.wind.speedMs.toFixed(1)} m/s` : "–"} />
           </View>
           <Button c={c} label={d.simOn ? "Stop simulator" : "Start simulator"} onPress={toggleSimulator} disabled={flying} />
         </View>
