@@ -6,18 +6,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { FlightSession } from "../../../packages/flight-core/src/flight-session.ts";
-import { fromLocal } from "../../../packages/flight-core/src/geo.ts";
+import { fromLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
 import { emptyProgress, type Mission, type ScanProgress } from "../../../packages/flight-core/src/mission.ts";
 import { planGrid } from "../../../packages/flight-core/src/planner.ts";
 import { DEFAULT_SAFETY, preflightCheck, type CheckItem } from "../../../packages/flight-core/src/safety.ts";
 import { DjiDrone } from "../modules/dji-drone";
 import { SIM_HOME, drone, useDrone } from "./drone";
 import { S, commit, commitNow } from "./store";
-/** A 20 m x 40 m test area just north of the simulated take-off point. */
-const corner = (north: number, east: number) => fromLocal(SIM_HOME, { x: east, y: north });
-// Small on purpose: each test then takes about 2 minutes, so the drone (motors running on a table,
-// with no air flowing over it) does not overheat and fly home by itself part-way through.
-const TEST_AREA = [corner(-5, -6), corner(15, -6), corner(15, 6), corner(-5, 6)];
+/**
+ * A 12 m x 20 m test area round the take-off point, mostly north of it. It is placed where the
+ * simulated drone actually is (the simulator keeps its last position until it is restarted).
+ * Small on purpose: each test then takes about 2 minutes, so the drone (motors running on a table,
+ * with no air flowing over it) does not overheat and fly home by itself part-way through.
+ */
+function testArea(home: LatLng): LatLng[] {
+  const corner = (north: number, east: number) => fromLocal(home, { x: east, y: north });
+  return [corner(-5, -6), corner(15, -6), corner(15, 6), corner(-5, 6)];
+}
 const TEST_HEIGHT_M = 15;
 
 type Scenario = {
@@ -119,7 +124,10 @@ export function TestBench() {
   const firedRef = useRef(false);
   const progressRef = useRef<ScanProgress | null>(null);
 
-  const mission: Mission = useMemo(() => planGrid(TEST_AREA, { altitudeM: TEST_HEIGHT_M }), []);
+  // Where the current test took off, and its scan (kept for test 3, which resumes test 2's scan).
+  const [test, setTest] = useState<{ home: LatLng; area: LatLng[]; mission: Mission } | null>(null);
+  const preview = useMemo(() => planGrid(testArea(SIM_HOME), { altitudeM: TEST_HEIGHT_M }), []);
+  const mission = test?.mission ?? preview;
 
   // Each scenario's automatic action, once enough photos are taken.
   useEffect(
@@ -148,11 +156,23 @@ export function TestBench() {
   }
 
   function run(sc: Scenario) {
-    const progress = sc.resume && progressRef.current ? progressRef.current : emptyProgress(mission);
+    const resuming = sc.resume && progressRef.current && test;
+    let t = test;
+    if (!resuming) {
+      const here = telemetry?.signalOk ? telemetry.position : null;
+      if (!here) {
+        drone.addLog("No position from the drone yet. Start the simulator and wait for Link OK.");
+        return;
+      }
+      const area = testArea(here);
+      t = { home: here, area, mission: planGrid(area, { altitudeM: TEST_HEIGHT_M }) };
+    }
+    const { home, area, mission } = t!;
+    const progress = resuming ? progressRef.current! : emptyProgress(mission);
     const result = preflightCheck({
       settings: DEFAULT_SAFETY,
-      boundary: TEST_AREA,
-      home: SIM_HOME,
+      boundary: area,
+      home,
       mission,
       // The simulator has no weather; this stands in for the Met Office check.
       forecast: { speedMs: 0, gustMs: 0, fromDeg: 0, source: "simulator" },
@@ -168,9 +188,10 @@ export function TestBench() {
     scenarioRef.current = sc;
     firedRef.current = false;
     setScenario(sc);
-    drone.startJob("test", SIM_HOME, {
+    setTest(t);
+    drone.startJob("test", home, {
       mission,
-      boundary: TEST_AREA,
+      boundary: area,
       settings: DEFAULT_SAFETY,
       progress,
       onProgress: (p) => (progressRef.current = p),

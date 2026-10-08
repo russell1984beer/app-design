@@ -250,6 +250,13 @@ class DroneController(
 
   private var failsafeRequest = 0
 
+  /** Return or land asked for during take-off: the take-off is over, never hand control to the app after it. */
+  private fun endAppTakeoff() {
+    appTakeoffInProgress = false
+    handingOverAtMs = null
+    takeoffRequestedAtMs = null
+  }
+
   /**
    * The drone refuses a new home point until it has recorded its own (a few seconds after it gets a
    * GPS fix, also in the simulator), so keep trying for a while before reporting the failure.
@@ -345,13 +352,18 @@ class DroneController(
     if (!sdkReady()) return@post
     target = null
     appAskedReturnAtMs = scheduler.nowMs()
-    releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) status("error", "Return to home failed: ${e.text()}. Use the controller's RTH button.") } }
+    appRequested = "returning"
+    endAppTakeoff()
+    releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) { appRequested = null; status("error", "Return to home failed: ${e.text()}. Use the controller's RTH button.") } } }
   }
 
   fun land() = scheduler.post {
     if (!sdkReady()) return@post
     target = null
-    releaseSticksThen { action(FlightControllerKey.KeyStartAutoLanding) { e -> if (e != null) status("error", "Landing failed: ${e.text()}") } }
+    appAskedReturnAtMs = scheduler.nowMs()
+    appRequested = "landing"
+    endAppTakeoff()
+    releaseSticksThen { action(FlightControllerKey.KeyStartAutoLanding) { e -> if (e != null) { appRequested = null; status("error", "Landing failed: ${e.text()}") } } }
   }
 
   // ---- Simulator ---------------------------------------------------------------------------------
@@ -488,6 +500,17 @@ class DroneController(
 
   private var lowBatteryInfo: dji.sdk.keyvalue.value.flightcontroller.LowBatteryRTHInfo? = null
   private var appAskedReturnAtMs = 0L
+  private var appRequested: String? = null
+
+  /** The app's return or landing, for up to 10 s until the drone's mode shows it (then the drone's mode counts). */
+  private fun pendingRequest(now: Long): String? {
+    val req = appRequested ?: return null
+    if (droneFlyingItself() || now - appAskedReturnAtMs > REQUEST_WAIT_MS) {
+      appRequested = null
+      return null
+    }
+    return req
+  }
 
   private fun onFlightMode(mode: FlightMode?) {
     val was = djiFlightMode
@@ -546,7 +569,7 @@ class DroneController(
         "lng" to loc?.longitude,
         "altitudeM" to (loc?.altitude ?: 0.0),
         "batteryPercent" to battery,
-        "flightMode" to TelemetryRules.flightMode(djiFlightMode?.name, isFlying, motorsOn, appInControl(), appTakeoffInProgress || handingOverAtMs != null),
+        "flightMode" to TelemetryRules.flightMode(djiFlightMode?.name, isFlying, motorsOn, appInControl(), appTakeoffInProgress || handingOverAtMs != null, pendingRequest(now)),
         "signalOk" to TelemetryRules.signalOk(rcConnected, aircraftConnected, now - locationAtMs),
         "windSpeedMs" to TelemetryRules.windSpeedMs(windSpeed),
         "windFromDeg" to TelemetryRules.windDirectionDeg(windDirection?.name),
@@ -613,6 +636,7 @@ class DroneController(
     const val TAKEOFF_WAIT_MS = 30_000L
     const val HANDOVER_WAIT_MS = 5_000L
     const val HOME_POINT_TRIES = 20
+    const val REQUEST_WAIT_MS = 10_000L
     const val SIMULATOR_SATELLITES = 15
   }
 }

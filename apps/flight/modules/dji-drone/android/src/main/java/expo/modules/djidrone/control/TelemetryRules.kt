@@ -20,13 +20,17 @@ object TelemetryRules {
     motorsOn: Boolean,
     appInControl: Boolean,
     appTakeoffInProgress: Boolean,
+    /** "returning" or "landing" just asked for by the app, until the drone's own mode shows it. */
+    appRequested: String? = null,
   ): String {
     if (!isFlying && !motorsOn) return "onGround"
     return when (djiFlightMode) {
       "GO_HOME" -> "returning"
       "AUTO_LANDING", "FORCE_LANDING", "ATTI_LANDING" -> "landing"
-      "AUTO_TAKE_OFF", "MOTOR_START", "TAKE_OFF_READY" -> if (appTakeoffInProgress) "takingOff" else "pilot"
+      "AUTO_TAKE_OFF", "MOTOR_START", "TAKE_OFF_READY" -> appRequested ?: if (appTakeoffInProgress) "takingOff" else "pilot"
       else -> when {
+        // Between the app releasing the sticks and the drone switching mode, it is not the pilot.
+        appRequested != null -> appRequested
         appInControl -> "app"
         appTakeoffInProgress -> "takingOff"
         !isFlying -> "onGround"

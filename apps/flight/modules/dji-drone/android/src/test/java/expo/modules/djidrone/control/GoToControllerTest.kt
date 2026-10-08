@@ -120,7 +120,9 @@ class TelemetryRulesTest {
 
   @Test
   fun `flight modes`() {
-    val m = TelemetryRules::flightMode
+    val m = { mode: String, flying: Boolean, motors: Boolean, app: Boolean, takeoff: Boolean ->
+      TelemetryRules.flightMode(mode, flying, motors, app, takeoff)
+    }
     assertEquals("onGround", m("GPS_NORMAL", false, false, false, false))
     assertEquals("takingOff", m("AUTO_TAKE_OFF", true, true, false, true))
     assertEquals("takingOff", m("GPS_NORMAL", true, true, false, true))
@@ -130,6 +132,10 @@ class TelemetryRulesTest {
     // Flying but not under app control: the pilot has it.
     assertEquals("pilot", m("GPS_NORMAL", true, true, false, false))
     assertEquals("pilot", m("AUTO_TAKE_OFF", true, true, false, false))
+    // The app has just asked for Return to Home: not the pilot while the drone switches over.
+    assertEquals("returning", TelemetryRules.flightMode("GPS_NORMAL", true, true, false, false, "returning"))
+    assertEquals("returning", TelemetryRules.flightMode("AUTO_TAKE_OFF", true, true, false, false, "returning"))
+    assertEquals("landing", TelemetryRules.flightMode("GPS_NORMAL", true, true, false, false, "landing"))
   }
 
   @Test
