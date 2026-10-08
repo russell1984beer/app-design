@@ -91,14 +91,14 @@ Not checked yet:
 
 | # | Question | How the code handles it now | Checked by |
 | --- | --- | --- | --- |
-| U1 | Virtual sticks in the ground frame: is *pitch* east and *roll* north, or the other way round? | Assumes pitch = east. If wrong, the drone flies the wrong way, the 4-second guard stops it, and the log says "moving away from its target". | Test 1 |
+| U1 | Virtual sticks in the ground frame: is *pitch* east and *roll* north, or the other way round? | Assumes pitch = east. **Settled: correct** (test 1 flew the whole scan). | Test 1 |
 | U2 | Wind speed unit from the drone | Assumes tenths of a m/s. | Test 6 |
 | U3 | Does the wind direction mean "from" or "to"? | Assumes "from". | Test 6 |
 | U4 | Simulator wind axes (which is north) | Sets X = north. | Test 6 |
-| U5 | Will the drone accept a home point set from the app? | Sets it before take-off; refuses to take off if this fails. | Test 1 |
-| U6 | Does the camera report each new photo in the simulator? | Waits up to 5 s for the photo report, otherwise counts the photo as failed. | Test 1 |
-| U7 | Does Return to Home work straight after the app hands back the sticks? | Hands back the sticks, then starts Return to Home. | Test 2 |
-| U8 | What happens to virtual sticks when the phone is unplugged? | Expects the drone to stop and hover. | Test 7 |
+| U5 | Will the drone accept a home point set from the app? | Sets it before take-off; refuses to take off if this fails. **Settled: yes**, once the drone has recorded its own home point (a few seconds after a GPS fix); the app retries for 20 s. | Test 1 |
+| U6 | Does the camera report each new photo in the simulator? | Waits up to 5 s for the photo report, otherwise counts the photo as failed. **Settled: yes** (28/28). | Test 1 |
+| U7 | Does Return to Home work straight after the app hands back the sticks? | Hands back the sticks, then starts Return to Home. **Settled: works** (test 2 passed). | Test 2 |
+| U8 | What happens to virtual sticks when the phone is unplugged? | Expects the drone to stop and hover. **Settled: it hovers** (owner, test 7). Picking the flight back up after the cable returns is still being checked. | Test 7 |
 
 ## One-time setup on the Windows PC
 
@@ -214,13 +214,13 @@ looked wrong.
 
 | Test | What it checks | Result | Notes |
 | --- | --- | --- | --- |
-| 1. Normal scan | Whole scan, photos, landing at home. Settles U1, U5, U6. | | |
-| 2. Return button in the app | App's Return button. Settles U7. | | |
-| 3. Resume | Carries on after test 2, only the missing photos. | | |
-| 4. Return button on the controller | RC-N2 RTH button overrides the app. | | |
-| 5. Pilot takes over | Pause button gives the sticks back to you. | | |
-| 6. Gust | Wind limit. Note the wind speed the app shows, for U2–U4. | | |
-| 7. Phone loses the controller | Phone cable unplugged mid-scan. Settles U8. | | |
+| 1. Normal scan | Whole scan, photos, landing at home. Settles U1, U5, U6. | PASS | |
+| 2. Return button in the app | App's Return button. Settles U7. | PASS | |
+| 3. Resume | Carries on after test 2, only the missing photos. | PASS | |
+| 4. Return button on the controller | RC-N2 RTH button overrides the app. | PASS | |
+| 5. Pilot takes over | Pause button gives the sticks back to you. | PASS | |
+| 6. Gust | Wind limit. Note the wind speed the app shows, for U2–U4. | CHECK | The app did not see the simulator's wind; wind now logged. |
+| 7. Phone loses the controller | Phone cable unplugged mid-scan. Settles U8. | CHECK | Drone hovered; the app did not pick the flight back up after the cable returned. |
 | 8. Controller switched off | The drone's own signal-loss failsafe. | | |
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. | | |
 
