@@ -105,6 +105,39 @@ class DroneController(
     tick()
     // The DJI SDK's native code is only loaded once it has started; listening earlier crashes the app.
     DjiSdk.whenInitialized { scheduler.post { if (running) startListening() } }
+    DjiSdk.addConnectHook(onConnect)
+  }
+
+  // Listeners set up before the app was registered or the drone connected may never report, so
+  // they are set up again each time either happens.
+  private val onConnect: () -> Unit = {
+    scheduler.post {
+      if (running && listening) {
+        Log.i(TAG, "Renewing drone listeners.")
+        keys.cancelListen(this)
+        sticks.removeVirtualStickStateListener(stickListener)
+        listening = false
+        startListening()
+      }
+    }
+  }
+
+  /** Backup to the listeners: read the SDK's latest values directly, once a second. */
+  private fun readLatest() {
+    try {
+      keys.getValue(KeyTools.createKey(RemoteControllerKey.KeyConnection))?.let { rcConnected = it }
+      keys.getValue(KeyTools.createKey(FlightControllerKey.KeyConnection))?.let { aircraftConnected = it }
+      keys.getValue(KeyTools.createKey(BatteryKey.KeyChargeRemainingInPercent))?.let { battery = it }
+      // A cached position only counts while both links are up (signalOk checks them too).
+      if (rcConnected && aircraftConnected) {
+        keys.getValue(KeyTools.createKey(FlightControllerKey.KeyAircraftLocation3D))?.let {
+          location = it
+          locationAtMs = scheduler.nowMs()
+        }
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Could not read drone values: ${e.message}")
+    }
   }
 
   private var listening = false
@@ -131,6 +164,7 @@ class DroneController(
 
   fun stop() = scheduler.post {
     running = false
+    DjiSdk.removeConnectHook(onConnect)
     if (listening) {
       keys.cancelListen(this)
       sticks.removeVirtualStickStateListener(stickListener)
@@ -373,10 +407,15 @@ class DroneController(
     virtualStickEnabled && authority == FlightControlAuthority.MSDK && !pilotTookOver
 
   private var lastLogMs = 0L
+  private var lastReadMs = 0L
   private var emitFailed = false
 
   private fun emitTelemetry(now: Long) {
     // A short summary in the phone's log every 5 seconds, to see what is and is not connected.
+    if (listening && now - lastReadMs >= 1000) {
+      lastReadMs = now
+      readLatest()
+    }
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
       Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} battery=$battery product=$productType")

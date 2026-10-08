@@ -21,6 +21,11 @@ object DjiSdk {
   @Volatile var initialized = false
     private set
   private val waiting = mutableListOf<() -> Unit>()
+  private val connectHooks = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+
+  /** Run [hook] each time the app is registered or a drone connects (key listeners are renewed then). */
+  fun addConnectHook(hook: () -> Unit) { connectHooks.add(hook) }
+  fun removeConnectHook(hook: () -> Unit) { connectHooks.remove(hook) }
 
   /** Run [task] once the SDK has started (straight away if it already has). */
   fun whenInitialized(task: () -> Unit) {
@@ -56,6 +61,7 @@ object DjiSdk {
       override fun onRegisterSuccess() {
         registered = true
         report("registered", "DJI SDK registered.")
+        connectHooks.forEach { it() }
       }
 
       override fun onRegisterFailure(error: IDJIError) {
@@ -65,6 +71,7 @@ object DjiSdk {
       override fun onProductConnect(productId: Int) {
         productConnected = true
         report("productConnected", "Drone connected.")
+        connectHooks.forEach { it() }
       }
 
       override fun onProductDisconnect(productId: Int) {
