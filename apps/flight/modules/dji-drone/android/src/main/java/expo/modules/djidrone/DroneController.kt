@@ -229,12 +229,31 @@ class DroneController(
         }
       }
     } }
-    set(FlightControllerKey.KeyHomeLocation, LocationCoordinate2D(homeLat, homeLng), done("home point"))
+    setHomePoint(LocationCoordinate2D(homeLat, homeLng), ++failsafeRequest, HOME_POINT_TRIES, done("home point"))
     set(FlightControllerKey.KeyGoHomeHeight, returnHeightM, done("return height ($returnHeightM m)"))
     set(FlightControllerKey.KeyFailsafeAction, failsafeAction, done("signal-loss action"))
     // Photo mode for the scan; a failure here shows up later as failed photos.
     set(CameraKey.KeyCameraMode, CameraMode.PHOTO_NORMAL) { e ->
       if (e != null) status("warning", "Could not switch the camera to photo mode: ${e.text()}")
+    }
+  }
+
+  private var failsafeRequest = 0
+
+  /**
+   * The drone refuses a new home point until it has recorded its own (a few seconds after it gets a
+   * GPS fix, also in the simulator), so keep trying for a while before reporting the failure.
+   */
+  private fun setHomePoint(home: LocationCoordinate2D, request: Int, triesLeft: Int, done: (IDJIError?) -> Unit) {
+    set(FlightControllerKey.KeyHomeLocation, home) { e ->
+      when {
+        request != failsafeRequest -> {} // superseded by a newer request
+        e == null || triesLeft <= 1 -> done(e)
+        else -> {
+          if (triesLeft == HOME_POINT_TRIES) status("info", "Waiting for the drone to record its home point…")
+          scheduler.postDelayed(1000) { if (request == failsafeRequest) setHomePoint(home, request, triesLeft - 1, done) }
+        }
+      }
     }
   }
 
@@ -533,8 +552,9 @@ class DroneController(
     const val TAG = "DjiDrone"
     const val TICK_MS = 100L
     const val PHOTO_TIMEOUT_MS = 5000L
-    const val TAKEOFF_WAIT_MS = 10_000L
+    const val TAKEOFF_WAIT_MS = 30_000L
     const val HANDOVER_WAIT_MS = 5_000L
+    const val HOME_POINT_TRIES = 20
     const val SIMULATOR_SATELLITES = 15
   }
 }
