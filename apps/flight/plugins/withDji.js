@@ -24,6 +24,11 @@ function withDji(config) {
       const dir = path.join(c.modRequest.platformProjectRoot, "app", "src", "main", "res", "xml");
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, "accessory_filter.xml"), ACCESSORY_FILTER_XML);
+      // The DJI SDK needs its own (newer) C++ runtime; the app's own jniLibs win over the copies in
+      // dependencies such as React Native's. See modules/dji-drone/android/libcxx/README.md.
+      const libDir = path.join(c.modRequest.platformProjectRoot, "app", "src", "main", "jniLibs", "arm64-v8a");
+      fs.mkdirSync(libDir, { recursive: true });
+      fs.copyFileSync(path.join(__dirname, "..", "modules", "dji-drone", "android", "libcxx", "arm64-v8a", "libc++_shared.so"), path.join(libDir, "libc++_shared.so"));
       return c;
     },
   ]);
