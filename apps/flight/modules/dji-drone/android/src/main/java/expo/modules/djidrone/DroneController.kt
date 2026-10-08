@@ -1,5 +1,6 @@
 package expo.modules.djidrone
 
+import android.util.Log
 import dji.sdk.keyvalue.key.BatteryKey
 import dji.sdk.keyvalue.key.CameraKey
 import dji.sdk.keyvalue.key.DJIKey
@@ -116,15 +117,16 @@ class DroneController(
     listen(FlightControllerKey.KeyFlightMode) { djiFlightMode = it }
     listen(FlightControllerKey.KeyIsFlying) { isFlying = it == true }
     listen(FlightControllerKey.KeyAreMotorsOn) { motorsOn = it == true }
-    listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true }
+    listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
     listen(FlightControllerKey.KeyWindSpeed) { windSpeed = it }
     listen(FlightControllerKey.KeyWindDirection) { windDirection = it }
     listen(FlightControllerKey.KeyWindWarning) { windWarning = it }
-    listen(RemoteControllerKey.KeyConnection) { rcConnected = it == true }
+    listen(RemoteControllerKey.KeyConnection) { rcConnected = it == true; Log.i(TAG, "Controller link: ${if (rcConnected) "connected" else "not connected"}") }
     listen(BatteryKey.KeyChargeRemainingInPercent) { battery = it }
     listen(ProductKey.KeyProductType) { productType = it?.name }
     listen(CameraKey.KeyNewlyGeneratedMediaFile) { onMediaFile(it) }
     sticks.setVirtualStickStateListener(stickListener)
+    Log.i(TAG, "Listening to the drone.")
   }
 
   fun stop() = scheduler.post {
@@ -370,7 +372,26 @@ class DroneController(
   private fun appInControl(): Boolean =
     virtualStickEnabled && authority == FlightControlAuthority.MSDK && !pilotTookOver
 
+  private var lastLogMs = 0L
+  private var emitFailed = false
+
   private fun emitTelemetry(now: Long) {
+    // A short summary in the phone's log every 5 seconds, to see what is and is not connected.
+    if (now - lastLogMs >= 5000) {
+      lastLogMs = now
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} battery=$battery product=$productType")
+    }
+    try {
+      sendTelemetry(now)
+      if (emitFailed) Log.i(TAG, "Telemetry sending again.")
+      emitFailed = false
+    } catch (e: Exception) {
+      if (!emitFailed) Log.e(TAG, "Could not send telemetry to the app", e)
+      emitFailed = true
+    }
+  }
+
+  private fun sendTelemetry(now: Long) {
     val loc = location
     emit(
       "onTelemetry",
@@ -388,6 +409,9 @@ class DroneController(
         "productType" to productType,
         "djiFlightMode" to djiFlightMode?.name,
         "pilotTookOver" to pilotTookOver,
+        "rcConnected" to rcConnected,
+        "aircraftConnected" to aircraftConnected,
+        "sdkListening" to listening,
       ),
     )
   }
@@ -437,6 +461,7 @@ class DroneController(
   }
 
   companion object {
+    const val TAG = "DjiDrone"
     const val TICK_MS = 100L
     const val PHOTO_TIMEOUT_MS = 5000L
     const val TAKEOFF_WAIT_MS = 10_000L

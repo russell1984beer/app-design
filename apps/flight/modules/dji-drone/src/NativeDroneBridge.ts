@@ -69,6 +69,20 @@ export class NativeDroneBridge implements DroneBridge {
     };
   }
 
+  /** What is and is not connected, in plain English, for the test bench. */
+  linkReport(): string {
+    const latest = this.latest;
+    if (!latest) return "Nothing heard from the drone module yet.";
+    if (this.now() - latest.at >= STALE_AFTER_MS) return "The drone module has stopped reporting.";
+    const t = latest.t;
+    if (t.sdkListening === false) return "Waiting for the DJI SDK to start.";
+    if (t.rcConnected === false) return "Controller not connected. Is it switched on, with the phone plugged into it and Plotwise chosen at the USB prompt?";
+    if (t.aircraftConnected === false) return "Controller connected, but not the drone. Switch the drone on and wait for the controller to link to it.";
+    if (t.lat == null) return "Drone connected, but it has no GPS position. Indoors, tap Start simulator to give it one.";
+    if (!t.signalOk) return "Drone connected, waiting for a steady signal.";
+    return "Drone and controller connected.";
+  }
+
   drainEvents(): DroneEvent[] {
     const e = this.events;
     this.events = [];

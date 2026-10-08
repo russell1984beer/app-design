@@ -2,6 +2,7 @@ package expo.modules.djidrone
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import dji.v5.common.error.IDJIError
 import dji.v5.common.register.DJISDKInitEvent
 import dji.v5.manager.SDKManager
@@ -82,6 +83,7 @@ object DjiSdk {
 
   private fun report(kind: String, message: String) {
     lastStatus = kind to message
+    Log.i("DjiDrone", message)
     onStatus?.invoke(kind, message)
   }
 }

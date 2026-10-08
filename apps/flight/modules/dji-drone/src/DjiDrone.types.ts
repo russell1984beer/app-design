@@ -17,6 +17,10 @@ export type NativeTelemetry = {
   productType: string | null;
   djiFlightMode: string | null;
   pilotTookOver: boolean;
+  /** Connection details, for the test bench's readout (missing from older builds). */
+  rcConnected?: boolean;
+  aircraftConnected?: boolean;
+  sdkListening?: boolean;
 };
 
 export type NativeDroneEvent =

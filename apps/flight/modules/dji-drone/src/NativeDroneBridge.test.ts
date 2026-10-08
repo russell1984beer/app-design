@@ -191,6 +191,25 @@ test("no GPS position yet counts as no link", () => {
   assert.equal(bridge.telemetry().signalOk, false, "before any telemetry");
 });
 
+test("link report says which part is not connected", () => {
+  const native = new FakeNative();
+  const bridge = new NativeDroneBridge(native, { now: () => native.timeMs });
+  bridge.start();
+  assert.match(bridge.linkReport(), /Nothing heard/);
+  const base = { lat: null, lng: null, altitudeM: 0, batteryPercent: 80, flightMode: "onGround", signalOk: false, windSpeedMs: null, windFromDeg: null, windWarning: "none", headingDeg: 0, productType: null, djiFlightMode: null, pilotTookOver: false, sdkListening: true } as const;
+  const send = (t: Partial<NativeTelemetry>) => (native as unknown as { emit(e: string, p: NativeTelemetry): void }).emit("onTelemetry", { ...base, ...t });
+  send({ rcConnected: false, aircraftConnected: false });
+  assert.match(bridge.linkReport(), /Controller not connected/);
+  send({ rcConnected: true, aircraftConnected: false });
+  assert.match(bridge.linkReport(), /not the drone/);
+  send({ rcConnected: true, aircraftConnected: true });
+  assert.match(bridge.linkReport(), /no GPS position/);
+  send({ rcConnected: true, aircraftConnected: true, lat: 52, lng: -1, signalOk: true });
+  assert.match(bridge.linkReport(), /Drone and controller connected/);
+  native.timeMs += STALE_AFTER_MS;
+  assert.match(bridge.linkReport(), /stopped reporting/);
+});
+
 test("unknown wind direction is treated as a headwind on the way home", () => {
   const { native, bridge, session } = setup();
   native.hideWindDirection = true;

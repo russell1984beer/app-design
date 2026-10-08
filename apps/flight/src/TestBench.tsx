@@ -205,6 +205,7 @@ export function TestBench() {
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.label, { color: c.muted }]}>Drone</Text>
           <Text style={{ color: c.ink }}>{d.status}</Text>
+          <Text style={{ color: telemetry?.signalOk ? c.ok : c.warn }}>{d.bridge.linkReport()}</Text>
           <View style={styles.row}>
             <Stat c={c} k="Link" v={telemetry?.signalOk ? "OK" : "None"} bad={!telemetry?.signalOk} />
             <Stat c={c} k="Mode" v={telemetry?.flightMode ?? "–"} />
