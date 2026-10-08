@@ -43,6 +43,8 @@ export type SurveyPackage = {
   photo?: { mime: "image/jpeg" | "image/png"; base64: string; widthPx: number; heightPx: number };
   /** Share of the plot that the survey actually covered, 0–1. */
   coverage: number;
+  /** Shown in the app instead of the usual description, e.g. for a test survey. */
+  label?: string;
 };
 
 /** Height at any point of the plan, smoothly between grid squares. */

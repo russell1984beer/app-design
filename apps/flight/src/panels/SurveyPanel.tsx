@@ -24,7 +24,9 @@ export function SurveySource() {
   return (
     <View style={{ marginTop: 14 }}>
       <H2 small>{survey ? "Drone survey" : "Draft survey"}</H2>
-      {survey ? (
+      {survey?.label ? (
+        <Note>{survey.label}</Note>
+      ) : survey ? (
         <Note>
           Flown {new Date(survey.flownAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} from {survey.photoCount} photos. It covers{" "}
           {Math.round(survey.coverage * 100)}% of the plot{survey.coverage < 0.9 ? "; the gaps are filled in from nearby heights" : ""}.

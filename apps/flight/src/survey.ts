@@ -3,6 +3,7 @@
 // Also: sharing the scan details the PC tool needs to line the survey up with the plan.
 
 import * as DocumentPicker from "expo-document-picker";
+import { Platform } from "react-native";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
@@ -28,6 +29,15 @@ function surveyFile(): File {
 
 /** Read the saved survey when the app starts. */
 export async function loadSavedSurvey(): Promise<void> {
+  // The browser preview can be given a survey to show.
+  const demo = (globalThis as { __PLOTWISE_DEMO_SURVEY__?: string }).__PLOTWISE_DEMO_SURVEY__;
+  if (Platform.OS === "web" && demo) {
+    current = readSurvey(demo);
+    S.scanned = true;
+    S.layer = "photo";
+    commit();
+    return;
+  }
   try {
     const f = surveyFile();
     if (!f.exists) return;

@@ -55,6 +55,15 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - `packages/garden-core/` (TypeScript, no dependencies; for iOS and Android): the prototype's plot
   model and draft levels, contours, slope, design features and styles, sun and shade, plants,
   material quantities and the example roof report. `npm test` there.
+- Survey processing (stage 1, free, on the owner's PC): after a real scan the app records the scan
+  details (take-off GPS, plot, home point) and shares them as `plotwise-scan-<date>.json`.
+  `tools/survey` (`npm run survey -- --photos <dir> --scan <file>`) runs OpenDroneMap 3.5.6 in Docker
+  (DSM + DTM + orthophoto at 2 cm) and converts the GeoTIFFs (UTM) into `plotwise-survey-<date>.json`:
+  ground/surface height grids (25 cm) and the plot photo, lined up through the scan details. The app
+  opens it (Survey tab, iPad too); levels, contours, slope, design and materials then use it. Steps for
+  the owner: `docs/survey-processing.md`. Checked end to end in the cloud workspace with computer-drawn
+  photos of a known garden flown on the real plan: ground levels within 0.5 cm median, 2.6 cm worst.
+  Cloud upload/sync of photos and surveys is not built yet.
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
   - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. `planSurvey` is
     the garden scan, fixed to the owner's chosen plan (the prototype's): passes straight across the
@@ -109,14 +118,14 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Builds in the cloud workspace (dl.google.com allowed; Android SDK at /opt/android-sdk, Java 17
     needed). Maven Central rate-limits this machine, so a local Gradle init script points it at
     Google's Maven Central mirror. Release app is ~200 MB and contains the DJI key: never publish it.
-  - Not yet run on the phone or in DJI's simulator. Survey processing (photogrammetry) and roof
-    damage detection are not built: the Survey uses a draft of the garden from the title plan with
-    estimated levels, and the roof report is a labelled example.
+  - Not yet run on the phone or in DJI's simulator. Until a survey file is opened, the Survey uses a
+    draft of the garden from the title plan with estimated levels. Roof damage detection is not
+    built: the roof report is a labelled example.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
 - Next: owner builds the app and runs the 9 simulator tests; then the owner adds a Met Office key; DJI FlySafe
-  no-fly zones, photo upload and survey processing, the first iPad build (owner needs Apple Developer + Expo accounts).
+  no-fly zones, cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
 
 ## Build phases
 1. **Flight app (Android)**: connect via MSDK, home point, automatic grid mission over a
