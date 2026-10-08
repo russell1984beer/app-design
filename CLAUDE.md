@@ -122,7 +122,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Runs on the owner's Galaxy S22 (built on the PC with Temurin JDK 17; Android Studio's newer
     JBR breaks the CMake step). DJI SDK native code needs its own libc++_shared.so (NDK r28),
     packaged by the plugin from `modules/dji-drone/android/libcxx/`; nothing may call DJI managers
-    before `DjiSdk.initialized`. Not yet tried in DJI's simulator. Until a survey file is opened, the Survey uses a
+    before `DjiSdk.initialized`. Key listeners set up before registration never report, so they are
+    renewed on registration and on each drone connection (plus a once-a-second direct read). Connected
+    to the drone and DJI's simulator (Link OK, battery shown); the 9 simulator tests are not yet run. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
