@@ -89,6 +89,9 @@ class DroneController(
   private var failsafe = Failsafe.NONE
   private var takeoffRequestedAtMs: Long? = null
   private var appTakeoffInProgress = false
+  private var takeoffStartedAtMs = 0L
+  /** Take-off finished, waiting for virtual sticks to come on. */
+  private var handingOverAtMs: Long? = null
   private var pilotTookOver = false
   private var target: Target? = null
   private val goTo = GoToController()
@@ -247,9 +250,15 @@ class DroneController(
   private fun doTakeOff() {
     takeoffRequestedAtMs = null
     pilotTookOver = false
+    // Marked before the command is sent: the motors can start before DJI confirms it, and a
+    // take-off the app did not ask for counts as the pilot flying.
+    appTakeoffInProgress = true
+    takeoffStartedAtMs = scheduler.nowMs()
     action(FlightControllerKey.KeyStartTakeoff) { e ->
-      if (e == null) appTakeoffInProgress = true
-      else status("error", "Take-off failed: ${e.text()}")
+      if (e != null) {
+        appTakeoffInProgress = false
+        status("error", "Take-off failed: ${e.text()}")
+      }
     }
   }
 
@@ -347,7 +356,21 @@ class DroneController(
     // Take-off finished: take control with virtual sticks so FlightSession can fly the mission.
     if (appTakeoffInProgress && isFlying && djiFlightMode != FlightMode.AUTO_TAKE_OFF && (location?.altitude ?: 0.0) > 0.8) {
       appTakeoffInProgress = false
+      handingOverAtMs = now
       enableSticks()
+    }
+    // Still the app's take-off until virtual sticks are on; then the app is in control.
+    handingOverAtMs?.let {
+      if (appInControl()) handingOverAtMs = null
+      else if (now - it > HANDOVER_WAIT_MS) {
+        handingOverAtMs = null
+        status("error", "Could not take control after take-off. Fly manually or press RTH.")
+      }
+    }
+    // Take-off asked for but the drone never left the ground.
+    if (appTakeoffInProgress && !isFlying && !motorsOn && now - takeoffStartedAtMs > TAKEOFF_WAIT_MS) {
+      appTakeoffInProgress = false
+      status("error", "Take-off did not start. Check the drone and try again.")
     }
     // Pending take-off waiting for safety settings for too long.
     takeoffRequestedAtMs?.let {
@@ -397,7 +420,10 @@ class DroneController(
   private fun enableSticks() {
     if (pilotTookOver) return
     sticks.enableVirtualStick(completion { e ->
-      if (e != null) status("error", "Could not take control after take-off: ${e.text()}. Fly manually or press RTH.")
+      if (e != null) {
+        handingOverAtMs = null
+        status("error", "Could not take control after take-off: ${e.text()}. Fly manually or press RTH.")
+      }
       else sticks.setVirtualStickAdvancedModeEnabled(true)
     })
   }
@@ -443,7 +469,7 @@ class DroneController(
         "lng" to loc?.longitude,
         "altitudeM" to (loc?.altitude ?: 0.0),
         "batteryPercent" to battery,
-        "flightMode" to TelemetryRules.flightMode(djiFlightMode?.name, isFlying, motorsOn, appInControl(), appTakeoffInProgress),
+        "flightMode" to TelemetryRules.flightMode(djiFlightMode?.name, isFlying, motorsOn, appInControl(), appTakeoffInProgress || handingOverAtMs != null),
         "signalOk" to TelemetryRules.signalOk(rcConnected, aircraftConnected, now - locationAtMs),
         "windSpeedMs" to TelemetryRules.windSpeedMs(windSpeed),
         "windFromDeg" to TelemetryRules.windDirectionDeg(windDirection?.name),
@@ -508,6 +534,7 @@ class DroneController(
     const val TICK_MS = 100L
     const val PHOTO_TIMEOUT_MS = 5000L
     const val TAKEOFF_WAIT_MS = 10_000L
+    const val HANDOVER_WAIT_MS = 5_000L
     const val SIMULATOR_SATELLITES = 15
   }
 }
