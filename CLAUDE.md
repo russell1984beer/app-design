@@ -112,6 +112,10 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     `npm run ipad` builds in Expo's cloud and sends it to TestFlight (see `docs/ipad.md`). Off
     Android the DJI module is replaced by a stand-in (`canFly` false): no Scan tab, no flight buttons.
     Not built for iOS yet.
+  - Cloud builds for the phone (being set up, see `docs/cloud-builds.md`): `eas.json` profile `phone`
+    (internal APK, EAS environment `preview`, `DJI_API_KEY` stored as an Expo secret by the owner);
+    `npm run phone:cloud` starts it from the cloud workspace with `EXPO_TOKEN`. Needs expo.dev hosts
+    allowed in the environment's network settings. The APK contains the DJI key: never share its link.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin

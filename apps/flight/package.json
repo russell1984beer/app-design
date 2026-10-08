@@ -10,7 +10,8 @@
     "test": "node --test modules/dji-drone/src/*.test.ts plugins/*.test.js",
     "typecheck": "tsc --noEmit",
     "phone": "expo run:android --variant release",
-    "ipad": "npx eas-cli@latest build --platform ios --profile ipad --auto-submit"
+    "ipad": "npx eas-cli@latest build --platform ios --profile ipad --auto-submit",
+    "phone:cloud": "npx eas-cli@latest build --platform android --profile phone --non-interactive --no-wait"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

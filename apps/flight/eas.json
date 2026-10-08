@@ -4,6 +4,13 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "phone": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "ipad": {
       "distribution": "store",
       "autoIncrement": true,
