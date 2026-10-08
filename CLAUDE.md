@@ -62,7 +62,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   ground/surface height grids (25 cm) and the plot photo, lined up through the scan details. The app
   opens it (Survey tab, iPad too); levels, contours, slope, design and materials then use it. Steps for
   the owner: `docs/survey-processing.md`. Checked end to end in the cloud workspace with computer-drawn
-  photos of a known garden flown on the real plan: ground levels within 0.5 cm median, 2.6 cm worst.
+  photos of a known garden (with raised houses) flown on the real plan: ground levels within 0.5 cm
+  median, 2.7 cm worst; roof height 6.02 m against 6.00 m.
   Cloud upload/sync of photos and surveys is not built yet.
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
   - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. `planSurvey` is
