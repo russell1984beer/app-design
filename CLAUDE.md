@@ -29,7 +29,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - Scans flown on Android sync to the cloud and appear on iOS.
 
 ## Secrets
-- The DJI App Key is tied to the package name. Keep it in an untracked local config file
+- The DJI App Key is tied to the package name, `com.plotwise.app` (Android package and iOS bundle id). Keep it in an untracked local config file
   (e.g. `local.properties` / `.env`), list that file in `.gitignore`, never commit it,
   never print it in logs.
 

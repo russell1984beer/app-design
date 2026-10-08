@@ -130,7 +130,7 @@ Do these in order. Each step says how to check it worked.
 6. **Get a DJI App Key:**
    1. Sign in at developer.dji.com.
    2. Go to *User Center → Apps → Create App*. App type: **Mobile SDK**. Package name:
-      **com.plotwise.flight** (it must be exactly this).
+      **com.plotwise.app** (it must be exactly this).
    3. Activate the app from the email DJI sends.
    4. Copy the App Key.
 7. **Put the key in a file that never gets uploaded:**

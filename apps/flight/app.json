@@ -10,7 +10,7 @@
     ],
     "userInterfaceStyle": "automatic",
     "android": {
-      "package": "com.plotwise.flight"
+      "package": "com.plotwise.app"
     },
     "plugins": [
       [
