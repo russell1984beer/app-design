@@ -106,7 +106,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     +, − and Fit buttons top right. One finger works as before; a tap that turns into a pinch is taken back. Works on the phone, pinch smooth (9 October 2026).
   - Wide screens (phone sideways, iPad; `wide` in App.tsx): the title sits over the map in the left
     column and the panel runs full height on the right. Checked on the phone (9 October 2026). The tab bar is
-    tucked away there; a "Menu" button bottom-left of the map brings it up until a tab is picked.
+    tucked away there; a "Menu" button bottom-left of the map brings it up until a tab is picked (works on the phone; overlapping height labels are left out, tidier).
   - `src/EmergencyBar.tsx`: big red STOP button on every tab while the app flies the drone.
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
     Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
