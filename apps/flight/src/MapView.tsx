@@ -687,7 +687,10 @@ function heightsLayer(s: AppState) {
 
 /** Labels on the tallest spots (trees, roofs): the highest point within 3 m, at most 10 of them. */
 function heightLabels(s: AppState, px: (n: number) => number) {
-  return heights(s).peaks.map((p) => (
+  // Only labels that do not overlap on screen (tallest first): zoom in to see the rest.
+  const shown: HeightCell[] = [];
+  for (const p of heights(s).peaks) if (!shown.some((o) => Math.abs(o.x - p.x) < px(64) && Math.abs(o.y - p.y) < px(20))) shown.push(p);
+  return shown.map((p) => (
       <G key={`l${p.x},${p.y}`}>
         <Circle cx={p.x + p.cell / 2} cy={p.y + p.cell / 2} r={0.25} fill={C.ink} />
         <T x={p.x + p.cell / 2 + 0.4} y={p.y + p.cell / 2 + 0.35} size={0.95} weight="700" px={px}>{`${p.h.toFixed(1)} m`}</T>

@@ -3,7 +3,7 @@
 
 import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
@@ -52,6 +52,10 @@ function Shell() {
   const { width, height } = useWindowDimensions();
   // Side by side on tablets, and on the phone turned sideways in the controller.
   const wide = width >= 820 || width > height;
+  // Sideways the tab bar is tucked away to give the map and panel the full height; the Menu button
+  // brings it up, and it drops away again once a tab is picked.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const showNav = !wide || menuOpen;
 
   useEffect(() => {
     loadSaved().then(loadSavedSurvey).then(loadSavedLidar).then(() => commit());
@@ -87,6 +91,17 @@ function Shell() {
           {wide && header}
           <View style={{ flex: 1, minHeight: 0 }}>
             <MapView />
+            {wide && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={menuOpen ? "Hide the tabs" : "Show the tabs"}
+                onPress={() => setMenuOpen(!menuOpen)}
+                hitSlop={8}
+                style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={styles.menuText}>{menuOpen ? "Hide menu ▾" : `Menu: ${TABS.find(([id]) => id === s.tab)?.[1]} ▴`}</Text>
+              </Pressable>
+            )}
           </View>
         </View>
         <View style={[styles.panel, wide ? { width: 390, maxHeight: undefined, borderTopRightRadius: 0 } : { maxHeight: height * 0.46 }]}>
@@ -96,7 +111,7 @@ function Shell() {
         </View>
       </KeyboardAvoidingView>
       <EmergencyBar />
-      <Nav tab={s.tab} bottom={insets.bottom} />
+      {showNav && <Nav tab={s.tab} bottom={insets.bottom} onPick={() => setMenuOpen(false)} />}
     </View>
   );
 }
@@ -110,13 +125,16 @@ const TABS: [Tab, string][] = [
   ["quote", "Materials"],
 ];
 
-function Nav({ tab, bottom }: { tab: Tab; bottom: number }) {
+function Nav({ tab, bottom, onPick }: { tab: Tab; bottom: number; onPick: () => void }) {
   return (
     <View style={[styles.nav, { paddingBottom: bottom }]} accessibilityRole="tablist">
       {TABS.filter(([id]) => canFly || id !== "scan").map(([id, label]) => {
         const on = tab === id;
         return (
-          <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => go(id)} style={styles.navBtn}>
+          <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => {
+              go(id);
+              onPick();
+            }} style={styles.navBtn}>
             <View style={[styles.navIcon, on && { backgroundColor: C.hivis }]}>
               <TabIcon id={id} colour={on ? C.ink : C.muted} />
             </View>
@@ -174,4 +192,16 @@ const styles = StyleSheet.create({
   navBtn: { flex: 1, alignItems: "center", gap: 3, paddingTop: 9, paddingBottom: 11 },
   navIcon: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   navText: { fontSize: 11, color: C.muted },
+  menuBtn: {
+    position: "absolute",
+    left: 0,
+    bottom: 0,
+    backgroundColor: C.paper,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  menuText: { fontSize: 14, fontWeight: "700", color: C.ink },
 });
