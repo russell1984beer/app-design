@@ -104,6 +104,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     saved on the phone (AsyncStorage), so a stopped scan can resume.
   - Map zoom (`src/mapZoom.ts`, per tab): pinch with two fingers to zoom (up to 8x) and slide the map;
     +, − and Fit buttons top right. One finger works as before; a tap that turns into a pinch is taken back. Works on the phone, pinch smooth (9 October 2026).
+  - Wide screens (phone sideways, iPad; `wide` in App.tsx): the title sits over the map in the left
+    column and the panel runs full height on the right. Checked on the phone (9 October 2026).
   - `src/EmergencyBar.tsx`: big red STOP button on every tab while the app flies the drone.
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
     Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
