@@ -543,7 +543,8 @@ function street(s: AppState, px: (n: number) => number) {
         Street
       </T>
       {sea !== null && (
-        <T x={W / 2} y={H + 2.75} size={1} anchor="middle" fill="#2E3836" px={px}>
+        // At least a line of text (13 pixels) below "Street", which never gets smaller than 11 pixels.
+        <T x={W / 2} y={H + 1.45 + Math.max(1.3, px(13))} size={1} anchor="middle" fill="#2E3836" px={px}>
           {`${sea.toFixed(1)} m above sea level`}
         </T>
       )}

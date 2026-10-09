@@ -68,18 +68,26 @@ function Shell() {
     );
   }
 
+  const header = (
+    <View style={[styles.header, wide && { paddingHorizontal: 0 }]}>
+      <Text style={styles.brand}>Plotwise</Text>
+      <Text style={styles.proj}>Test property, whole plot</Text>
+    </View>
+  );
+
   const Panel = { plan: PlanPanel, scan: ScanPanel, survey: SurveyPanel, design: DesignPanel, roof: RoofPanel, quote: MaterialsPanel }[s.tab];
 
   return (
     <View style={[styles.body, { paddingTop: insets.top }]}>
       <SystemBars />
-      <View style={styles.header}>
-        <Text style={styles.brand}>Plotwise</Text>
-        <Text style={styles.proj}>Test property, whole plot</Text>
-      </View>
+      {!wide && header}
       <KeyboardAvoidingView behavior="height" style={[styles.main, wide && { flexDirection: "row" }]}>
-        <View style={[styles.mapWrap, wide && { paddingHorizontal: 16, paddingVertical: 8 }]}>
-          <MapView />
+        {/* Sideways (or on the iPad) the title sits over the map, so the panel can use the full height. */}
+        <View style={[styles.mapWrap, wide && { paddingHorizontal: 16, paddingBottom: 8 }]}>
+          {wide && header}
+          <View style={{ flex: 1, minHeight: 0 }}>
+            <MapView />
+          </View>
         </View>
         <View style={[styles.panel, wide ? { width: 390, maxHeight: undefined, borderTopRightRadius: 0 } : { maxHeight: height * 0.46 }]}>
           <ScrollView contentContainerStyle={{ padding: 18, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
