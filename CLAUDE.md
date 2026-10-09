@@ -123,7 +123,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     repeated simulator tests filled the storage and the camera then answered -472 "weak GPS"; a photo failure
     with no room left now says the storage is full.
     `src/DroneStorage.tsx` (Scan tab and test bench): "room for N photos" and a two-tap "Format the drone's
-    storage" (Kotlin `formatStorage`: `CameraKey.KeyFormatStorage` on the storage in use; only landed, motors off).
+    storage" (Kotlin `formatStorage`: `CameraKey.KeyFormatStorage` on the storage in use; only landed, motors off). Worked on the phone (9 October 2026).
   - Materials tab: editable unit prices (saved on the phone), Export PDF quote (expo-print) and
     Export DXF plan (R12, metres), both through the share sheet. Generators in garden-core `export.ts`.
   - iPad: `app.json` has iOS (`com.plotwise.app`, tablet); `eas.json` profile `ipad`;
