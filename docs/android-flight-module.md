@@ -222,7 +222,7 @@ looked wrong.
 | 7. Phone loses the controller | Phone cable unplugged mid-scan: the app sees the signal go and sends nothing. | PASS | The simulated flight ends with the cable; picking a flight back up is checked on the first real flight (U8). |
 | 8. Controller switched off | The drone's own signal-loss failsafe. |  PASS | |
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. |  PASS | |
-| 10. Obstacle close by | The app's obstacle stop (a 2 m obstacle fed into the app for 3 seconds): stops, says why, hovers until Resume. | | DJI's simulator has nothing for the drone's sensors to see. |
+| 10. Obstacle close by | The app's obstacle stop (a 2 m obstacle fed into the app for 3 seconds): stops, says why, hovers until Resume. | PASS | DJI's simulator has nothing for the drone's sensors to see. |
 
 **Not tested in the simulator:**
 
@@ -247,7 +247,7 @@ clearance check or watching the drone.
 
 ## After all 10 pass: the first flight check
 
-All 9 passed on 9 October 2026 (test 10, the obstacle stop, was added afterwards and needs a run too). The first real flight is the **first flight check** on the Scan
+All 9 passed on 9 October 2026; test 10 (the obstacle stop, added afterwards) passed the same evening. The first real flight is the **first flight check** on the Scan
 tab (Set up the first flight check). It takes off, climbs to 10 m above the take-off point, hovers
 for 60 seconds, then scans the bottom of the garden up to the take-off point (the full width, in the
 garden scan's pattern, starting at the far end), comes back over the take-off point and lands
