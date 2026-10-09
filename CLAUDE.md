@@ -116,6 +116,10 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     (internal APK, EAS environment `preview`, `DJI_API_KEY` stored as an Expo secret by the owner);
     `npm run phone:cloud` starts it from the cloud workspace with `EXPO_TOKEN`. Needs expo.dev hosts
     allowed in the environment's network settings. The APK contains the DJI key: never share its link.
+  - First flight check (Scan tab, `src/panels/FirstFlight.tsx`; flight-core `planFirstFlight`, test
+    `test/first-flight.test.ts`): 5 m up, 60 s hover (wind reading vs Met Office for U2/U3, optional
+    cable unplug for U8, "carry on" button), a 4 m square with 4 photos, then lands straight down
+    (`Mission.endWith = "land"`, waypoint `holdS`). Recorded in `firstFlightDoneAt`. Not flown yet.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
@@ -146,8 +150,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
-- Next: the owner adds a Met Office key (real take-offs are blocked without a forecast); a short, low first
-  real flight in the garden that also checks U2/U3 (wind against DJI Fly) and U8 (cable out while hovering); DJI FlySafe
+- Next: the owner adds a Met Office key (real take-offs are blocked without a forecast); the first flight check
+  (built) in the garden, which also checks U2/U3 (wind) and U8 (cable out while hovering); DJI FlySafe
   no-fly zones, cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
 
 ## Build phases

@@ -64,6 +64,9 @@ export class FlightSession {
   private photoAttempts = new Map<number, number>();
   private airborneSince?: { timeS: number; battery: number };
   private heldFrom?: SessionState;
+  /** Arrival time at the waypoint being held over (waypoint holdS). */
+  private holdStart?: { index: number; timeS: number };
+  private holdEnded = new Set<number>();
 
   constructor(options: FlightSessionOptions) {
     this.o = options;
@@ -109,6 +112,23 @@ export class FlightSession {
     if (this.state !== "holding") return;
     this.setState(this.heldFrom ?? "scanning");
     this.heldFrom = undefined;
+  }
+
+  /** Seconds left of a waypoint's hover (holdS), or undefined when not holding over one. */
+  get holdRemainingS(): number | undefined {
+    const h = this.holdStart;
+    if (!h || this.holdEnded.has(h.index) || this.state !== "scanning") return undefined;
+    const w = this.o.mission.waypoints.find((x) => x.index === h.index);
+    return Math.max(0, (w?.holdS ?? 0) - (this.now() - h.timeS));
+  }
+
+  /** The pilot is happy: carry on now instead of waiting out the hover. */
+  endHold(): void {
+    if (this.holdStart) this.holdEnded.add(this.holdStart.index);
+  }
+
+  private now(): number {
+    return this.o.clock ? this.o.clock() : performance.now() / 1000;
   }
 
   /** Land straight down where it is (the pilot has checked the ground below is clear). */
@@ -199,7 +219,7 @@ export class FlightSession {
     const next = remainingWaypoints(mission, this.progress)[0];
 
     if (this.state === "takingOff") {
-      if (!next) return this.goHome("complete");
+      if (!next) return this.finish();
       // Climb straight up above the take-off point before going anywhere.
       bridge.goTo(t.position, next.altitudeM, mission.speedMs);
       this.setState("climbing");
@@ -207,12 +227,12 @@ export class FlightSession {
     }
 
     if (this.state === "climbing") {
-      if (!next) return this.goHome("complete");
+      if (!next) return this.finish();
       if (Math.abs(t.altitudeM - next.altitudeM) < ARRIVED_ALT_M) this.setState("scanning");
       else return;
     }
 
-    if (!next) return this.goHome("complete");
+    if (!next) return this.finish();
 
     if (this.commandedIndex !== next.index) {
       bridge.setGimbalPitch(next.gimbalPitchDeg);
@@ -224,6 +244,14 @@ export class FlightSession {
 
     const arrived =
       distanceM(t.position, next.position) < ARRIVED_M && Math.abs(t.altitudeM - next.altitudeM) < ARRIVED_ALT_M;
+    if (arrived && next.holdS && !this.holdEnded.has(next.index)) {
+      if (this.holdStart?.index !== next.index) {
+        this.holdStart = { index: next.index, timeS: this.now() };
+        this.log.push(`hovering ${next.holdS} s over waypoint ${next.index}`);
+      }
+      if (this.now() - this.holdStart.timeS < next.holdS) return;
+      this.holdEnded.add(next.index);
+    }
     if (arrived && !this.photoRequested) {
       if (next.photo) {
         bridge.takePhoto(next.index);
@@ -269,6 +297,14 @@ export class FlightSession {
     else if (t.flightMode === "pilot") this.setState("pilotControl");
     else if (t.flightMode === "returning" || t.flightMode === "landing") this.setState("returning");
     else this.goHome("signalLoss"); // drone was hovering (failsafe set to hover): bring it home
+  }
+
+  /** Every waypoint done: the drone's own Return to Home, or land straight down if the mission says so. */
+  private finish(): void {
+    if (this.o.mission.endWith !== "land") return this.goHome("complete");
+    this.o.bridge.land();
+    this.returnReason = "complete";
+    this.setState("landing");
   }
 
   private goHome(reason: ReturnReason): void {

@@ -5,7 +5,7 @@ import type { Telemetry } from "../../../packages/flight-core/src/bridge.ts";
 import { gsdCm, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
 import { fromLocal, toLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
-import { planSurvey } from "../../../packages/flight-core/src/planner.ts";
+import { planFirstFlight, planSurvey } from "../../../packages/flight-core/src/planner.ts";
 import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/roof.ts";
 import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
 import { eastNorthToPlan, planToEastNorth, type Pt } from "../../../packages/garden-core/src/index.ts";
@@ -79,17 +79,24 @@ export function anchorFor(s: AppState, t: Telemetry | null): LatLng | null {
   return t?.signalOk ? t.position : null;
 }
 
-export type FlightPlan = { kind: "survey" | "roof"; mission: Mission; boundary: LatLng[]; property?: LatLng[]; anchor: LatLng; check: PreflightResult };
+export type FlightKind = "survey" | "roof" | "check";
 
-export function prepareFlight(kind: "survey" | "roof", s: AppState, t: Telemetry | null, resume = false): FlightPlan | { error: string } {
+export type FlightPlan = { kind: FlightKind; mission: Mission; boundary: LatLng[]; property?: LatLng[]; anchor: LatLng; check: PreflightResult };
+
+export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null, resume = false): FlightPlan | { error: string } {
   // Resuming uses the home point's position from the first flight, so the plan is exactly the same.
-  const anchor = resume && s.resume[kind] ? s.resume[kind].anchor : anchorFor(s, t);
+  const saved = kind === "check" ? undefined : s.resume[kind];
+  const anchor = resume && saved ? saved.anchor : anchorFor(s, t);
   if (!anchor) return { error: "No GPS position from the drone yet. Put the drone on the take-off point, switch it on and wait for GPS." };
   let mission: Mission;
   let boundary: LatLng[];
   let property: LatLng[] | undefined;
   if (kind === "survey") {
     mission = surveyMission(s, anchor);
+    boundary = plotGps(s, anchor);
+  } else if (kind === "check") {
+    // Round wherever the drone is sitting (it should be on the take-off point), inside the plot.
+    mission = planFirstFlight(anchor);
     boundary = plotGps(s, anchor);
   } else {
     const r = roofScan(s, anchor);
@@ -137,20 +144,22 @@ export function resumable(kind: "survey" | "roof", s: AppState = S): { done: num
 /** Take off and fly the plan. Saves progress after every photo so the scan can resume. */
 export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
   if (S.mode === "sim" && !drone.simOn) await drone.setSimulator(true);
-  const saved = resume ? S.resume[plan.kind] : undefined;
+  const kind = plan.kind;
+  const saved = resume && kind !== "check" ? S.resume[kind] : undefined;
   const progress = saved && saved.progress.missionId === plan.mission.id ? saved.progress : undefined;
-  if (!resume) delete S.resume[plan.kind];
+  if (!resume && kind !== "check") delete S.resume[kind];
   drone.startJob(plan.kind, plan.anchor, {
     mission: plan.mission,
     boundary: plan.boundary,
     settings: S.safety,
     progress,
     onProgress: (p) => {
-      S.resume[plan.kind] = { anchor: plan.anchor, progress: p };
+      if (kind === "check") return; // a first flight check is short: it is simply flown again
+      S.resume[kind] = { anchor: plan.anchor, progress: p };
       if (plan.kind === "roof") S.roof.photosTaken = p.completedWaypoints.length;
       if (p.completedWaypoints.length >= plan.mission.waypoints.length) {
-        delete S.resume[plan.kind];
-        if (plan.kind === "survey" && S.mode === "real") recordScan(plan.anchor, plan.mission.waypoints.length);
+        delete S.resume[kind];
+        if (kind === "survey" && S.mode === "real") recordScan(plan.anchor, plan.mission.waypoints.length);
       }
       commitNow();
     },

@@ -12,7 +12,7 @@ import { DjiDrone, NativeDroneBridge } from "../modules/dji-drone";
 /** Where the simulated drone starts: a made-up open field. Change it if the simulator complains. */
 export const SIM_HOME: LatLng = { lat: 52.0, lng: -1.0 };
 
-export type JobKind = "survey" | "roof" | "test";
+export type JobKind = "survey" | "roof" | "check" | "test";
 
 export type Job = {
   kind: JobKind;
@@ -109,10 +109,17 @@ class DroneHub {
     const session = new FlightSession({ ...options, bridge: this.bridge, home: anchor });
     this.job = { kind, mission: options.mission, anchor, session };
     this.sessionLogLength = 0;
-    this.addLog(`Starting ${kind === "survey" ? "garden scan" : kind === "roof" ? "roof scan" : "simulator test"}`);
+    this.addLog(`Starting ${kind === "survey" ? "garden scan" : kind === "roof" ? "roof scan" : kind === "check" ? "first flight check" : "simulator test"}`);
     session.start();
     this.emit();
     return session;
+  }
+
+  /** Forget a finished flight (its result has been read). */
+  clearJob(): void {
+    if (this.flying) return;
+    this.job = null;
+    this.emit();
   }
 
   /** The emergency STOP button: hover in place and wait. */

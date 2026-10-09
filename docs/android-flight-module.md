@@ -230,11 +230,35 @@ looked wrong.
   cover it (normal, headwind and worn battery).
 - **The geofence.** The test plan stays inside the area. It is covered by the automatic tests.
 
-## After all 9 pass
+## After all 9 pass: the first flight check
 
-Only then plan the first real flight. Keep it low (10 m) and short, in the garden, with the
-propellers on and you holding the controller ready to press Pause. That flight needs its own
-checklist, which comes next.
+All 9 passed on 9 October 2026. The first real flight is the **first flight check** on the Scan
+tab (Set up the first flight check). It takes off, climbs to 5 m above the take-off point, hovers
+for 60 seconds, flies a 4 m square round the take-off point taking a photo straight down at each
+corner, comes back over the take-off point and lands straight down (it does not climb to the
+return height unless a safety rule or the pilot sends it home).
+
+Before it:
+
+1. The Met Office key is in `apps/flight/.env` and the app has been rebuilt (real take-offs are
+   blocked without a forecast).
+2. Switch the drone off and on after any simulator session (the simulator leaves it refusing to
+   take off).
+3. Daylight, low wind, propellers on, the drone on the take-off point in the garden, people and pets
+   indoors. Switch the Scan tab to **Real flight** and tick Before you fly on the Plan tab.
+4. Hold the controller the whole time. Pause stops the drone and gives you the sticks; Return to
+   Home brings it back.
+
+While it hovers, the screen shows:
+
+- **Wind:** the drone's own reading next to the Met Office forecast. Take a screenshot. This
+  settles U2 and U3 (a reading ten times too big or small, or from the opposite side, means the
+  units or direction are read wrongly).
+- **Unplugging the phone (optional):** unplug for 5 seconds, then plug back in. The drone should
+  hold its position; when the cable is back the app brings it home (U8). The check ends there.
+- **Carry on to the square now** skips the rest of the hover.
+
+Try it in DJI's simulator first if you like (propellers off): the same button works there.
 
 ## Not built yet
 

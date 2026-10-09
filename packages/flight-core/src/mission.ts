@@ -13,15 +13,19 @@ export type Waypoint = {
   gimbalPitchDeg: number;
   /** Compass heading the drone should face; undefined keeps the current heading. */
   headingDeg?: number;
+  /** Hover here this many seconds on arrival (before any photo), e.g. for checks on a first flight. */
+  holdS?: number;
 };
 
 export type Mission = {
   id: string;
-  kind: "grid" | "orbit";
+  kind: "grid" | "orbit" | "check";
   /** Cruise speed between waypoints, m/s. */
   speedMs: number;
   waypoints: Waypoint[];
   estimate: MissionEstimate;
+  /** After the last waypoint: the drone's own Return to Home (default), or land straight down where it is. */
+  endWith?: "returnHome" | "land";
 };
 
 export type MissionEstimate = {

@@ -8,6 +8,7 @@ import { compass } from "../../../../packages/garden-core/src/index.ts";
 import { shareScanDetails } from "../survey";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
+import { FirstFlightProgress, FirstFlightStart } from "./FirstFlight";
 import { surveyStatItems } from "./PlanPanel";
 
 /** Drone link, mode switch and live numbers: shared by the Scan and Roof tabs. */
@@ -127,6 +128,14 @@ export function ScanPanel() {
     }
   }
 
+  if (d.job?.kind === "check") {
+    return (
+      <View>
+        <FirstFlightProgress />
+      </View>
+    );
+  }
+
   if (job && (d.flying || job.session.state !== "landed" || !job.session.isComplete)) {
     const landed = job.session.state === "landed";
     return (
@@ -176,6 +185,7 @@ export function ScanPanel() {
       {error && <Status status="block" text={error} />}
       {resume && <Btn label={`Resume scan (${resume.done} of ${resume.total} photos done)`} onPress={() => takeOff(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
       <Btn label={resume ? "Start again from the beginning" : "Take off and scan"} alt={!!resume} onPress={() => takeOff(false)} disabled={"error" in plan || !plan.check.canTakeOff} />
+      <FirstFlightStart />
       <Btn label="Edit flight plan" alt onPress={() => go("plan")} />
       <Btn
         label="Simulator tests"
