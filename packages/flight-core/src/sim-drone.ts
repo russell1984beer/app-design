@@ -70,6 +70,7 @@ export class SimDrone implements DroneBridge {
       signalOk: this.signalOk,
       wind: { ...this.wind },
       windWarning: this.wind.speedMs >= 10.7 ? "strong" : this.wind.speedMs >= 8 ? "moderate" : "none",
+      obstacleM: this.obstacleM,
     };
   }
 
@@ -121,6 +122,13 @@ export class SimDrone implements DroneBridge {
   }
 
   // ---- Test controls -----------------------------------------------------
+
+  /** Something the drone's sensors see this close (undefined: nothing). */
+  obstacleM?: number;
+
+  setObstacle(distanceM: number | undefined): void {
+    this.obstacleM = distanceM;
+  }
 
   setSignal(ok: boolean): void {
     this.signalOk = ok;

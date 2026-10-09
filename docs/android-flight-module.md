@@ -99,6 +99,7 @@ Not checked yet:
 | U6 | Does the camera report each new photo in the simulator? | Waits up to 5 s for the photo report, otherwise counts the photo as failed. **Settled: yes** (28/28). | Test 1 |
 | U7 | Does Return to Home work straight after the app hands back the sticks? | Hands back the sticks, then starts Return to Home. **Settled: works** (test 2 passed). | Test 2 |
 | U8 | What happens to virtual sticks when the phone is unplugged? | Expects the drone to stop and hover. In DJI's simulator the simulated flight ends when the cable comes out (afterwards the drone reports motors off and its position never moves), so this can only be settled on the **first real flight**: hovering low in the garden, unplug the phone for a few seconds, check the drone holds position and that the app brings it home once the cable is back. | First real flight |
+| U9 | The drone's obstacle distances: are they millimetres, and which values mean "nothing seen"? Does the drone brake by itself while the app flies it with virtual sticks? | Reads them as millimetres; 0 and anything over 50 m count as nothing. Sets the drone's obstacle avoidance to **Brake**, sideways and upwards, before each flight (downwards is left alone, it would stop the landing). The phone's log shows the raw numbers every 5 seconds (`obstacle=h=<nearest>/<count>@<angle> up=<value>`). On the **first real flight**, while it hovers at 10 m, walk up to about 5 m from the drone's side (never under it): the log's nearest number should drop to about 5000. | First real flight |
 
 ## One-time setup on the Windows PC
 
@@ -207,7 +208,7 @@ The key stays on your PC and phone; `.env` is never uploaded to GitHub. Checked 
 
 Run them in order from the app. Each one says what to do and what should happen, and shows
 **PASS** or **CHECK** at the end. The app remembers each pass; the *Real flight* switch on the
-Scan and Roof tabs stays blocked until all 9 have passed. Fill in this table and send it back, along with anything that
+Scan and Roof tabs stays blocked until all 10 have passed. Fill in this table and send it back, along with anything that
 looked wrong.
 
 | Test | What it checks | Result | Notes |
@@ -221,6 +222,7 @@ looked wrong.
 | 7. Phone loses the controller | Phone cable unplugged mid-scan: the app sees the signal go and sends nothing. | PASS | The simulated flight ends with the cable; picking a flight back up is checked on the first real flight (U8). |
 | 8. Controller switched off | The drone's own signal-loss failsafe. |  PASS | |
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. |  PASS | |
+| 10. Obstacle close by | The app's obstacle stop (a 2 m obstacle fed into the app for 3 seconds): stops, says why, hovers until Resume. | | DJI's simulator has nothing for the drone's sensors to see. |
 
 **Not tested in the simulator:**
 
@@ -228,9 +230,24 @@ looked wrong.
   cover it (normal, headwind and worn battery).
 - **The geofence.** The test plan stays inside the area. It is covered by the automatic tests.
 
-## After all 9 pass: the first flight check
+### Obstacle stop
 
-All 9 passed on 9 October 2026. The first real flight is the **first flight check** on the Scan
+Two layers, both on during app flights:
+
+- **The drone's own brake.** Before every take-off the app sets the drone's obstacle avoidance to
+  Brake, sideways and upwards. A failure only warns.
+- **The app's stop.** If the drone's sensors report anything within 3 m (1.5 m on the roof circles,
+  which fly 2 m from the roof) during the scan, the app stops and hovers exactly like the STOP
+  button, and the yellow bar says it stopped for an obstacle. Resume ignores obstacles for 15 seconds
+  so you can carry on past it; Return home or Land here as usual. It does not act during take-off,
+  the return or landing (the drone's own brake and the pilot cover those).
+
+Thin branches and wires are hard for any drone's sensors to see, so it does not replace the
+clearance check or watching the drone.
+
+## After all 10 pass: the first flight check
+
+All 9 passed on 9 October 2026 (test 10, the obstacle stop, was added afterwards and needs a run too). The first real flight is the **first flight check** on the Scan
 tab (Set up the first flight check). It takes off, climbs to 10 m above the take-off point, hovers
 for 60 seconds, then scans the bottom of the garden up to the take-off point (the full width, in the
 garden scan's pattern, starting at the far end), comes back over the take-off point and lands

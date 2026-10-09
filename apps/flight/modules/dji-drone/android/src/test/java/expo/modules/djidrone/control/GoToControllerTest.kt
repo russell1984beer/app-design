@@ -146,4 +146,12 @@ class TelemetryRulesTest {
     assertNull(TelemetryRules.windDirectionDeg("WINDLESS"))
     assertEquals(8.5, TelemetryRules.windSpeedMs(85))
   }
+
+  @Test
+  fun `obstacle distances`() {
+    assertEquals(2.5, TelemetryRules.nearestObstacleM(listOf(0, 8000, 2500, 65535), 60000))
+    assertEquals(1.2, TelemetryRules.nearestObstacleM(listOf(8000), 1200))
+    assertNull(TelemetryRules.nearestObstacleM(listOf(0, 65535, 60000), 0))
+    assertNull(TelemetryRules.nearestObstacleM(emptyList(), 0))
+  }
 }

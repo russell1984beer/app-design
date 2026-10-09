@@ -46,6 +46,13 @@ export type FlightSessionOptions = {
   clock?: () => number;
 };
 
+/** The drone's sensors see something this close while scanning: stop, hover and wait for the pilot. */
+export const OBSTACLE_STOP_M = 3;
+/** Roof circles keep only 2 m from the roof (MIN_ROOF_DISTANCE_M), so they stop for something nearer than that. */
+export const OBSTACLE_STOP_ORBIT_M = 1.5;
+/** After the pilot resumes, give them this long to fly clear before the obstacle rule applies again. */
+const OBSTACLE_RESUME_GRACE_S = 15;
+
 const ARRIVED_M = 0.5;
 const ARRIVED_ALT_M = 0.3;
 const MAX_PHOTO_ATTEMPTS = 3;
@@ -64,6 +71,9 @@ export class FlightSession {
   private photoAttempts = new Map<number, number>();
   private airborneSince?: { timeS: number; battery: number };
   private heldFrom?: SessionState;
+  /** Why it is holding: the pilot's STOP button, or an obstacle the drone's sensors saw. */
+  holdReason?: "pilot" | "obstacle";
+  private obstacleIgnoreUntil = -Infinity;
   /** Arrival time at the waypoint being held over (waypoint holdS). */
   private holdStart?: { index: number; timeS: number };
   private holdEnded = new Set<number>();
@@ -104,14 +114,24 @@ export class FlightSession {
     this.heldFrom = this.state === "climbing" ? "takingOff" : this.state;
     this.commandedIndex = undefined;
     this.photoRequested = false;
+    this.holdReason = "pilot";
     this.setState("holding");
+  }
+
+  /** The drone's own sensors see something close: stop and hover, exactly like the STOP button. */
+  private obstacleHold(distanceM: number): void {
+    this.pilotHold();
+    this.holdReason = "obstacle";
+    this.log.push(`obstacle ${distanceM.toFixed(1)} m away: stopped, hovering, waiting for the pilot`);
   }
 
   /** Carry on with the scan after an emergency stop. */
   pilotResume(): void {
     if (this.state !== "holding") return;
+    if (this.holdReason === "obstacle") this.obstacleIgnoreUntil = this.now() + OBSTACLE_RESUME_GRACE_S;
     this.setState(this.heldFrom ?? "scanning");
     this.heldFrom = undefined;
+    this.holdReason = undefined;
   }
 
   /** Seconds left of a waypoint's hover (holdS), or undefined when not holding over one. */
@@ -210,6 +230,12 @@ export class FlightSession {
 
     // Emergency stop: keep hovering, send nothing else, wait for the pilot.
     if (this.state === "holding") return;
+
+    // Something close in front, beside or above (a branch, a wall): stop before the drone gets to it.
+    if (this.state === "scanning" && t.obstacleM !== undefined && t.obstacleM < (this.o.mission.kind === "orbit" ? OBSTACLE_STOP_ORBIT_M : OBSTACLE_STOP_M) && this.now() >= this.obstacleIgnoreUntil) {
+      this.obstacleHold(t.obstacleM);
+      return;
+    }
 
     this.flyMission(t);
   }

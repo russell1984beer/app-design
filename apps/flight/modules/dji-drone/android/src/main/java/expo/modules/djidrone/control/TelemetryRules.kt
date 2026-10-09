@@ -42,6 +42,19 @@ object TelemetryRules {
   /** Reasons the drone took control away from the app that mean the pilot has taken over. */
   val PILOT_TAKEOVER_REASONS = setOf("RC_PAUSE_STOP", "RC_SWITCH", "RC_NOT_P_MODE")
 
+  /**
+   * One of the drone's obstacle distances (DJI: millimetres) in metres; null for "nothing seen".
+   * 0 and very large values (the sensors' limit, often 65535 or 60000) mean nothing in range.
+   */
+  fun obstacleM(raw: Int): Double? = if (raw in 1 until OBSTACLE_MAX_MM) raw / 1000.0 else null
+
+  /** The nearest obstacle sideways (any direction round the drone) or above, metres; null if none. */
+  fun nearestObstacleM(horizontal: List<Int>, upward: Int): Double? =
+    (horizontal.mapNotNull { obstacleM(it) } + listOfNotNull(obstacleM(upward))).minOrNull()
+
+  /** Further than any obstacle sensor sees (the Mini 4 Pro's reach about 30-40 m). */
+  const val OBSTACLE_MAX_MM = 50_000
+
   fun windWarning(djiLevel: String?): String = when (djiLevel) {
     "LEVEL_1" -> "moderate"
     "LEVEL_2" -> "strong"

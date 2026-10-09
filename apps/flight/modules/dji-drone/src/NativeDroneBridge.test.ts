@@ -61,6 +61,7 @@ class FakeNative implements DjiDroneNative {
       productType: "DJI_MINI_4_PRO",
       djiFlightMode: null,
       pilotTookOver: t.flightMode === "pilot",
+      obstacleM: t.obstacleM ?? null,
     });
   }
 
@@ -173,6 +174,30 @@ test("gust from the simulator wind setting: returns home", () => {
   native.setSimulatorWind(-9, 0); // 9 m/s from the north
   runUntil(native, () => session.state === "landed");
   assert.equal(session.returnReason, "wind");
+});
+
+test("obstacle from the drone's sensors: stops and hovers, Resume finishes the scan", () => {
+  const { native, session, mission } = setup();
+  session.start();
+  runUntil(native, () => native.sim.photos.length >= 3);
+  native.sim.setObstacle(2);
+  runUntil(native, () => session.state === "holding");
+  assert.equal(session.holdReason, "obstacle");
+  native.sim.setObstacle(undefined);
+  session.pilotResume();
+  runUntil(native, () => session.state === "landed");
+  assert.equal(session.returnReason, "complete");
+  assert.equal(new Set(native.sim.photos.map((p) => p.waypointIndex)).size, mission.waypoints.length);
+});
+
+test("test bench obstacle stands in for the drone's own reading", () => {
+  const { native, bridge } = setup();
+  native.tick();
+  assert.equal(bridge.telemetry().obstacleM, undefined);
+  bridge.setTestObstacle(2);
+  assert.equal(bridge.telemetry().obstacleM, 2);
+  bridge.setTestObstacle(null);
+  assert.equal(bridge.telemetry().obstacleM, undefined);
 });
 
 test("no telemetry for 2 seconds counts as signal lost", () => {

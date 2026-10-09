@@ -13,6 +13,8 @@ export type NativeTelemetry = {
   windSpeedMs: number | null;
   windFromDeg: number | null;
   windWarning: "none" | "moderate" | "strong";
+  /** Nearest thing the drone's sensors see sideways or above, metres; null when nothing is close (missing from older builds). */
+  obstacleM?: number | null;
   headingDeg: number;
   productType: string | null;
   djiFlightMode: string | null;

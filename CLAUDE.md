@@ -87,7 +87,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Run `npm test` there and keep it green; `npm run typecheck` checks types.
   - End-to-end tests in `test/flight.test.ts` cover normal scans, signal loss, gusts,
     low battery (incl. headwind and a fast-draining battery), resume, the pilot's return
-    button, the RC return button, pilot takeover, geofence and camera faults.
+    button, the RC return button, pilot takeover, geofence, camera faults and obstacles.
     `test/roof.test.ts` covers the roof scan. Damage detection is not built yet.
   - All planning and safety logic belongs here, not in the Android module.
 - `apps/flight/` (Expo SDK 57; flies on Android, other tabs also on iPad): the app. See `docs/android-flight-module.md`.
@@ -100,12 +100,17 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     point (the drone's position in real mode, a made-up field in simulator mode) and the garden's
     compass direction, and runs flights through one shared drone connection (`src/drone.ts`).
     Scan and Roof have a DJI simulator / Real flight switch; real flights stay blocked until all
-    9 simulator tests pass; the Met Office forecast (`src/weather.ts`) gates real take-offs. State and scan progress are
+    10 simulator tests pass; the Met Office forecast (`src/weather.ts`) gates real take-offs. State and scan progress are
     saved on the phone (AsyncStorage), so a stopped scan can resume.
   - `src/EmergencyBar.tsx`: big red STOP button on every tab while the app flies the drone.
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
     Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
     can still take the sticks.
+  - Obstacle stop: before take-off the Kotlin module sets the drone's own obstacle avoidance to Brake
+    (sideways and up) and passes the nearest sensor distance on as Telemetry `obstacleM` (read as mm,
+    raw values in the 5 s log line; U9). FlightSession holds (like STOP, `holdReason` "obstacle") when
+    something is within 3 m while scanning (1.5 m on roof circles), with 15 s grace after Resume.
+    Test bench test 10 feeds a 2 m obstacle in (`setTestObstacle`).
   - Materials tab: editable unit prices (saved on the phone), Export PDF quote (expo-print) and
     Export DXF plan (R12, metres), both through the share sheet. Generators in garden-core `export.ts`.
   - iPad: `app.json` has iOS (`com.plotwise.app`, tablet); `eas.json` profile `ipad`;
@@ -178,7 +183,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     new home point until it has recorded its own, so the app retries for 20 s. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
-  - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
+  - Open questions U1–U9 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
 - Next: the first flight check

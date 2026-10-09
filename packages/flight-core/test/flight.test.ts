@@ -424,3 +424,82 @@ test("emergency stop: the pilot can still take the sticks", () => {
   session.update();
   assert.equal(session.state, "pilotControl");
 });
+
+test("obstacle: the drone's sensors see something close mid-scan, so it stops and hovers for the pilot", () => {
+  const { sim, session } = setup();
+  session.start();
+  run(sim, session, { until: () => sim.photos.length >= 4 && session.state === "scanning" });
+  sim.setObstacle(2);
+  sim.step(0.1);
+  session.update();
+  assert.equal(session.state, "holding");
+  assert.equal(session.holdReason, "obstacle");
+  const photos = sim.photos.length;
+  for (let i = 0; i < 300; i++) {
+    sim.step(0.1);
+    session.update();
+  }
+  assert.equal(session.state, "holding", "waits for the pilot");
+  assert.equal(sim.photos.length, photos, "no photos while holding");
+});
+
+test("obstacle further than the stop distance: the scan carries on", () => {
+  const { sim, session, mission } = setup();
+  session.start();
+  sim.setObstacle(6);
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(sim.photos.length, mission.waypoints.length);
+});
+
+test("obstacle, then Resume: the pilot gets time to clear it, then the scan finishes", () => {
+  const { sim, session, mission } = setup();
+  session.start();
+  run(sim, session, { until: () => sim.photos.length >= 4 && session.state === "scanning" });
+  sim.setObstacle(2);
+  sim.step(0.1);
+  session.update();
+  assert.equal(session.holdReason, "obstacle");
+  // Still seen when Resume is pressed: the grace time stops it holding again straight away.
+  session.pilotResume();
+  assert.equal(session.holdReason, undefined);
+  for (let i = 0; i < 50; i++) {
+    sim.step(0.1);
+    session.update();
+  }
+  assert.equal(session.state, "scanning");
+  sim.setObstacle(undefined);
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(new Set(sim.photos.map((p) => p.waypointIndex)).size, mission.waypoints.length);
+});
+
+test("obstacle seen again after the grace time: stops again", () => {
+  const { sim, session } = setup();
+  session.start();
+  run(sim, session, { until: () => sim.photos.length >= 4 && session.state === "scanning" });
+  sim.setObstacle(2);
+  sim.step(0.1);
+  session.update();
+  session.pilotResume();
+  const until = sim.timeS + 16;
+  while (sim.timeS < until && session.state === "scanning") {
+    sim.step(0.1);
+    session.update();
+  }
+  assert.equal(session.state, "holding");
+  assert.equal(session.holdReason, "obstacle");
+});
+
+test("obstacle on a roof circle: 2 m from the roof is expected, so only something nearer stops it", () => {
+  const mission = { ...planGrid(PLOT), kind: "orbit" as const };
+  const { sim, session } = setup({ mission });
+  session.start();
+  sim.setObstacle(2);
+  run(sim, session, { until: () => sim.photos.length >= 4 });
+  assert.equal(session.state, "scanning");
+  sim.setObstacle(1);
+  sim.step(0.1);
+  session.update();
+  assert.equal(session.holdReason, "obstacle");
+});

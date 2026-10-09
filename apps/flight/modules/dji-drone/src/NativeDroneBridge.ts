@@ -67,7 +67,15 @@ export class NativeDroneBridge implements DroneBridge {
       linkUp: fresh && t!.rcConnected === true && t!.aircraftConnected === true,
       wind: this.testWind ?? (t?.windSpeedMs != null ? { speedMs: t.windSpeedMs, fromDeg: this.windFrom(t, position) } : undefined),
       windWarning: t?.windWarning ?? "none",
+      obstacleM: this.testObstacleM ?? (fresh && t!.obstacleM != null ? t!.obstacleM : undefined),
     };
+  }
+
+  private testObstacleM: number | null = null;
+
+  /** Test bench only: report an obstacle this close (DJI's simulator has nothing for the sensors to see). */
+  setTestObstacle(distanceM: number | null): void {
+    this.testObstacleM = distanceM;
   }
 
   private testWind: { speedMs: number; fromDeg: number } | null = null;

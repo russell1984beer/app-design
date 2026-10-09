@@ -34,6 +34,8 @@ export type Telemetry = {
   wind?: Wind;
   /** The drone's own wind warning level. */
   windWarning: "none" | "moderate" | "strong";
+  /** Nearest obstacle the drone's own sensors see, sideways or above, metres (none: nothing seen or not reported). */
+  obstacleM?: number;
 };
 
 export type DroneEvent =

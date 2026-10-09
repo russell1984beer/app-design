@@ -30,6 +30,11 @@ import dji.sdk.keyvalue.value.gimbal.GimbalAngleRotationMode
 import dji.v5.common.callback.CommonCallbacks
 import dji.v5.common.error.IDJIError
 import dji.v5.manager.KeyManager
+import dji.v5.manager.aircraft.perception.PerceptionManager
+import dji.v5.manager.aircraft.perception.data.ObstacleAvoidanceType
+import dji.v5.manager.aircraft.perception.data.ObstacleData
+import dji.v5.manager.aircraft.perception.data.PerceptionDirection
+import dji.v5.manager.aircraft.perception.listener.ObstacleDataListener
 import dji.v5.manager.diagnostic.DJIDeviceHealthInfoChangeListener
 import dji.v5.manager.diagnostic.DeviceHealthManager
 import dji.v5.manager.aircraft.simulator.InitializationSettings
@@ -83,6 +88,10 @@ class DroneController(
   private var windSpeed: Int? = null
   private var windDirection: WindDirection? = null
   private var windWarning: WindWarning? = null
+  /** Nearest thing the drone's sensors see sideways or above, metres, and when it was last reported. */
+  private var obstacleM: Double? = null
+  private var obstacleAtMs = 0L
+  private var obstacleRaw: String = "-"
   private var virtualStickEnabled = false
   private var authority: FlightControlAuthority? = null
 
@@ -131,6 +140,7 @@ class DroneController(
     keys.cancelListen(listenHolder)
     sticks.removeVirtualStickStateListener(stickListener)
     removeHealthListener()
+    removeObstacleListener()
     listening = false
     startListening()
   }
@@ -198,6 +208,11 @@ class DroneController(
     } catch (e: Exception) {
       Log.w(TAG, "Drone warnings not available: ${e.message}")
     }
+    try {
+      PerceptionManager.getInstance().addObstacleDataListener(obstacleListener)
+    } catch (e: Exception) {
+      Log.w(TAG, "Obstacle distances not available: ${e.message}")
+    }
     Log.i(TAG, "Listening to the drone.")
   }
 
@@ -208,6 +223,7 @@ class DroneController(
       keys.cancelListen(listenHolder)
       sticks.removeVirtualStickStateListener(stickListener)
       removeHealthListener()
+      removeObstacleListener()
       listening = false
     }
     scheduler.cancelAll()
@@ -269,6 +285,7 @@ class DroneController(
     setHomePoint(LocationCoordinate2D(homeLat, homeLng), ++failsafeRequest, HOME_POINT_TRIES, done("home point"))
     set(FlightControllerKey.KeyGoHomeHeight, returnHeightM, done("return height ($returnHeightM m)"))
     set(FlightControllerKey.KeyFailsafeAction, failsafeAction, done("signal-loss action"))
+    setObstacleBraking()
     // Photo mode for the scan; a failure here shows up later as failed photos.
     set(CameraKey.KeyCameraMode, CameraMode.PHOTO_NORMAL) { e ->
       if (e != null) status("warning", "Could not switch the camera to photo mode: ${e.text()}")
@@ -544,6 +561,45 @@ class DroneController(
     }
   }
 
+  // ---- Obstacle sensing ---------------------------------------------------------------------------
+
+  /**
+   * The drone's own obstacle sensing set to brake (stop in front of things, not steer round them)
+   * sideways and upwards. Downwards stays as the pilot set it (it would stop the landing). A failure
+   * only warns: the app's own obstacle stop (flight-core) and the pilot still apply.
+   */
+  private fun setObstacleBraking() {
+    val p = try { PerceptionManager.getInstance() } catch (e: Exception) {
+      status("warning", "The drone's obstacle braking could not be checked: ${e.message}")
+      return
+    }
+    val warn = { what: String -> { e: IDJIError? ->
+      if (e != null) status("warning", "Could not $what: ${e.text()}. The app still stops for close obstacles it is told about.")
+      else Log.i(TAG, "Obstacle sensing: $what done.")
+      Unit
+    } }
+    p.setObstacleAvoidanceType(ObstacleAvoidanceType.BRAKE, completion(warn("set the drone's obstacle avoidance to Brake")))
+    p.setObstacleAvoidanceEnabled(true, PerceptionDirection.HORIZONTAL, completion(warn("switch on sideways obstacle sensing")))
+    p.setObstacleAvoidanceEnabled(true, PerceptionDirection.UPWARD, completion(warn("switch on upward obstacle sensing")))
+  }
+
+  private val obstacleListener = ObstacleDataListener { data -> scheduler.post { onObstacleData(data) } }
+
+  private fun onObstacleData(data: ObstacleData?) {
+    if (data == null) return
+    val horizontal = data.horizontalObstacleDistance.orEmpty()
+    val up = data.upwardObstacleDistance
+    // Raw numbers in the 5 s log summary, to confirm the units on the first flights (DJI: millimetres).
+    obstacleRaw = "h=${horizontal.filter { TelemetryRules.obstacleM(it) != null }.minOrNull() ?: "-"}/${horizontal.size}@${data.horizontalAngleInterval} up=$up"
+    obstacleM = TelemetryRules.nearestObstacleM(horizontal, up)
+    obstacleAtMs = scheduler.nowMs()
+  }
+
+  private fun removeObstacleListener() {
+    try { PerceptionManager.getInstance().removeObstacleDataListener(obstacleListener) } catch (_: Exception) {}
+    obstacleM = null
+  }
+
   private fun removeHealthListener() {
     try { DeviceHealthManager.getInstance().removeDJIDeviceHealthInfoChangeListener(healthListener) } catch (_: Exception) {}
   }
@@ -626,7 +682,7 @@ class DroneController(
     }
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
-      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} mode=${djiFlightMode?.name}")
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw mode=${djiFlightMode?.name}")
     }
     try {
       sendTelemetry(now)
@@ -652,6 +708,8 @@ class DroneController(
         "windSpeedMs" to TelemetryRules.windSpeedMs(windSpeed),
         "windFromDeg" to TelemetryRules.windDirectionDeg(windDirection?.name),
         "windWarning" to TelemetryRules.windWarning(windWarning?.name),
+        // Only a fresh reading counts: old distances say nothing about what is there now.
+        "obstacleM" to (if (now - obstacleAtMs <= OBSTACLE_FRESH_MS) obstacleM else null),
         "headingDeg" to compassHeading,
         "productType" to productType,
         "djiFlightMode" to djiFlightMode?.name,
@@ -718,6 +776,7 @@ class DroneController(
     const val SIMULATOR_RETRY_MS = 2_000L
     const val RELISTEN_AGAIN_MS = 3_000L
     const val STALE_POSITION_MS = 3_000L
+    const val OBSTACLE_FRESH_MS = 1_000L
     const val RENEW_EVERY_MS = 5_000L
     const val SIMULATOR_SATELLITES = 15
   }

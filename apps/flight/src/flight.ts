@@ -18,7 +18,7 @@ import { lidarFor, lidarStatus, takeoffOffset, type TakeoffOffset } from "./lida
 import { obstacleHeightsFor } from "./obstacles";
 import { currentForecast } from "./weather";
 
-export const SIM_TEST_COUNT = 9;
+export const SIM_TEST_COUNT = 10;
 
 /** Is the drone really on the plan's take-off point? Judged by where the house shows up in the LIDAR. */
 export function takeoffMismatch(s: AppState, anchor: LatLng | null): TakeoffOffset | null {

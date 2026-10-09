@@ -105,7 +105,10 @@ class DroneHub {
   startJob(kind: JobKind, anchor: LatLng, options: Omit<FlightSessionOptions, "bridge" | "home">): FlightSession {
     if (this.flying) throw new Error("A flight is already in progress");
     // A test wind from the simulator test bench must never reach a real scan.
-    if (kind !== "test") this.bridge.setTestWind(null);
+    if (kind !== "test") {
+      this.bridge.setTestWind(null);
+      this.bridge.setTestObstacle(null);
+    }
     const session = new FlightSession({ ...options, bridge: this.bridge, home: anchor });
     this.job = { kind, mission: options.mission, anchor, session };
     this.sessionLogLength = 0;

@@ -119,6 +119,22 @@ const SCENARIOS: Scenario[] = [
     expect: "Stops and hovers in place (no drifting, no photos) until Resume, then finishes the scan and lands at home.",
     pass: (s) => s.state === "landed" && s.returnReason === "complete" && s.log.some((l) => l.includes("-> holding")),
   },
+  {
+    id: "obstacle",
+    title: "10. Obstacle close by",
+    instructions:
+      "After 4 photos the app reports something 2 m away for 3 seconds (DJI's simulator has nothing for the drone's sensors to see). When the yellow bar says it stopped for an obstacle, tap Resume scan.",
+    expect: "Stops and hovers by itself, says why, then finishes the scan after Resume and lands at home.",
+    atPhoto: {
+      count: 4,
+      run: () => {
+        drone.bridge.setTestObstacle(2);
+        drone.addLog("Test obstacle: 2 m away.");
+        setTimeout(() => drone.bridge.setTestObstacle(null), 3000);
+      },
+    },
+    pass: (s) => s.state === "landed" && s.returnReason === "complete" && s.log.some((l) => l.includes("obstacle")),
+  },
 ];
 
 export function TestBench() {
@@ -194,6 +210,7 @@ export function TestBench() {
     }
     DjiDrone.setSimulatorWind(0, 0);
     drone.bridge.setTestWind(null);
+    drone.bridge.setTestObstacle(null);
     scenarioRef.current = sc;
     firedRef.current = false;
     setScenario(sc);

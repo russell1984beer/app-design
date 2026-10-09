@@ -15,6 +15,7 @@ export function EmergencyBar() {
   const [confirmLand, setConfirmLand] = useState(false);
   const state = d.job?.session.state;
   const holding = state === "holding";
+  const obstacle = holding && d.job?.session.holdReason === "obstacle";
 
   useEffect(() => {
     if (!holding) setConfirmLand(false);
@@ -40,7 +41,13 @@ export function EmergencyBar() {
 
   return (
     <View style={[styles.bar, styles.held]} accessibilityLiveRegion="assertive">
-      <Text style={styles.heldTitle}>Stopped. Hovering in place.</Text>
+      <Text style={styles.heldTitle}>{obstacle ? "Stopped for an obstacle. Hovering in place." : "Stopped. Hovering in place."}</Text>
+      {obstacle && (
+        <Text style={styles.heldNote}>
+          The drone's sensors saw something within a few metres (a branch, wire or wall). Look at the drone before choosing. Resume only if the way ahead is clear; it
+          will not stop for the same thing again for 15 seconds.
+        </Text>
+      )}
       <Text style={styles.heldNote}>
         Low battery, strong wind or leaving the area still bring it home by itself. To fly it yourself, press Pause on the controller, then use the sticks.
       </Text>
