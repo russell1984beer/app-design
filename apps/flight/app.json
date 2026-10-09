@@ -32,7 +32,14 @@
           }
         }
       ],
-      "./plugins/withDji.js"
+      "./plugins/withDji.js",
+      [
+        "expo-navigation-bar",
+        {
+          "hidden": true,
+          "style": "dark"
+        }
+      ]
     ],
     "ios": {
       "bundleIdentifier": "com.plotwise.app",

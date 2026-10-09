@@ -1,9 +1,10 @@
 // Plotwise: the app, laid out like the prototype (prototype/plotwise-prototype.html): a map of the
 // plot on top, a panel for the current tab underneath, and six tabs along the bottom.
 
+import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
@@ -30,6 +31,20 @@ export default function App() {
   );
 }
 
+/**
+ * On the flight phone the app fills the whole screen: Android's status bar and navigation buttons
+ * are hidden (swipe in from the top or bottom edge to bring them back for a moment). The iPad keeps them.
+ */
+function SystemBars() {
+  const phone = Platform.OS === "android";
+  return (
+    <>
+      <StatusBar style="dark" hidden={phone} />
+      {phone && <NavigationBar hidden style="dark" />}
+    </>
+  );
+}
+
 function Shell() {
   const s = useApp();
   const insets = useSafeAreaInsets();
@@ -45,7 +60,7 @@ function Shell() {
   if (s.showBench) {
     return (
       <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: "#e9eee9" }}>
-        <StatusBar style="dark" />
+        <SystemBars />
         <TestBench />
         <EmergencyBar />
       </View>
@@ -56,7 +71,7 @@ function Shell() {
 
   return (
     <View style={[styles.body, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+      <SystemBars />
       <View style={styles.header}>
         <Text style={styles.brand}>Plotwise</Text>
         <Text style={styles.proj}>Test property, whole plot</Text>
