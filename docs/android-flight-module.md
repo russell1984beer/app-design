@@ -220,7 +220,7 @@ looked wrong.
 | 4. Return button on the controller | RC-N2 RTH button overrides the app. | PASS | |
 | 5. Pilot takes over | Pause button gives the sticks back to you. | PASS | |
 | 6. Gust | Wind limit (app side: a 9 m/s wind fed into the app). | PASS | The drone reports 0 m/s with the simulator wind at 9 m/s, so the test feeds the wind into the app. |
-| 7. Phone loses the controller | Phone cable unplugged mid-scan: the app sees the signal go and sends nothing. | | The simulated flight ends with the cable; picking a flight back up is checked on the first real flight (U8). |
+| 7. Phone loses the controller | Phone cable unplugged mid-scan: the app sees the signal go and sends nothing. | PASS | The simulated flight ends with the cable; picking a flight back up is checked on the first real flight (U8). |
 | 8. Controller switched off | The drone's own signal-loss failsafe. | | |
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. | | |
 
