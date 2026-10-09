@@ -186,9 +186,7 @@ need it. To set it up, once:
    Notepad and add a new line: `EXPO_PUBLIC_METOFFICE_API_KEY=` followed by the key.
 5. Rebuild the app: `npm run prebuild` then `npm run phone`.
 
-The key stays on your PC and phone; `.env` is never uploaded to GitHub. The forecast code could
-not be tried against the real Met Office service from the cloud workspace, so check the Scan tab
-shows the wind on **Real flight** before the first real flight.
+The key stays on your PC and phone; `.env` is never uploaded to GitHub. Checked against the live Met Office service on 9 October 2026.
 
 ## Before every simulator session
 

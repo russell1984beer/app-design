@@ -78,8 +78,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     the ridge, 24 photos each, at least 2 m out from the roof and 2 m above the chimney, with its own
     flight area. The circles pass over next door's half (pre-flight warns about overflight).
   - `weather.ts`: Met Office Weather DataHub site-specific hourly forecast (apikey header); worst gust
-    in the next 2 hours feeds the pre-flight wind check. Not yet tried against the live service
-    (blocked from the cloud workspace). Key: `EXPO_PUBLIC_METOFFICE_API_KEY` in `apps/flight/.env`.
+    in the next 2 hours feeds the pre-flight wind check. Works against the live service on the owner's
+    phone (9 October 2026: 8.6 m/s, gusts 16.8 m/s, take-off correctly blocked). Key: `EXPO_PUBLIC_METOFFICE_API_KEY` in `apps/flight/.env`.
   - `safety.ts`: safety settings and defaults, pre-flight checks, return-home battery maths.
   - `bridge.ts`: the `DroneBridge` interface the Android module must implement.
   - `flight-session.ts`: `FlightSession`, the phone-side flight controller.
@@ -150,7 +150,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   - Open questions U1–U8 in the doc must be settled in DJI's simulator before any real flight.
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
-- Next: the owner adds a Met Office key (real take-offs are blocked without a forecast); the first flight check
+- Next: the first flight check
   (built) in the garden, which also checks U2/U3 (wind) and U8 (cable out while hovering); DJI FlySafe
   no-fly zones, cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
 
