@@ -219,7 +219,7 @@ looked wrong.
 | 3. Resume | Carries on after test 2, only the missing photos. | PASS | |
 | 4. Return button on the controller | RC-N2 RTH button overrides the app. | PASS | |
 | 5. Pilot takes over | Pause button gives the sticks back to you. | PASS | |
-| 6. Gust | Wind limit (app side: a 9 m/s wind fed into the app). | CHECK | The drone reported 0 m/s with the simulator wind at 9 m/s; the test now feeds the wind into the app. |
+| 6. Gust | Wind limit (app side: a 9 m/s wind fed into the app). | PASS | The drone reports 0 m/s with the simulator wind at 9 m/s, so the test feeds the wind into the app. |
 | 7. Phone loses the controller | Phone cable unplugged mid-scan. Settles U8. | CHECK | Drone hovered; the app did not pick the flight back up after the cable returned. |
 | 8. Controller switched off | The drone's own signal-loss failsafe. | | |
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. | | |

@@ -122,8 +122,11 @@ class DroneController(
     scheduler.postDelayed(RELISTEN_AGAIN_MS) { renewListeners() }
   }
 
+  private var lastRenewMs = 0L
+
   private fun renewListeners() {
     if (!running || !listening) return
+    lastRenewMs = scheduler.nowMs()
     Log.i(TAG, "Renewing drone listeners.")
     keys.cancelListen(listenHolder)
     sticks.removeVirtualStickStateListener(stickListener)
@@ -465,6 +468,12 @@ class DroneController(
     }
 
     if (listening) readFlightState(now)
+    // Both links up but no new position: the drone's flight data has not come back after a
+    // reconnection (seen in test 7). Keep renewing the listeners until it does.
+    if (listening && rcConnected && aircraftConnected && now - locationAtMs > STALE_POSITION_MS && now - lastRenewMs > RENEW_EVERY_MS) {
+      Log.i(TAG, "No new position for ${(now - locationAtMs) / 1000}s with both links up.")
+      renewListeners()
+    }
     trackLinkLoss(now)
     sendSticks(now)
     pendingPhoto?.let { if (now > it.deadlineMs) { pendingPhoto = null; photoFailed(it.waypointIndex, "no photo reported by the camera") } }
@@ -617,7 +626,7 @@ class DroneController(
     }
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
-      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} mode=${djiFlightMode?.name}")
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} mode=${djiFlightMode?.name}")
     }
     try {
       sendTelemetry(now)
@@ -708,6 +717,8 @@ class DroneController(
     const val REQUEST_WAIT_MS = 10_000L
     const val SIMULATOR_RETRY_MS = 2_000L
     const val RELISTEN_AGAIN_MS = 3_000L
+    const val STALE_POSITION_MS = 3_000L
+    const val RENEW_EVERY_MS = 5_000L
     const val SIMULATOR_SATELLITES = 15
   }
 }
