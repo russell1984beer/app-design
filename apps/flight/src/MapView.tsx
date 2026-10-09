@@ -342,11 +342,12 @@ function layers(s: AppState, px: (n: number) => number): ReactNode {
   if (tab === "roof") return roofLayer(s, px);
   const k = (n: number) => px(n);
   let body: ReactNode;
-  if (tab === "plan" || tab === "scan") body = <>{photoLayer(s, px)}{boundary(s, k)}{flightLayer(s, px, tab === "scan" && drone.job?.kind === "check")}</>;
+  if (tab === "plan" || tab === "scan")
+    body = <>{photoLayer(s, px)}{boundary(s, k)}{flightLayer(s, px, tab === "scan" && drone.job?.kind === "check")}{tab === "plan" && heightLabels(s, px)}</>;
   else if (!s.scanned) body = <><G opacity={0.5}>{photoLayer(s, px)}</G>{boundary(s, k)}</>;
   else if (tab === "survey") {
     const base =
-      s.layer === "photo" ? photoLayer(s, px) : s.layer === "slope" ? <><G opacity={0.3}>{photoLayer(s, px)}</G><G opacity={0.85}>{slopeLayer(s)}</G>{houseBox(s, px)}</> : <>{contourLayer(s, px)}{houseBox(s, px)}</>;
+      s.layer === "heights" ? <><G opacity={0.35}>{photoLayer(s, px)}</G><G opacity={0.85}>{heightsLayer(s)}</G>{heightLabels(s, px)}</> : s.layer === "photo" ? photoLayer(s, px) : s.layer === "slope" ? <><G opacity={0.3}>{photoLayer(s, px)}</G><G opacity={0.85}>{slopeLayer(s)}</G>{houseBox(s, px)}</> : <>{contourLayer(s, px)}{houseBox(s, px)}</>;
     body = <>{base}{boundary(s, k)}{dims(s, px)}{measureLayer(s, px)}</>;
   } else {
     const sun = tab === "design" && s.dmode === "sun";
@@ -488,6 +489,65 @@ function planBase(s: AppState, px: (n: number) => number) {
       {houseBox(s, px)}
     </>
   );
+}
+
+export const HEIGHT_BANDS: [number, string, string][] = [
+  [1, "#D9E8C4", "1 to 3 m"],
+  [3, "#A9CC86", "3 to 6 m"],
+  [6, "#E9B46B", "6 to 10 m"],
+  [10, "#C8553D", "Over 10 m"],
+];
+
+/** How tall things stand above the ground (surface minus ground), on the survey's grid. */
+type HeightCell = { x: number; y: number; cell: number; h: number };
+const heightCache = new Map<string, { cells: HeightCell[]; peaks: HeightCell[] }>();
+
+function heights(s: AppState): { cells: HeightCell[]; peaks: HeightCell[] } {
+  const sv = currentSurvey();
+  const key = `${sv?.createdAt}|${sv?.label ?? ""}|${JSON.stringify(s.plot)}`;
+  let h = heightCache.get(key);
+  if (!h) {
+    const cells = heightCells(s);
+    const tall = cells.filter((c) => c.h >= 2);
+    const peaks = tall
+      .filter((c) => !tall.some((o) => o.h > c.h && Math.hypot(o.x - c.x, o.y - c.y) < 3))
+      .sort((a, b) => b.h - a.h)
+      .slice(0, 10);
+    h = { cells, peaks };
+    heightCache.clear();
+    heightCache.set(key, h);
+  }
+  return h;
+}
+
+function heightCells(s: AppState): HeightCell[] {
+  const sv = currentSurvey();
+  if (!sv?.surface || sv.surface.cols !== sv.ground.cols || sv.surface.rows !== sv.ground.rows) return [];
+  const { cellM, cols, rows } = sv.ground;
+  const out: HeightCell[] = [];
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const h = sv.surface.values[r * cols + c] - sv.ground.values[r * cols + c];
+      if (h >= 1 && c * cellM < s.plot.widthM && r * cellM < s.plot.lengthM) out.push({ x: c * cellM, y: r * cellM, cell: cellM, h });
+    }
+  return out;
+}
+
+function heightsLayer(s: AppState) {
+  return heights(s).cells.map((c) => {
+    const band = [...HEIGHT_BANDS].reverse().find(([min]) => c.h >= min)!;
+    return <Rect key={`${c.x},${c.y}`} x={c.x} y={c.y} width={c.cell + 0.02} height={c.cell + 0.02} fill={band[1]} />;
+  });
+}
+
+/** Labels on the tallest spots (trees, roofs): the highest point within 3 m, at most 10 of them. */
+function heightLabels(s: AppState, px: (n: number) => number) {
+  return heights(s).peaks.map((p) => (
+      <G key={`l${p.x},${p.y}`}>
+        <Circle cx={p.x + p.cell / 2} cy={p.y + p.cell / 2} r={0.25} fill={C.ink} />
+        <T x={p.x + p.cell / 2 + 0.4} y={p.y + p.cell / 2 + 0.35} size={0.95} weight="700" px={px}>{`${p.h.toFixed(1)} m`}</T>
+      </G>
+    ));
 }
 
 function contourLayer(s: AppState, px: (n: number) => number) {

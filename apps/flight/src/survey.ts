@@ -9,18 +9,42 @@ import * as Sharing from "expo-sharing";
 
 import { readSurvey, type ScanDetails, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
 
+import { planToGps } from "./flight";
+import { currentLidar, lidarSurvey } from "./lidar";
 import { S, commit } from "./store";
 
 const SURVEY_FILE = "survey.json";
 
 let current: SurveyPackage | null = null;
 
-/** The survey in use, if it matches the plot. */
-export function currentSurvey(): SurveyPackage | null {
+/** The drone survey opened in the app, if it matches the plot. */
+export function droneSurvey(): SurveyPackage | null {
   if (!current) return null;
   const p = current.plot;
   const q = S.plot;
   return p.widthM === q.widthM && p.lengthM === q.lengthM ? current : null;
+}
+
+let lidarCache: { key: string; survey: SurveyPackage | null } | null = null;
+
+/** The levels in use: the drone survey if one is open, otherwise the Environment Agency's LIDAR. */
+export function currentSurvey(): SurveyPackage | null {
+  const drone = droneSurvey();
+  if (drone) return drone;
+  const l = currentLidar();
+  if (!l) return null;
+  const key = `${l.fetchedAt}|${JSON.stringify(S.plot)}`;
+  if (lidarCache?.key !== key) {
+    let survey: SurveyPackage | null = null;
+    try {
+      // The plot placed on GPS as it was when the LIDAR was fetched.
+      survey = lidarSurvey(l, S.plot, (p) => planToGps({ ...S, home: l.home }, l.anchor, p));
+    } catch {
+      survey = null;
+    }
+    lidarCache = { key, survey };
+  }
+  return lidarCache.survey;
 }
 
 function surveyFile(): File {

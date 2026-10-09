@@ -134,7 +134,22 @@ export type PreflightInput = {
   forecast?: WindForecast;
   noFlyZones: NoFlyZone[];
   batteryPercent: number;
+  /** Measured obstacle heights (e.g. from LIDAR), in metres above the ground at the take-off point. */
+  obstacles?: ObstacleHeights;
 };
+
+export type ObstacleHeights = {
+  /** Tallest thing within a few metres of the mission's path. */
+  routeTallestM: number;
+  /** Tallest thing over the whole flight area (the way home can cross any of it). */
+  areaTallestM: number;
+  /** Where the heights come from, for the messages, e.g. "LIDAR". */
+  source: string;
+};
+
+/** Below this the flight is blocked, and below ROUTE_CLEARANCE_WARN_M it is warned about. */
+export const ROUTE_CLEARANCE_MIN_M = 3;
+export const ROUTE_CLEARANCE_WARN_M = 5;
 
 export function preflightCheck(input: PreflightInput): PreflightResult {
   const { settings: s, boundary, home, mission, forecast } = input;
@@ -189,6 +204,7 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
   } else {
     items.push(pass("altitude", "Mission height clears obstacles."));
   }
+  if (input.obstacles) items.push(...obstacleChecks(input.obstacles, mission, s));
 
   if (!forecast) {
     items.push(block("wind", "No wind forecast. Connect to the internet to check the weather."));
@@ -224,6 +240,30 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
   }
 
   return { canTakeOff: items.every((i) => i.status !== "block"), items };
+}
+
+function obstacleChecks(o: ObstacleHeights, mission: Mission, s: SafetySettings): CheckItem[] {
+  const lowest = Math.min(...mission.waypoints.map((w) => w.altitudeM));
+  const gap = lowest - o.routeTallestM;
+  const t = (m: number) => `${m.toFixed(1)} m`;
+  const route =
+    gap < ROUTE_CLEARANCE_MIN_M
+      ? block(
+          "clearance",
+          `${o.source} shows something ${t(o.routeTallestM)} tall near the route, and the flight goes down to ${t(lowest)}: only ${t(gap)} clear. Raise the flight height to at least ${t(o.routeTallestM + ROUTE_CLEARANCE_MIN_M)}.`,
+        )
+      : gap < ROUTE_CLEARANCE_WARN_M
+        ? warn("clearance", `${o.source}: the tallest thing near the route is ${t(o.routeTallestM)}; the flight clears it by ${t(gap)}. Check it with your own eyes.`)
+        : pass("clearance", `${o.source}: the route clears everything near it by at least ${t(gap)}.`);
+  const neededHome = o.areaTallestM + s.obstacleClearanceM;
+  const home =
+    s.returnHeightM < neededHome
+      ? block(
+          "returnClearance",
+          `${o.source} shows something ${t(o.areaTallestM)} tall in the flight area. The return height must be at least ${Math.ceil(neededHome)} m (${s.obstacleClearanceM} m above it); it is ${s.returnHeightM} m.`,
+        )
+      : pass("returnClearance", `${o.source}: the return height clears the tallest thing in the area (${t(o.areaTallestM)}).`);
+  return [route, home];
 }
 
 function noFlyZoneChecks(zones: NoFlyZone[], boundary: LatLng[], marginM: number, maxHeightM: number): CheckItem[] {

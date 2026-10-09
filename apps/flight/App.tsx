@@ -12,6 +12,7 @@ import { canFly } from "./modules/dji-drone";
 import { drone } from "./src/drone";
 import { EmergencyBar } from "./src/EmergencyBar";
 import { MapView } from "./src/MapView";
+import { loadSavedLidar } from "./src/lidar";
 import { loadSavedSurvey } from "./src/survey";
 import { DesignPanel } from "./src/panels/DesignPanel";
 import { MaterialsPanel } from "./src/panels/MaterialsPanel";
@@ -19,7 +20,7 @@ import { PlanPanel } from "./src/panels/PlanPanel";
 import { RoofPanel } from "./src/panels/RoofPanel";
 import { ScanPanel } from "./src/panels/ScanPanel";
 import { SurveyPanel } from "./src/panels/SurveyPanel";
-import { go, loadSaved, useApp, type Tab } from "./src/store";
+import { commit, go, loadSaved, useApp, type Tab } from "./src/store";
 import { TestBench } from "./src/TestBench";
 import { C } from "./src/theme";
 
@@ -53,7 +54,7 @@ function Shell() {
   const wide = width >= 820 || width > height;
 
   useEffect(() => {
-    loadSaved().then(loadSavedSurvey);
+    loadSaved().then(loadSavedSurvey).then(loadSavedLidar).then(() => commit());
     drone.start();
   }, []);
 

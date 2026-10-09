@@ -129,6 +129,18 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     `src/flysafe.ts` keeps them 6 h per place. Take-off waits for the lookup; if it fails it only warns
     (the drone still enforces DJI's zones itself). On the phone at the test property (9 October 2026): "none
     nearby" (to be cross-checked once against DJI Fly's GEO map).
+  - Environment Agency LIDAR (free, England, Open Government Licence), real mode: `src/lidar.ts` fetches
+    the 1 m DTM and first-return DSM from the Defra WCS services (coverage id, axis names and format read
+    from GetCapabilities/DescribeCoverage at run time, as they could not be checked from the cloud
+    workspace) for 70 m round the take-off point, and keeps them in `lidar.json`. garden-core `bng.ts`
+    (WGS84 to National Grid, Helmert + OS Transverse Mercator, good to a few metres) and `raster.ts`
+    (GeoTIFF strips/tiles, none/LZW/Deflate via pako, predictors 2/3; ESRI ASCII grid). `src/lidarMath.ts`:
+    `obstacleHeights` (tallest thing within 5 m of the route, and over the flight area, above the
+    take-off ground) feeds flight-core's clearance checks (`obstacles`: under 3 m clear blocks, under 5 m
+    warns; return height must clear the area's tallest + 10 m); `lidarSurvey` makes it the Survey tab's
+    levels until a drone survey is opened (`currentSurvey` falls back to it). Survey tab "Heights" layer
+    and Plan-map labels show tree/roof heights. Without LIDAR the flight only warns. Not yet tried on the
+    phone.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin

@@ -14,6 +14,7 @@ import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
 import { recordScan } from "./survey";
 import { currentFlyZones } from "./flysafe";
+import { lidarFor, lidarStatus, obstacleHeights } from "./lidar";
 import { currentForecast } from "./weather";
 
 export const SIM_TEST_COUNT = 9;
@@ -120,6 +121,10 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
   const weather = s.mode === "real" ? currentForecast(anchor) : null;
   // DJI's no-fly zones round the take-off point (the simulator's made-up field has none to check).
   const flyZones = s.mode === "real" ? currentFlyZones(anchor) : null;
+  // Tree and roof heights from the Environment Agency's LIDAR (real flights only: the simulator's
+  // field is made up).
+  const lidar = s.mode === "real" ? lidarFor(anchor) : null;
+  const obstacles = lidar ? obstacleHeights(lidar, anchor, mission, boundary) : null;
   const forecast = s.mode === "sim" ? { speedMs: 0, gustMs: 0, fromDeg: 0, source: "DJI simulator" } : weather && "forecast" in weather ? weather.forecast : undefined;
   const check = preflightCheck({
     settings: s.safety,
@@ -130,6 +135,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     forecast,
     noFlyZones: flyZones && "zones" in flyZones ? flyZones.zones : [],
     batteryPercent: t?.batteryPercent ?? 0,
+    obstacles: obstacles ?? undefined,
   });
   const extra: CheckItem[] = [];
   if (!t?.signalOk) extra.push({ id: "link", status: "block", message: "Drone not connected. Plug the phone into the RC-N2 and switch the drone on." });
@@ -142,6 +148,12 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     else if ("error" in flyZones)
       // The drone itself still refuses to take off in DJI's restricted zones.
       extra.push({ id: "flySafe", status: "warn", message: `Could not check DJI's no-fly zones (${flyZones.error}). Check DJI Fly before you fly.` });
+    if (!obstacles) {
+      // Heights are an extra check: without them the flight is not blocked, but the pilot is told.
+      const st = lidarStatus(anchor);
+      const why = lidar ? "the LIDAR has no tree and roof heights here" : st.loading ? "still fetching the LIDAR" : st.error ? `no LIDAR (${st.error})` : "no LIDAR yet";
+      extra.push({ id: "heights", status: "warn", message: `Tree and roof heights not checked (${why}). Check the route is clear with your own eyes.` });
+    }
   }
   if (!s.checks.every(Boolean)) extra.push({ id: "checklist", status: "block", message: "Tick every item in Before you fly (Plan tab)." });
   const items = [...extra, ...check.items];

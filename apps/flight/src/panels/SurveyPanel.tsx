@@ -3,16 +3,20 @@ import { Text, View } from "react-native";
 
 import { area, fmtLevel, gradientText, measureLine, perimeter } from "../../../../packages/garden-core/src/index.ts";
 
-import { terrainFor } from "../MapView";
+import { HEIGHT_BANDS, terrainFor } from "../MapView";
 import { S, commit, go, useApp } from "../store";
-import { currentSurvey, openSurveyFile, removeSurvey, shareScanDetails } from "../survey";
+import { useDrone } from "../drone";
+import { anchorFor } from "../flight";
+import { currentLidar, fetchLidar, useLidar } from "../lidar";
+import { currentSurvey, droneSurvey, openSurveyFile, removeSurvey, shareScanDetails } from "../survey";
 import { Big, Btn, H2, Lead, Legend, Note, P, Readout, Row, Seg, Status } from "../ui";
 
 /** Where the levels come from: the real processed survey, or the draft from the title plan. */
 export function SurveySource() {
   const s = useApp();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const survey = currentSurvey();
+  const survey = droneSurvey();
+  const lidar = currentLidar();
   const open = async () => {
     setMsg(null);
     try {
@@ -23,9 +27,11 @@ export function SurveySource() {
   };
   return (
     <View style={{ marginTop: 14 }}>
-      <H2 small>{survey ? "Drone survey" : "Draft survey"}</H2>
+      <H2 small>{survey ? "Drone survey" : lidar ? "LIDAR levels" : "Draft survey"}</H2>
       {survey?.label ? (
         <Note>{survey.label}</Note>
+      ) : !survey && lidar ? (
+        <Note>{currentSurvey()?.label ?? "LIDAR levels could not be placed on this plot."}</Note>
       ) : survey ? (
         <Note>
           Flown {new Date(survey.flownAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} from {survey.photoCount} photos. It covers{" "}
@@ -47,8 +53,30 @@ export function SurveySource() {
           />
         )}
       </Row>
-      {survey && <Btn label="Remove the survey and use the draft" alt onPress={removeSurvey} />}
+      {survey && <Btn label={lidar ? "Remove the survey and use the LIDAR levels" : "Remove the survey and use the draft"} alt onPress={removeSurvey} />}
+      {!survey && <LidarFetch />}
       {msg && <Status status={msg.ok ? "pass" : "block"} text={msg.text} />}
+    </View>
+  );
+}
+
+/** Getting the free Environment Agency LIDAR: needs the drone's GPS position on the take-off point. */
+function LidarFetch() {
+  const s = useApp();
+  const d = useDrone();
+  const anchor = s.mode === "real" ? anchorFor(s, d.telemetry) : null;
+  const { site, loading, error } = useLidar(anchor, s.home);
+  if (loading) return <Status status="warn" text="Getting the Environment Agency's LIDAR levels…" />;
+  if (site)
+    return anchor ? <Btn label="Get the LIDAR again (drone on the take-off point)" alt onPress={() => fetchLidar(anchor, s.home)} /> : null;
+  return (
+    <View>
+      <Note>
+        Free real levels for England: the Environment Agency's LIDAR (1 m grid). On the Scan tab choose Real flight, put the drone on the take-off point
+        and switch it on; once it has GPS, the levels are fetched by themselves. Or tap below.
+      </Note>
+      {error && <Status status="warn" text={`Could not get the LIDAR: ${error}.`} />}
+      <Btn label="Get the LIDAR levels now" alt disabled={!anchor} onPress={() => anchor && fetchLidar(anchor, s.home)} />
     </View>
   );
 }
@@ -113,18 +141,27 @@ export function SurveyPanel() {
     <View>
       <H2>Survey</H2>
       <Seg
-        options={[["photo", "Photo"], ["contours", "Contours"], ["slope", "Slope"]]}
+        options={[["photo", "Photo"], ["contours", "Contours"], ["slope", "Slope"], ["heights", "Heights"]]}
         value={s.layer}
         onChange={(v) => {
           s.layer = v;
           commit();
         }}
       />
+      {s.layer === "heights" &&
+        (currentSurvey()?.surface ? (
+          <View>
+            <Legend items={HEIGHT_BANDS.map(([, colour, label]) => [colour, label] as [string, string])} />
+            <Note style={{ marginBottom: 10 }}>How tall trees, sheds and roofs stand above the ground, with the tallest spots labelled.</Note>
+          </View>
+        ) : (
+          <Note style={{ marginBottom: 10 }}>No heights yet: they come with the LIDAR levels or a drone survey.</Note>
+        ))}
       {s.layer === "slope" && <Legend items={[["#D3E3C6", "Under 4%"], ["#ECE09C", "4 to 8%"], ["#E9B46B", "8 to 15%"], ["#D8784C", "Over 15%"]]} />}
       {s.layer === "contours" && (
         <Note style={{ marginBottom: 10 }}>
           Contours every 25 cm. Heights are relative to the back door threshold.{" "}
-          {currentSurvey() ? "Measured by the drone survey." : "These levels are estimates until a real survey is opened."}
+          {droneSurvey() ? "Measured by the drone survey." : currentSurvey() ? "From the Environment Agency's LIDAR (1 m grid)." : "These levels are estimates until a real survey is opened."}
         </Note>
       )}
       <Seg

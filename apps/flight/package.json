@@ -7,7 +7,7 @@
     "start": "expo start --dev-client",
     "prebuild": "expo prebuild --platform android --clean",
     "android": "expo run:android",
-    "test": "node --test modules/dji-drone/src/*.test.ts plugins/*.test.js",
+    "test": "node --test modules/dji-drone/src/*.test.ts src/*.test.ts plugins/*.test.js",
     "typecheck": "tsc --noEmit",
     "phone": "expo run:android --variant release",
     "ipad": "npx eas-cli@latest build --platform ios --profile ipad --auto-submit",
@@ -24,12 +24,14 @@
     "expo-print": "~57.0.2",
     "expo-sharing": "~57.0.22",
     "expo-status-bar": "~57.0.1",
+    "pako": "^2.1.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "5.7.0",
     "react-native-svg": "15.15.4"
   },
   "devDependencies": {
+    "@types/pako": "^2.0.4",
     "@types/react": "~19.2.0",
     "typescript": "~5.9.0"
   }

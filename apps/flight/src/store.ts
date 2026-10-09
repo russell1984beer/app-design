@@ -28,7 +28,7 @@ export type AppState = {
   mode: FlightMode;
   /** A survey is loaded (the draft from the title plan until real processing exists). */
   scanned: boolean;
-  layer: "photo" | "contours" | "slope";
+  layer: "photo" | "contours" | "slope" | "heights";
   tool: "dist" | "area";
   pts: Pt[];
   closed: boolean;

@@ -252,6 +252,19 @@ test("preflight: height-limited zones allow flights that stay below the limit", 
   assert.ok(blocked({ ...goodPreflight(), noFlyZones: [{ ...over, heightLimitM: 20 }] }, "noFlyZones"));
 });
 
+test("preflight: measured obstacle heights (LIDAR) near the route and over the area", () => {
+  const status = (o: { routeTallestM: number; areaTallestM: number }, id: string) =>
+    preflightCheck({ ...goodPreflight(), obstacles: { ...o, source: "LIDAR" } }).items.find((i) => i.id === id)?.status;
+  // The good preflight flies at 20 m with a 30 m return height.
+  assert.equal(status({ routeTallestM: 5, areaTallestM: 9 }, "clearance"), "pass");
+  assert.equal(status({ routeTallestM: 16, areaTallestM: 16 }, "clearance"), "warn");
+  assert.equal(status({ routeTallestM: 18, areaTallestM: 18 }, "clearance"), "block");
+  assert.equal(status({ routeTallestM: 5, areaTallestM: 19 }, "returnClearance"), "pass");
+  assert.equal(status({ routeTallestM: 5, areaTallestM: 22 }, "returnClearance"), "block");
+  // No measured heights: no extra checks.
+  assert.equal(preflightCheck(goodPreflight()).items.find((i) => i.id === "clearance"), undefined);
+});
+
 test("preflight: warns when passes are too far apart for the photos to overlap", () => {
   const ok = preflightCheck(goodPreflight());
   assert.equal(ok.items.find((i) => i.id === "passSpacing")?.status, "pass");

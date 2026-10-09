@@ -237,6 +237,12 @@ garden scan's pattern, starting at the far end), comes back over the take-off po
 straight down (it does not climb to the return height unless a safety rule or the pilot sends it
 home). Check that every tree and aerial in that part of the garden is well under 10 m first.
 
+On Real flight the Scan tab also fetches the Environment Agency's free LIDAR for the area (the
+"Heights" line). The pre-flight list then says how much clearance the route has over the tallest
+tree or roof near it (it blocks under 3 m and warns under 5 m), and checks the return height
+clears the tallest thing in the area by 10 m. The LIDAR may be a few years old and its position is
+good to a few metres, so still look at the route yourself.
+
 Before it:
 
 1. The Met Office key is in `apps/flight/.env` and the app has been rebuilt (real take-offs are

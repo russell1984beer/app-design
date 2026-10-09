@@ -7,6 +7,7 @@ import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 import { shareScanDetails } from "../survey";
 import { refreshFlyZones, useFlyZones } from "../flysafe";
+import { useLidar } from "../lidar";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
 import { FirstFlightProgress, FirstFlightStart } from "./FirstFlight";
@@ -42,9 +43,22 @@ export function DroneStatus() {
         </P>
         {s.mode === "real" && <WeatherLine />}
         {s.mode === "real" && <FlyZoneLine />}
+        {s.mode === "real" && <HeightsLine />}
       </Readout>
     </View>
   );
+}
+
+/** Tree and roof heights (and real levels) from the Environment Agency's LIDAR, fetched by itself. */
+function HeightsLine() {
+  const s = useApp();
+  const d = useDrone();
+  const pos = anchorFor(s, d.telemetry);
+  const { site, loading, error } = useLidar(pos, s.home);
+  if (!pos) return null;
+  if (site) return <P>Heights: from the Environment Agency's LIDAR{site.dsm ? "" : " (ground only, no tree or roof heights)"}.</P>;
+  if (loading) return <P>Heights: getting the Environment Agency's LIDAR…</P>;
+  return <P>Heights: {error ? `could not get the LIDAR (${error}). Check the route is clear with your own eyes.` : "waiting…"}</P>;
 }
 
 /** DJI's no-fly zones near the take-off point. What they mean for this flight is in the pre-flight list. */
