@@ -50,51 +50,70 @@ function homeGround(s: LidarSite, home: LatLng): number {
   return lo;
 }
 
+/** Height of whatever stands at a GPS point, above the take-off point's ground; NaN where unknown. */
+export type HeightAbove = (p: LatLng) => number;
+
 /**
- * Heights above the take-off point's ground of the tallest thing near the mission's path and over
- * the whole flight area, for the pre-flight check. Null without the surface model.
+ * The LIDAR's heights above the take-off point's ground. Spots marked as gone show the ground;
+ * `skip` leaves points to another source (NaN), e.g. inside the plot when a drone survey covers it.
  */
-const obstacleCache = new Map<string, ObstacleHeights | null>();
-
-export function obstacleHeights(s: LidarSite, home: LatLng, mission: Mission, area: LatLng[], gone: LatLng[] = []): ObstacleHeights | null {
-  // Worked out once per site, take-off point (to about 10 cm), mission, area and gone spots.
-  const ll = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
-  const key = [s.fetchedAt, ll(home), mission.id, ...area.map(ll), "gone", ...gone.map(ll)].join("|");
-  if (!obstacleCache.has(key)) obstacleCache.set(key, computeObstacles(s, home, mission, area, gone));
-  return obstacleCache.get(key)!;
-}
-
-/** The top of whatever stands at a point: the surface model, or the ground where a spot is gone. */
-function topAt(s: LidarSite, gone: LatLng[]): (p: LatLng) => number {
-  const dsm = s.dsm!;
-  return (p) => (gone.some((g) => Math.hypot(toLocal(g, p).x, toLocal(g, p).y) < GONE_RADIUS_M) ? at(s.dtm, p) : at(dsm, p));
-}
-
-function computeObstacles(s: LidarSite, home: LatLng, mission: Mission, area: LatLng[], gone: LatLng[]): ObstacleHeights | null {
+export function lidarHeights(s: LidarSite, home: LatLng, gone: LatLng[] = [], skip?: (p: LatLng) => boolean): HeightAbove | null {
   if (!s.dsm) return null;
   const ground = homeGround(s, home);
   if (!Number.isFinite(ground)) return null;
-  const top = topAt(s, gone);
-  // Along the path, every metre or so, including out from and back to the take-off point.
+  const dsm = s.dsm;
+  const isGone = (p: LatLng) => gone.some((g) => {
+    const v = toLocal(g, p);
+    return Math.hypot(v.x, v.y) < GONE_RADIUS_M;
+  });
+  return (p) => (skip?.(p) ? NaN : (isGone(p) ? at(s.dtm, p) : at(dsm, p)) - ground);
+}
+
+/**
+ * The tallest thing near the mission's path (within `bufferM`, out from and back to the take-off
+ * point included) and over the whole flight area, from one or more height sources (the highest
+ * wins). Null if no source knows anything there.
+ */
+export function obstaclesFrom(sources: HeightAbove[], home: LatLng, mission: Mission, area: LatLng[], source: string, bufferM = ROUTE_BUFFER_M): ObstacleHeights | null {
+  const top: HeightAbove = (p) => {
+    let best = NaN;
+    for (const f of sources) {
+      const v = f(p);
+      if (Number.isFinite(v) && !(v <= best)) best = v;
+    }
+    return best;
+  };
   const path = [home, ...mission.waypoints.map((w) => w.position), home];
   let route = -Infinity;
   for (let i = 1; i < path.length; i++) {
     const v = toLocal(path[i - 1], path[i]);
     const steps = Math.max(1, Math.ceil(Math.hypot(v.x, v.y) / 2));
-    for (let k = 0; k <= steps; k++) route = Math.max(route, maxNear(top, fromLocal(path[i - 1], { x: (v.x * k) / steps, y: (v.y * k) / steps }), ROUTE_BUFFER_M));
+    for (let k = 0; k <= steps; k++) route = Math.max(route, maxNear(top, fromLocal(path[i - 1], { x: (v.x * k) / steps, y: (v.y * k) / steps }), bufferM));
   }
-  // The flight area: every metre inside its bounding box, plus the buffer.
   const pts = area.map((p) => toLocal(home, p));
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
   let areaMax = -Infinity;
-  for (let x = Math.min(...xs) - ROUTE_BUFFER_M; x <= Math.max(...xs) + ROUTE_BUFFER_M; x++)
-    for (let y = Math.min(...ys) - ROUTE_BUFFER_M; y <= Math.max(...ys) + ROUTE_BUFFER_M; y++) {
+  for (let x = Math.min(...xs) - bufferM; x <= Math.max(...xs) + bufferM; x++)
+    for (let y = Math.min(...ys) - bufferM; y <= Math.max(...ys) + bufferM; y++) {
       const v = top(fromLocal(home, { x, y }));
       if (v > areaMax) areaMax = v;
     }
   if (!Number.isFinite(route) || !Number.isFinite(areaMax)) return null;
-  return { routeTallestM: Math.max(0, route - ground), areaTallestM: Math.max(0, areaMax - ground), source: "LIDAR" };
+  return { routeTallestM: Math.max(0, route), areaTallestM: Math.max(0, areaMax), source };
+}
+
+const obstacleCache = new Map<string, ObstacleHeights | null>();
+
+/** The LIDAR alone (kept for the tests and as the simple case). */
+export function obstacleHeights(s: LidarSite, home: LatLng, mission: Mission, area: LatLng[], gone: LatLng[] = []): ObstacleHeights | null {
+  const ll = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+  const key = [s.fetchedAt, ll(home), mission.id, ...area.map(ll), "gone", ...gone.map(ll)].join("|");
+  if (!obstacleCache.has(key)) {
+    const h = lidarHeights(s, home, gone);
+    obstacleCache.set(key, h ? obstaclesFrom([h], home, mission, area, "LIDAR") : null);
+  }
+  return obstacleCache.get(key)!;
 }
 
 /**

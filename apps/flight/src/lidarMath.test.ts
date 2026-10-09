@@ -111,3 +111,24 @@ test("a tall spot marked as gone (tree cut down) is ignored by the clearance che
   const k = Math.floor(5 / 0.5) * sv.ground.cols + Math.floor(3.5 / 0.5);
   assert.ok(sv.surface!.values[k] - sv.ground.values[k] < 0.5);
 });
+
+test("a drone survey replaces the LIDAR inside the plot; the LIDAR still covers beyond it", async () => {
+  const { lidarHeights, obstaclesFrom } = await import("./lidarMath.ts");
+  const { toLocal } = await import("../../../packages/flight-core/src/geo.ts");
+  const area = [at(5, -3), at(25, -3), at(25, 3), at(5, 3)];
+  const mission = planGrid(area, { altitudeM: 10 });
+  const s = { ...site(), fetchedAt: "survey-test" };
+  // "Plot": 10 m either side of the route's middle line, north of the take-off point up to 30 m.
+  const inPlot = (p: { lat: number; lng: number }) => {
+    const v = toLocal(HOME, p);
+    return Math.abs(v.x) <= 10 && v.y >= -5 && v.y <= 30;
+  };
+  // The drone survey shows the tree is gone: a 2 m shrub everywhere in the plot.
+  const survey = (p: { lat: number; lng: number }) => (inPlot(p) ? 2 : NaN);
+  const lidar = lidarHeights(s, HOME, [], inPlot)!;
+  const o = obstaclesFrom([survey, lidar], HOME, mission, area, "The drone survey")!;
+  assert.ok(Math.abs(o.routeTallestM - 2) < 0.5, `route ${o.routeTallestM}`);
+  // Widen the area to reach the mast 45 m east (outside the plot): the LIDAR still sees it.
+  const wide = obstaclesFrom([survey, lidar], HOME, mission, [at(-5, -3), at(25, -3), at(25, 50), at(-5, 50)], "x")!;
+  assert.ok(wide.areaTallestM > 17, `area ${wide.areaTallestM}`);
+});

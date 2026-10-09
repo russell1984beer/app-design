@@ -14,7 +14,8 @@ import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
 import { recordScan } from "./survey";
 import { currentFlyZones } from "./flysafe";
-import { lidarFor, lidarStatus, obstacleHeights, takeoffOffset, type TakeoffOffset } from "./lidar";
+import { lidarFor, lidarStatus, takeoffOffset, type TakeoffOffset } from "./lidar";
+import { obstacleHeightsFor } from "./obstacles";
 import { currentForecast } from "./weather";
 
 export const SIM_TEST_COUNT = 9;
@@ -142,8 +143,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
   // Tree and roof heights from the Environment Agency's LIDAR (real flights only: the simulator's
   // field is made up).
   const lidar = s.mode === "real" ? lidarFor(anchor) : null;
-  const gone = s.goneSpots.map((p) => planToGps(s, anchor, p));
-  const obstacles = lidar ? obstacleHeights(lidar, anchor, mission, boundary, gone) : null;
+  const obstacles = s.mode === "real" ? obstacleHeightsFor(s, anchor, mission, boundary) : null;
   const forecast = s.mode === "sim" ? { speedMs: 0, gustMs: 0, fromDeg: 0, source: "DJI simulator" } : weather && "forecast" in weather ? weather.forecast : undefined;
   const check = preflightCheck({
     settings: s.safety,
@@ -180,7 +180,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
         status: "warn",
         message: `The drone may be about ${offsetWords(off.alongM)} than the take-off point on the plan. Check it is standing on the marked spot.`,
       });
-    if (obstacles && s.goneSpots.length)
+    if (obstacles?.source === "LIDAR" && s.goneSpots.length)
       extra.push({
         id: "goneSpots",
         status: "warn",
