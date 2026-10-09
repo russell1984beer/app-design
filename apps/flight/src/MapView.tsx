@@ -442,7 +442,7 @@ function T({
   // (plan metres) come out jumbled on Android. Kept between 11 and 22 pixels so labels stay
   // readable when zoomed out and do not balloon when zoomed in.
   const k = px(1);
-  const fontPx = Math.min(22, Math.max(11, size / k));
+  const fontPx = fontPxFor(size, px);
   const common = { x: 0, y: 0, fontSize: fontPx, fontWeight: weight ?? "400", textAnchor: anchor ?? "start", fontFamily: "sans-serif" } as const;
   return (
     <G transform={transform}>
@@ -607,7 +607,7 @@ function houseBox(s: AppState, px: (n: number) => number) {
       <T x={HW / 2} y={GH + HD / 2} size={1.23} weight="700" anchor="middle" fill="#3E4A47" px={px}>
         House
       </T>
-      <T x={HW / 2} y={GH + HD / 2 + 1.3} size={0.91} anchor="middle" fill="#3E4A47" px={px}>
+      <T x={HW / 2} y={GH + HD / 2 + Math.max(1.3, px(fontPxFor(0.91, px) + 3))} size={0.91} anchor="middle" fill="#3E4A47" px={px}>
         {`roof ridge about ${s.plot.ridgeHeightM} m`}
       </T>
     </>
@@ -819,6 +819,63 @@ function itemShape(it: Item, fill: string, stroke: { stroke?: string; strokeWidt
   return <Rect key={key} transform={tr} x={-it.w / 2} y={-it.h / 2} width={it.w} height={it.h} rx={0.12} fill={fill} fillOpacity={opacity} {...stroke} />;
 }
 
+/** The on-screen font size (pixels) of map text `size` plan metres tall: see T. */
+function fontPxFor(size: number, px: (n: number) => number): number {
+  return Math.min(22, Math.max(11, size / px(1)));
+}
+
+/**
+ * The features' names and sizes, placed so none overlap on screen: the selected feature first, then
+ * new ones, then the biggest. The size line is dropped first when both do not fit; zoom in to see the rest.
+ * They also keep clear of the house's own label.
+ */
+function itemLabels(s: AppState, px: (n: number) => number): ReactNode[] {
+  type Box = [number, number, number, number];
+  const placed: Box[] = [];
+  const { rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
+  const houseHalf = px((`roof ridge about ${s.plot.ridgeHeightM} m`.length * fontPxFor(0.91, px) * 0.55 + 6) / 2);
+  placed.push([HW / 2 - houseHalf, GH + HD / 2 - px(fontPxFor(1.23, px)), HW / 2 + houseHalf, GH + HD / 2 + Math.max(1.3, px(fontPxFor(0.91, px) + 3)) + px(3)]);
+  const hits = (b: Box) => placed.some((o) => b[0] < o[2] && o[0] < b[2] && b[1] < o[3] && o[1] < b[3]);
+  const sizeOf = (it: Item) => {
+    const [x0, y0, x1, y1] = bbox(it);
+    return (x1 - x0) * (y1 - y0);
+  };
+  const order = [...s.items].sort((a, b) => Number(b.id === s.sel) - Number(a.id === s.sel) || Number(!!a.exist) - Number(!!b.exist) || sizeOf(b) - sizeOf(a));
+  const out: ReactNode[] = [];
+  for (const it of order) {
+    const [x0, y0, x1, y1] = bbox(it);
+    const c = centre(it);
+    const fs = Math.min(1.15, Math.max(0.65, Math.min(x1 - x0, y1 - y0) / 3.5));
+    const namePx = fontPxFor(fs, px);
+    const sizePx = fontPxFor(fs * 0.85, px);
+    const name = itemName(it);
+    const size = sizeText(it);
+    // Rough text widths (an average letter is about 0.55 of the font size), in plan metres.
+    const wide = (text: string, f: number) => px(text.length * f * 0.55 + 6);
+    const nameBox: Box = [c[0] - wide(name, namePx) / 2, c[1] - px(namePx), c[0] + wide(name, namePx) / 2, c[1] + px(3)];
+    const sizeY = c[1] + px(sizePx + 3);
+    const sizeBox: Box = [c[0] - wide(size, sizePx) / 2, nameBox[3], c[0] + wide(size, sizePx) / 2, sizeY + px(3)];
+    const must = it.id === s.sel;
+    if (must || !hits(nameBox)) {
+      placed.push(nameBox);
+      out.push(
+        <T key={`n${it.id}`} x={c[0]} y={c[1]} size={fs} weight="700" anchor="middle" px={px}>
+          {name}
+        </T>,
+      );
+      if (must || !hits(sizeBox)) {
+        placed.push(sizeBox);
+        out.push(
+          <T key={`s${it.id}`} x={c[0]} y={sizeY} size={fs * 0.85} anchor="middle" px={px}>
+            {size}
+          </T>,
+        );
+      }
+    }
+  }
+  return out;
+}
+
 function itemsLayer(s: AppState, px: (n: number) => number) {
   const out = s.items.map((it) => {
     const K = KINDS[it.kind];
@@ -849,22 +906,12 @@ function itemsLayer(s: AppState, px: (n: number) => number) {
         }
       }
     }
-    const [x0, y0, x1, y1] = bbox(it);
-    const c = centre(it);
-    const fs = Math.min(1.15, Math.max(0.65, Math.min(x1 - x0, y1 - y0) / 3.5));
-    parts.push(
-      <T key="name" x={c[0]} y={c[1] - fs * 0.15} size={fs} weight="700" anchor="middle" px={px}>
-        {itemName(it)}
-      </T>,
-      <T key="size" x={c[0]} y={c[1] + fs * 1.05} size={fs * 0.85} anchor="middle" px={px}>
-        {sizeText(it)}
-      </T>,
-    );
     return <G key={it.id}>{parts}</G>;
   });
   return (
     <>
       {out}
+      {itemLabels(s, px)}
       {handlesLayer(s, px)}
       {drawLayer(s, px)}
     </>
