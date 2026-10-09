@@ -98,7 +98,7 @@ Not checked yet:
 | U5 | Will the drone accept a home point set from the app? | Sets it before take-off; refuses to take off if this fails. **Settled: yes**, once the drone has recorded its own home point (a few seconds after a GPS fix); the app retries for 20 s. | Test 1 |
 | U6 | Does the camera report each new photo in the simulator? | Waits up to 5 s for the photo report, otherwise counts the photo as failed. **Settled: yes** (28/28). | Test 1 |
 | U7 | Does Return to Home work straight after the app hands back the sticks? | Hands back the sticks, then starts Return to Home. **Settled: works** (test 2 passed). | Test 2 |
-| U8 | What happens to virtual sticks when the phone is unplugged? | Expects the drone to stop and hover. **Settled: it hovers** (owner, test 7). Picking the flight back up after the cable returns is still being checked. | Test 7 |
+| U8 | What happens to virtual sticks when the phone is unplugged? | Expects the drone to stop and hover. In DJI's simulator the simulated flight ends when the cable comes out (afterwards the drone reports motors off and its position never moves), so this can only be settled on the **first real flight**: hovering low in the garden, unplug the phone for a few seconds, check the drone holds position and that the app brings it home once the cable is back. | First real flight |
 
 ## One-time setup on the Windows PC
 
@@ -220,7 +220,7 @@ looked wrong.
 | 4. Return button on the controller | RC-N2 RTH button overrides the app. | PASS | |
 | 5. Pilot takes over | Pause button gives the sticks back to you. | PASS | |
 | 6. Gust | Wind limit (app side: a 9 m/s wind fed into the app). | PASS | The drone reports 0 m/s with the simulator wind at 9 m/s, so the test feeds the wind into the app. |
-| 7. Phone loses the controller | Phone cable unplugged mid-scan. Settles U8. | CHECK | Drone hovered; the app did not pick the flight back up after the cable returned. |
+| 7. Phone loses the controller | Phone cable unplugged mid-scan: the app sees the signal go and sends nothing. | | The simulated flight ends with the cable; picking a flight back up is checked on the first real flight (U8). |
 | 8. Controller switched off | The drone's own signal-loss failsafe. | | |
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. | | |
 

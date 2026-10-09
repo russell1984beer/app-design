@@ -25,6 +25,11 @@ export type Telemetry = {
   flightMode: FlightMode;
   /** The controller link to the drone is working. */
   signalOk: boolean;
+  /**
+   * The controller and the drone are connected again, even though the flight data is not yet
+   * fresh (signalOk false). Lets the app see that the drone is on the ground after a link loss.
+   */
+  linkUp?: boolean;
   /** The drone's own wind estimate, if it reports one. */
   wind?: Wind;
   /** The drone's own wind warning level. */

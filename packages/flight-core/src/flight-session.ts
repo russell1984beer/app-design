@@ -142,6 +142,11 @@ export class FlightSession {
       if (this.state !== "signalLost") {
         this.setState("signalLost");
         this.returnReason ??= "signalLoss";
+      } else if (t.linkUp && t.flightMode === "onGround") {
+        // The link is back and the drone says it is on the ground (motors off), even if its
+        // position has not come back (seen in DJI's simulator, whose flight ends with the link).
+        this.log.push("link back: the drone says it is on the ground");
+        this.setState("landed");
       }
       return;
     }

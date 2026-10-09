@@ -106,6 +106,37 @@ test("signal loss with the app still running: the app sends no commands and wait
   assert.ok(distanceM(sim.telemetry().position, home) < 1);
 });
 
+test("link back but no fresh flight data: a drone on the ground ends the flight", () => {
+  let frozen = false;
+  const { sim, session } = setup({
+    boundary: FIELD,
+    home: FIELD_HOME,
+    bridge: (s) =>
+      new Proxy(s, {
+        get(target, prop, receiver) {
+          if (prop === "telemetry") {
+            return () => {
+              const t = target.telemetry();
+              // DJI's simulator after the cable is replugged: links up, drone on the ground, position stale.
+              return frozen ? { ...t, signalOk: false, linkUp: true, flightMode: "onGround" as const } : t;
+            };
+          }
+          const v = Reflect.get(target, prop, receiver);
+          return typeof v === "function" ? v.bind(target) : v;
+        },
+      }),
+  });
+  session.start();
+  run(sim, session, { until: () => sim.photos.length >= 3 });
+  sim.setSignal(false);
+  session.update();
+  assert.equal(session.state, "signalLost");
+  frozen = true;
+  session.update();
+  assert.equal(session.state, "landed");
+  assert.equal(session.returnReason, "signalLoss");
+});
+
 test("signal loss set to hover: when the link comes back the app brings the drone home", () => {
   const { sim, session, home } = setup({ boundary: FIELD, home: FIELD_HOME, settings: { signalLossAction: "hover" } });
   session.start();

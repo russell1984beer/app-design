@@ -64,6 +64,7 @@ export class NativeDroneBridge implements DroneBridge {
       flightMode: t?.flightMode ?? "onGround",
       // No position yet (no GPS) counts as no link: the app must not fly blind.
       signalOk: fresh && t!.signalOk && t!.lat != null,
+      linkUp: fresh && t!.rcConnected === true && t!.aircraftConnected === true,
       wind: this.testWind ?? (t?.windSpeedMs != null ? { speedMs: t.windSpeedMs, fromDeg: this.windFrom(t, position) } : undefined),
       windWarning: t?.windWarning ?? "none",
     };

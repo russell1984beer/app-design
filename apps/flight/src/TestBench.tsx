@@ -99,7 +99,7 @@ const SCENARIOS: Scenario[] = [
     instructions:
       "After a few photos, unplug the phone from the controller for 10 seconds, then plug it back in. Leave the controller on.",
     expect:
-      "Drone stops and hovers by itself (no more app commands). App shows 'Signal lost', then brings the drone home when the cable is back.",
+      "App shows 'Signal lost' and sends no more commands. In DJI's simulator the simulated flight ends when the cable comes out, so when the cable is back the app shows the drone landed. (Picking a real flight back up is checked on the first real flight.)",
     pass: (s) => s.state === "landed" && s.returnReason === "signalLoss",
   },
   {
