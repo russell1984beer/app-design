@@ -44,6 +44,17 @@ export function surveyMission(s: AppState, anchor: LatLng): Mission {
   return planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap });
 }
 
+/** The bottom of the garden (the far end of the plot) up to the take-off point, full width. */
+export function firstFlightArea(s: AppState): Pt[] {
+  const W = s.plot.widthM;
+  const y = s.home[1];
+  return [[0, 0], [W, 0], [W, y], [0, y]];
+}
+
+export function firstFlightMission(s: AppState, anchor: LatLng): Mission {
+  return planFirstFlight(anchor, firstFlightArea(s).map((p) => planToGps(s, anchor, p)));
+}
+
 export function roofScan(s: AppState, anchor: LatLng): RoofScan {
   return planRoofScan({
     roof: roofPlan(s).map((p) => planToGps(s, anchor, p)),
@@ -96,8 +107,8 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     mission = surveyMission(s, anchor);
     boundary = plotGps(s, anchor);
   } else if (kind === "check") {
-    // Round wherever the drone is sitting (it should be on the take-off point), inside the plot.
-    mission = planFirstFlight(anchor);
+    if (s.home[1] < 3) return { error: "The take-off point is too close to the bottom of the garden for this check. Move it on the Plan map." };
+    mission = firstFlightMission(s, anchor);
     boundary = plotGps(s, anchor);
   } else {
     const r = roofScan(s, anchor);

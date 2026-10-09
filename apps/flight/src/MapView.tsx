@@ -46,7 +46,7 @@ import {
 } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone, useDrone } from "./drone";
-import { gpsToPlan, missionOnPlan, roofScan, surveyMission } from "./flight";
+import { firstFlightMission, gpsToPlan, missionOnPlan, roofScan, surveyMission } from "./flight";
 import { S, commit, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
 import { C } from "./theme";
@@ -342,7 +342,7 @@ function layers(s: AppState, px: (n: number) => number): ReactNode {
   if (tab === "roof") return roofLayer(s, px);
   const k = (n: number) => px(n);
   let body: ReactNode;
-  if (tab === "plan" || tab === "scan") body = <>{photoLayer(s, px)}{boundary(s, k)}{flightLayer(s, px)}</>;
+  if (tab === "plan" || tab === "scan") body = <>{photoLayer(s, px)}{boundary(s, k)}{flightLayer(s, px, tab === "scan" && drone.job?.kind === "check")}</>;
   else if (!s.scanned) body = <><G opacity={0.5}>{photoLayer(s, px)}</G>{boundary(s, k)}</>;
   else if (tab === "survey") {
     const base =
@@ -541,8 +541,11 @@ function dims(s: AppState, px: (n: number) => number) {
   );
 }
 
-function flightLayer(s: AppState, px: (n: number) => number) {
-  const route = missionOnPlan(s, surveyMission(s, SIM_HOME), SIM_HOME);
+function flightLayer(s: AppState, px: (n: number) => number, firstFlight = false) {
+  // The first flight check's route while it flies, otherwise the full garden scan.
+  const route = firstFlight
+    ? missionOnPlan(s, firstFlightMission(s, SIM_HOME), SIM_HOME).slice(1, -1)
+    : missionOnPlan(s, surveyMission(s, SIM_HOME), SIM_HOME);
   const h = s.home;
   return (
     <>
@@ -835,7 +838,7 @@ function DroneOverlay({ px }: { px: (n: number) => number }) {
   const job = d.job;
   const t = d.telemetry;
   if (!job || job.kind === "test" || !t || t.position.lat === 0) return null;
-  if (s.tab === "roof" ? job.kind !== "roof" || s.roof.showExample : !(s.tab === "scan" || s.tab === "plan") || job.kind !== "survey") return null;
+  if (s.tab === "roof" ? job.kind !== "roof" || s.roof.showExample : !(s.tab === "scan" || s.tab === "plan") || (job.kind !== "survey" && job.kind !== "check")) return null;
   const p = gpsToPlan(s, job.anchor, t.position);
   const route = missionOnPlan(s, job.mission, job.anchor);
   const done = job.session.progress.completedWaypoints;

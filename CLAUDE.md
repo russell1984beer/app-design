@@ -117,9 +117,11 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     `npm run phone:cloud` starts it from the cloud workspace with `EXPO_TOKEN`. Needs expo.dev hosts
     allowed in the environment's network settings. The APK contains the DJI key: never share its link.
   - First flight check (Scan tab, `src/panels/FirstFlight.tsx`; flight-core `planFirstFlight`, test
-    `test/first-flight.test.ts`): 5 m up, 60 s hover (wind reading vs Met Office for U2/U3, optional
-    cable unplug for U8, "carry on" button), a 4 m square with 4 photos, then lands straight down
-    (`Mission.endWith = "land"`, waypoint `holdS`). Recorded in `firstFlightDoneAt`. Not flown yet.
+    `test/first-flight.test.ts`), as the owner chose: 10 m up, 60 s hover over the take-off point (wind
+    reading vs Met Office for U2/U3, optional cable unplug for U8, "carry on" button), then the garden
+    scan pattern over the bottom of the garden up to the take-off point (`firstFlightArea`, full width,
+    far end first; about 63 photos at the default home), back over the take-off point, lands straight
+    down (`Mission.endWith = "land"`, waypoint `holdS`). Recorded in `firstFlightDoneAt`. Not flown yet.
   - DJI FlySafe no-fly zones (real mode): `FlyZones.kt` asks the DJI SDK (`FlyZoneManager.
     getFlyZonesInSurroundingArea`) for the zones round the take-off point; `modules/dji-drone/src/flyZones.ts`
     turns them into flight-core `NoFlyZone`s (restricted and authorisation block, warning warns, height

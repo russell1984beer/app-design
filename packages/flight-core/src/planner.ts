@@ -253,33 +253,32 @@ export function planOrbit(o: Partial<OrbitSettings> & Pick<OrbitSettings, "cente
 }
 
 export type FirstFlightSettings = {
-  /** Height above the take-off point, metres. Low on purpose. */
+  /** Height above the take-off point, metres, for the hover and the scan. */
   altitudeM: number;
-  /** Side of the square flown round the take-off point, metres. */
-  sideM: number;
   /** Hover above the take-off point this long first, for the checks (wind, unplugged cable). */
   holdS: number;
+  /** Photo overlap for the scan, 0-1 (as the full garden scan). */
+  overlap: number;
   speedMs: number;
 };
 
-export const FIRST_FLIGHT: FirstFlightSettings = { altitudeM: 5, sideM: 4, holdS: 60, speedMs: 1.5 };
+export const FIRST_FLIGHT: FirstFlightSettings = { altitudeM: 10, holdS: 60, overlap: 0.75, speedMs: 3 };
 
 /**
- * The first real flight: a low, short check before any scan. Climbs to 5 m above the take-off
- * point and hovers there (time to compare the wind reading and try unplugging the phone), flies a
- * 4 m square round it taking a photo straight down at each corner, comes back over the take-off
- * point and lands straight down (no climb to the return height).
+ * The first real flight, chosen by the owner: climb to 10 m over the take-off point and hover there
+ * (time to compare the wind reading and try unplugging the phone), then scan `area` (the bottom of
+ * the garden up to the take-off point) in the garden scan's pattern, finishing at the take-off end,
+ * come back over the take-off point and land straight down (no climb to the return height).
  */
-export function planFirstFlight(home: LatLng, overrides: Partial<FirstFlightSettings> = {}): Mission {
+export function planFirstFlight(home: LatLng, area: LatLng[], overrides: Partial<FirstFlightSettings> = {}): Mission {
   const s = { ...FIRST_FLIGHT, ...overrides };
-  const h = s.sideM / 2;
-  const at = (north: number, east: number) => fromLocal(home, { x: east, y: north });
-  const corners: [number, number][] = [[h, -h], [h, h], [-h, h], [-h, -h]];
-  const waypoints: Waypoint[] = [
-    { index: 0, position: home, altitudeM: s.altitudeM, photo: false, gimbalPitchDeg: -90, holdS: s.holdS },
-    ...corners.map(([n, e], i) => ({ index: i + 1, position: at(n, e), altitudeM: s.altitudeM, photo: true, gimbalPitchDeg: -90 })),
-    { index: 5, position: home, altitudeM: s.altitudeM, photo: false, gimbalPitchDeg: -90 },
-  ];
+  const scan = planSurvey(area, { altitudeM: s.altitudeM, overlap: s.overlap, speedMs: s.speedMs, edgeLap: false });
+  let passes = scan.waypoints;
+  // Start at the far end and work back towards the take-off point, so the scan ends near it.
+  if (passes.length > 1 && distanceM(passes[0].position, home) < distanceM(passes[passes.length - 1].position, home)) passes = [...passes].reverse();
+  const hover: Waypoint = { index: 0, position: home, altitudeM: s.altitudeM, photo: false, gimbalPitchDeg: -90, holdS: s.holdS };
+  const back: Waypoint = { index: passes.length + 1, position: home, altitudeM: s.altitudeM, photo: false, gimbalPitchDeg: -90 };
+  const waypoints = [hover, ...passes.map((w, i) => ({ ...w, index: i + 1 })), back];
   const mission = buildMission("check", waypoints, s.speedMs);
   return { ...mission, endWith: "land", estimate: { ...mission.estimate, durationS: mission.estimate.durationS + s.holdS } };
 }

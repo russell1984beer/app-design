@@ -1,6 +1,7 @@
-// The first real flight: a low, short check before any scan (flight-core planFirstFlight). The drone
-// hovers 5 m above the take-off point while the pilot compares the wind reading and, if they want,
-// tries unplugging the phone; then it flies a 4 m square taking 4 photos and lands where it took off.
+// The first real flight, a short check before the full scan (flight-core planFirstFlight). The drone
+// hovers 10 m above the take-off point while the pilot compares the wind reading and, if they want,
+// tries unplugging the phone; then it scans the bottom of the garden up to the take-off point and
+// lands where it took off.
 
 import { useEffect, useState } from "react";
 import { View } from "react-native";
@@ -8,8 +9,8 @@ import { View } from "react-native";
 import { FIRST_FLIGHT } from "../../../../packages/flight-core/src/planner.ts";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
-import { useDrone } from "../drone";
-import { anchorFor, launch, prepareFlight, RETURN_REASON, STATE_TEXT } from "../flight";
+import { SIM_HOME, useDrone } from "../drone";
+import { anchorFor, firstFlightMission, launch, prepareFlight, RETURN_REASON, STATE_TEXT } from "../flight";
 import { S, commitNow, useApp } from "../store";
 import { Btn, H2, Lead, Note, P, Readout, Status } from "../ui";
 import { useForecast } from "../weather";
@@ -22,6 +23,7 @@ export function FirstFlightStart() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const plan = prepareFlight("check", s, d.telemetry);
+  const photoCount = firstFlightMission(s, SIM_HOME).estimate.photoCount;
   const done = s.firstFlightDoneAt;
 
   if (!open) {
@@ -31,7 +33,7 @@ export function FirstFlightStart() {
         <Note>
           {done
             ? `Flown on ${new Date(done).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}. You can fly it again at any time.`
-            : `Fly this before the first real scan: ${FIRST_FLIGHT.altitudeM} m up, a short hover, a ${FIRST_FLIGHT.sideM} m square with 4 photos, then it lands where it took off.`}
+            : `Fly this before the first full scan: ${FIRST_FLIGHT.altitudeM} m up, a short hover, a scan of the bottom of the garden up to the take-off point, then it lands where it took off.`}
         </Note>
         <Btn label="Set up the first flight check" alt={!!done} onPress={() => setOpen(true)} />
       </View>
@@ -59,7 +61,9 @@ export function FirstFlightStart() {
       <Readout>
         <P>1. It takes off and climbs to {FIRST_FLIGHT.altitudeM} m above the take-off point.</P>
         <P>2. It hovers there for {FIRST_FLIGHT.holdS} seconds while you check the wind reading, and try unplugging the phone if you want to.</P>
-        <P>3. It flies a {FIRST_FLIGHT.sideM} m square round the take-off point, taking a photo straight down at each corner.</P>
+        <P>
+          3. It scans the bottom of the garden up to the take-off point at {FIRST_FLIGHT.altitudeM} m: {photoCount} photos, starting at the far end and working back.
+        </P>
         <P>4. It comes back over the take-off point and lands straight down.</P>
       </Readout>
       {s.mode === "sim" && <Note style={{ marginBottom: 8, color: "#B7791F", fontWeight: "700" }}>DJI simulator is selected: propellers OFF. Switch to Real flight for the real check.</Note>}
@@ -97,7 +101,8 @@ export function FirstFlightProgress() {
 
   if (!job || !session) return null;
   const hold = session.holdRemainingS;
-  const photos = Math.max(0, session.progress.completedWaypoints.filter((i) => job.mission.waypoints[i]?.photo).length);
+  const photos = session.progress.completedWaypoints.filter((i) => job.mission.waypoints[i]?.photo).length;
+  const totalPhotos = job.mission.estimate.photoCount;
   const forecast = result && "forecast" in result ? result.forecast : null;
 
   return (
@@ -106,7 +111,7 @@ export function FirstFlightProgress() {
       <Readout>
         <P bold>{hold !== undefined ? `Hovering: ${Math.ceil(hold)} s left` : (STATE_TEXT[session.state] ?? session.state)}</P>
         <P>
-          Height {t ? `${t.altitudeM.toFixed(1)} m` : "–"} · Battery {t?.batteryPercent ? `${t.batteryPercent}%` : "–"} · Photos {photos} of 4
+          Height {t ? `${t.altitudeM.toFixed(1)} m` : "–"} · Battery {t?.batteryPercent ? `${t.batteryPercent}%` : "–"} · Photos {photos} of {totalPhotos}
         </P>
         {session.returnReason && <P>{session.returnReason === "complete" ? "Check complete: landed where it took off." : RETURN_REASON[session.returnReason]}</P>}
       </Readout>
@@ -136,7 +141,7 @@ export function FirstFlightProgress() {
               down on the take-off point. Keep your thumbs near the sticks; the controller still works the whole time.
             </Note>
           </Readout>
-          <Btn label="Carry on to the square now" onPress={() => session.endHold()} />
+          <Btn label="Carry on to the scan now" onPress={() => session.endHold()} />
         </View>
       )}
 
@@ -145,7 +150,7 @@ export function FirstFlightProgress() {
       {!d.flying && (
         <View>
           {finished ? (
-            <Status status="pass" text="First flight check done. Copy the 4 photos from the drone's memory card if you want to look at them." />
+            <Status status="pass" text="First flight check done. The photos are on the drone's memory card; they can go through the survey tool like a full scan." />
           ) : (
             <Status status="warn" text="The check did not finish. Look at the reason above; you can fly it again." />
           )}

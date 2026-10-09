@@ -231,10 +231,11 @@ looked wrong.
 ## After all 9 pass: the first flight check
 
 All 9 passed on 9 October 2026. The first real flight is the **first flight check** on the Scan
-tab (Set up the first flight check). It takes off, climbs to 5 m above the take-off point, hovers
-for 60 seconds, flies a 4 m square round the take-off point taking a photo straight down at each
-corner, comes back over the take-off point and lands straight down (it does not climb to the
-return height unless a safety rule or the pilot sends it home).
+tab (Set up the first flight check). It takes off, climbs to 10 m above the take-off point, hovers
+for 60 seconds, then scans the bottom of the garden up to the take-off point (the full width, in the
+garden scan's pattern, starting at the far end), comes back over the take-off point and lands
+straight down (it does not climb to the return height unless a safety rule or the pilot sends it
+home). Check that every tree and aerial in that part of the garden is well under 10 m first.
 
 Before it:
 
@@ -254,7 +255,7 @@ While it hovers, the screen shows:
   units or direction are read wrongly).
 - **Unplugging the phone (optional):** unplug for 5 seconds, then plug back in. The drone should
   hold its position; when the cable is back the app brings it home (U8). The check ends there.
-- **Carry on to the square now** skips the rest of the hover.
+- **Carry on to the scan now** skips the rest of the hover.
 
 Try it in DJI's simulator first if you like (propellers off): the same button works there.
 
