@@ -121,7 +121,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     reading vs Met Office for U2/U3, optional cable unplug for U8, "carry on" button), then the garden
     scan pattern over the bottom of the garden up to the take-off point (`firstFlightArea`, full width,
     far end first; about 63 photos at the default home), back over the take-off point, lands straight
-    down (`Mission.endWith = "land"`, waypoint `holdS`). Recorded in `firstFlightDoneAt`. Not flown yet. Tallest tree in the bottom of the garden: about 5 m (owner), so 10 m leaves 5 m clear.
+    down (`Mission.endWith = "land"`, waypoint `holdS`). Recorded in `firstFlightDoneAt`. Flown in DJI's simulator (landed, 9 October 2026); not flown for real yet. Tallest tree in the bottom of the garden: about 5 m (owner), so 10 m leaves 5 m clear.
   - DJI FlySafe no-fly zones (real mode): `FlyZones.kt` asks the DJI SDK (`FlyZoneManager.
     getFlyZonesInSurroundingArea`) for the zones round the take-off point; `modules/dji-drone/src/flyZones.ts`
     turns them into flight-core `NoFlyZone`s (restricted and authorisation block, warning warns, height
