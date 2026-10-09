@@ -36,6 +36,8 @@ export type Telemetry = {
   windWarning: "none" | "moderate" | "strong";
   /** Nearest obstacle the drone's own sensors see, sideways or above, metres (none: nothing seen or not reported). */
   obstacleM?: number;
+  /** How many more photos fit on the drone's storage (none: not reported). */
+  photosLeft?: number;
 };
 
 export type DroneEvent =

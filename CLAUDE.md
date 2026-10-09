@@ -117,6 +117,11 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     something is within 3 m while scanning (1.5 m on roof circles), with 15 s grace after Resume.
     Test bench test 10 feeds a 2 m obstacle in (`setTestObstacle`). In DJI's simulator the real sensors
     are ignored: on the table they saw the room (0.3-0.4 m) and stopped test 1 twice (9 October 2026).
+  - Drone storage: Kotlin reads `CameraKey.KeyCameraStorageInfos` (photos that still fit) into Telemetry
+    `photosLeft`; the pre-flight check (flight-core `storageCheck`) blocks when the flight's photos (only the
+    missing ones when resuming) do not fit, warns with under 5 to spare. Seen on the phone (9 October 2026):
+    repeated simulator tests filled the storage and the camera then answered -472 "weak GPS"; a photo failure
+    with no room left now says the storage is full.
   - Materials tab: editable unit prices (saved on the phone), Export PDF quote (expo-print) and
     Export DXF plan (R12, metres), both through the share sheet. Generators in garden-core `export.ts`.
   - iPad: `app.json` has iOS (`com.plotwise.app`, tablet); `eas.json` profile `ipad`;

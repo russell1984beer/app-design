@@ -202,6 +202,8 @@ export function TestBench() {
       forecast: { speedMs: 0, gustMs: 0, fromDeg: 0, source: "simulator" },
       noFlyZones: [],
       batteryPercent: telemetry?.batteryPercent ?? 0,
+      photosLeft: telemetry?.photosLeft,
+      photosNeeded: mission.waypoints.length - progress.completedWaypoints.length,
     });
     setChecks(result.items.filter((i) => i.status !== "pass"));
     if (!result.canTakeOff) {

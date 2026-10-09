@@ -136,6 +136,10 @@ export type PreflightInput = {
   batteryPercent: number;
   /** Measured obstacle heights (e.g. from LIDAR), in metres above the ground at the take-off point. */
   obstacles?: ObstacleHeights;
+  /** Photos that still fit on the drone's storage, if the drone reports it. */
+  photosLeft?: number;
+  /** Photos this flight still has to take (fewer when resuming); default every waypoint. */
+  photosNeeded?: number;
 };
 
 export type ObstacleHeights = {
@@ -239,7 +243,19 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
     );
   }
 
+  if (input.photosLeft !== undefined) items.push(storageCheck(input.photosLeft, input.photosNeeded ?? mission.waypoints.length));
+
   return { canTakeOff: items.every((i) => i.status !== "block"), items };
+}
+
+/** Each photo is tried 3 times before the scan gives up, so a little room spare is asked for. */
+export const STORAGE_SPARE_PHOTOS = 5;
+
+function storageCheck(left: number, needed: number): CheckItem {
+  const free = "Copy the photos off the drone, then format its storage in DJI Fly (camera settings, Storage, Format).";
+  if (left < needed) return block("storage", `The drone's storage has room for ${left} more photo${left === 1 ? "" : "s"}; this flight takes ${needed}. ${free}`);
+  if (left < needed + STORAGE_SPARE_PHOTOS) return warn("storage", `The drone's storage has room for only ${left} photos; this flight takes ${needed}. ${free}`);
+  return pass("storage", `Room for ${left} photos on the drone (this flight takes ${needed}).`);
 }
 
 function obstacleChecks(o: ObstacleHeights, mission: Mission, s: SafetySettings): CheckItem[] {

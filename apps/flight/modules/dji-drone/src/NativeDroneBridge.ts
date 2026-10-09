@@ -68,6 +68,7 @@ export class NativeDroneBridge implements DroneBridge {
       wind: this.testWind ?? (t?.windSpeedMs != null ? { speedMs: t.windSpeedMs, fromDeg: this.windFrom(t, position) } : undefined),
       windWarning: t?.windWarning ?? "none",
       obstacleM: this.testObstacleM ?? (fresh && t!.obstacleM != null ? t!.obstacleM : undefined),
+      photosLeft: t?.photosLeft ?? undefined,
     };
   }
 

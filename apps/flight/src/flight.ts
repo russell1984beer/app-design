@@ -155,6 +155,9 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     noFlyZones: flyZones && "zones" in flyZones ? flyZones.zones : [],
     batteryPercent: t?.batteryPercent ?? 0,
     obstacles: obstacles ?? undefined,
+    photosLeft: t?.photosLeft,
+    // Resuming takes only the photos still missing.
+    photosNeeded: mission.waypoints.length - (resume && saved?.progress.missionId === mission.id ? saved.progress.completedWaypoints.length : 0),
   });
   const extra: CheckItem[] = [];
   if (!t?.signalOk) extra.push({ id: "link", status: "block", message: "Drone not connected. Plug the phone into the RC-N2 and switch the drone on." });

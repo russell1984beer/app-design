@@ -91,6 +91,8 @@ class DroneController(
   private var obstacleM: Double? = null
   private var obstacleAtMs = 0L
   private var obstacleRaw: String = "-"
+  /** Photos that still fit on the drone's storage (the card, or its own memory without one). */
+  private var photosLeft: Int? = null
   private var virtualStickEnabled = false
   private var authority: FlightControlAuthority? = null
 
@@ -153,6 +155,7 @@ class DroneController(
       keys.getValue(KeyTools.createKey(RemoteControllerKey.KeyConnection))?.let { rcConnected = it }
       keys.getValue(KeyTools.createKey(FlightControllerKey.KeyConnection))?.let { aircraftConnected = it }
       keys.getValue(KeyTools.createKey(BatteryKey.KeyChargeRemainingInPercent))?.let { battery = it }
+      keys.getValue(KeyTools.createKey(CameraKey.KeyCameraStorageInfos))?.let { onStorage(it) }
     } catch (e: Exception) {
       Log.w(TAG, "Could not read drone values: ${e.message}")
     }
@@ -201,6 +204,7 @@ class DroneController(
     listen(BatteryKey.KeyChargeRemainingInPercent) { battery = it }
     listen(ProductKey.KeyProductType) { productType = it?.name }
     listen(CameraKey.KeyNewlyGeneratedMediaFile) { onMediaFile(it) }
+    listen(CameraKey.KeyCameraStorageInfos) { if (it != null) onStorage(it) }
     sticks.setVirtualStickStateListener(stickListener)
     try {
       DeviceHealthManager.getInstance().addDJIDeviceHealthInfoChangeListener(healthListener)
@@ -688,7 +692,7 @@ class DroneController(
     }
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
-      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw mode=${djiFlightMode?.name}")
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw photosLeft=$photosLeft mode=${djiFlightMode?.name}")
     }
     try {
       sendTelemetry(now)
@@ -716,6 +720,7 @@ class DroneController(
         "windWarning" to TelemetryRules.windWarning(windWarning?.name),
         // Only a fresh reading counts: old distances say nothing about what is there now.
         "obstacleM" to (if (now - obstacleAtMs <= OBSTACLE_FRESH_MS) obstacleM else null),
+        "photosLeft" to photosLeft,
         "headingDeg" to compassHeading,
         "productType" to productType,
         "djiFlightMode" to djiFlightMode?.name,
@@ -737,8 +742,16 @@ class DroneController(
     )
   }
 
+  private fun onStorage(info: dji.sdk.keyvalue.value.camera.CameraStorageInfos) {
+    photosLeft = info.currentCameraStorageInfo?.availablePhotoCount
+  }
+
+  // Seen on the phone: with the storage full the camera answers "weak GPS" (-472), so say what is meant.
   private fun photoFailed(index: Int, reason: String) =
-    emit("onDroneEvent", mapOf("type" to "photoFailed", "waypointIndex" to index, "reason" to reason))
+    emit(
+      "onDroneEvent",
+      mapOf("type" to "photoFailed", "waypointIndex" to index, "reason" to if (photosLeft == 0) "the drone's storage is full ($reason)" else reason),
+    )
 
   private fun status(kind: String, message: String) = emit("onStatus", mapOf("kind" to kind, "message" to message))
 

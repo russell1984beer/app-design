@@ -288,3 +288,17 @@ test("preflight: battery too low to start is blocked; not enough for the whole s
   assert.ok(big.canTakeOff);
   assert.equal(big.items.find((i) => i.id === "battery")?.status, "warn");
 });
+
+test("pre-flight: the drone's storage must have room for the flight's photos", () => {
+  const input = goodPreflight();
+  const n = input.mission.waypoints.length;
+  const item = (photosLeft?: number, photosNeeded?: number) => preflightCheck({ ...input, photosLeft, photosNeeded }).items.find((i) => i.id === "storage");
+  assert.equal(item(), undefined, "no check when the drone does not report it");
+  assert.equal(item(0)?.status, "block");
+  assert.equal(item(n - 1)?.status, "block");
+  assert.equal(item(n + 1)?.status, "warn");
+  assert.equal(item(n + 100)?.status, "pass");
+  // Resuming needs room only for the photos still to take.
+  assert.equal(item(10, 3)?.status, "pass");
+  assert.ok(!preflightCheck({ ...input, photosLeft: 0 }).canTakeOff);
+});
