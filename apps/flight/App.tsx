@@ -99,7 +99,13 @@ function Shell() {
                 hitSlop={8}
                 style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.7 }]}
               >
-                <Text style={styles.menuText}>{menuOpen ? "Hide menu ▾" : `Menu: ${TABS.find(([id]) => id === s.tab)?.[1]} ▴`}</Text>
+                <Svg width={22} height={22} viewBox="0 0 24 24">
+                  {menuOpen ? (
+                    <Path d="M6 9l6 6 6-6" stroke={C.ink} strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  ) : (
+                    <Path d="M5 7h14M5 12h14M5 17h14" stroke={C.ink} strokeWidth={2.4} fill="none" strokeLinecap="round" />
+                  )}
+                </Svg>
               </Pressable>
             )}
           </View>
@@ -192,16 +198,18 @@ const styles = StyleSheet.create({
   navBtn: { flex: 1, alignItems: "center", gap: 3, paddingTop: 9, paddingBottom: 11 },
   navIcon: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   navText: { fontSize: 11, color: C.muted },
+  // A round button like the map's zoom buttons.
   menuBtn: {
     position: "absolute",
-    left: 0,
-    bottom: 0,
-    backgroundColor: C.paper,
+    left: 8,
+    bottom: 8,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.92)",
     borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderColor: "rgba(0,0,0,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  menuText: { fontSize: 14, fontWeight: "700", color: C.ink },
 });
