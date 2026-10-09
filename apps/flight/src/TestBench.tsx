@@ -80,21 +80,15 @@ const SCENARIOS: Scenario[] = [
   {
     id: "gust",
     title: "6. Gust",
-    instructions: "After 4 photos the app sets the simulator wind to 9 m/s.",
+    instructions:
+      "After 4 photos the app reports a 9 m/s wind to itself (DJI's simulator wind does not reach the drone's wind reading).",
     expect: "Stops the scan and returns home (wind over the 8 m/s limit).",
     atPhoto: {
       count: 4,
       run: () => {
         DjiDrone.setSimulatorWind(-9, 0);
-        // What the drone reports back settles U2-U4 (wind unit, direction, simulator axes).
-        for (const after of [3, 8, 15]) {
-          setTimeout(() => {
-            const w = drone.telemetry?.wind;
-            drone.addLog(
-              `Wind ${after}s after setting 9 m/s: drone reports ${w ? `${w.speedMs.toFixed(1)} m/s from ${Math.round(w.fromDeg)}°` : "no wind speed"}, warning ${drone.telemetry?.windWarning ?? "?"}`,
-            );
-          }, after * 1000);
-        }
+        drone.bridge.setTestWind({ speedMs: 9, fromDeg: 0 });
+        drone.addLog("Test wind: 9 m/s from the north.");
       },
     },
     pass: (s) => s.state === "landed" && s.returnReason === "wind",
@@ -199,6 +193,7 @@ export function TestBench() {
       return;
     }
     DjiDrone.setSimulatorWind(0, 0);
+    drone.bridge.setTestWind(null);
     scenarioRef.current = sc;
     firedRef.current = false;
     setScenario(sc);

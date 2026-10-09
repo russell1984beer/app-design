@@ -64,9 +64,19 @@ export class NativeDroneBridge implements DroneBridge {
       flightMode: t?.flightMode ?? "onGround",
       // No position yet (no GPS) counts as no link: the app must not fly blind.
       signalOk: fresh && t!.signalOk && t!.lat != null,
-      wind: t?.windSpeedMs != null ? { speedMs: t.windSpeedMs, fromDeg: this.windFrom(t, position) } : undefined,
+      wind: this.testWind ?? (t?.windSpeedMs != null ? { speedMs: t.windSpeedMs, fromDeg: this.windFrom(t, position) } : undefined),
       windWarning: t?.windWarning ?? "none",
     };
+  }
+
+  private testWind: { speedMs: number; fromDeg: number } | null = null;
+
+  /**
+   * Test bench only: report this wind instead of the drone's. DJI's simulator wind does not reach the
+   * Mini 4 Pro's own wind reading (it stays at 0), so the gust test feeds the wind in here.
+   */
+  setTestWind(wind: { speedMs: number; fromDeg: number } | null): void {
+    this.testWind = wind;
   }
 
   /** What is and is not connected, in plain English, for the test bench. */

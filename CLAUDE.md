@@ -133,8 +133,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     also shows the drone's own warnings (DeviceHealthManager). Third run: "Aircraft temperature high"
     26 s before the drone's own return, so likely overheating on the table (motors on, no airflow);
     the test area is now 20 x 12 m (28 photos, about 2 minutes), placed where the simulated drone is.
-    Tests 1-5 passed in DJI's simulator. Test 6 (gust): the simulator wind was not seen by the app (wind
-    now shown and logged, U2-U4 open). Test 7 (cable unplugged): signal lost, then no recovery seen yet. The drone refuses a
+    Tests 1-5 passed in DJI's simulator. Test 6 (gust): DJI's simulator wind does not reach the drone's wind
+    reading (0 m/s), so the test feeds a 9 m/s wind into the app (`setTestWind`, test bench only); U2/U3
+    (wind unit and direction) must be checked against DJI Fly on the first real flights. Test 7 (cable unplugged): signal lost, then no recovery seen yet. The drone refuses a
     new home point until it has recorded its own, so the app retries for 20 s. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
