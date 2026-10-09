@@ -56,6 +56,8 @@ function Shell() {
   // brings it up, and it drops away again once a tab is picked.
   const [menuOpen, setMenuOpen] = useState(false);
   const showNav = !wide || menuOpen;
+  // Sideways the panel takes about 60% of the width (the long thin plot needs little); the iPad caps it.
+  const panelWidth = Math.round(Math.min(560, Math.max(390, width * 0.6)));
 
   useEffect(() => {
     loadSaved().then(loadSavedSurvey).then(loadSavedLidar).then(() => commit());
@@ -110,7 +112,7 @@ function Shell() {
             )}
           </View>
         </View>
-        <View style={[styles.panel, wide ? { width: 390, maxHeight: undefined, borderTopRightRadius: 0 } : { maxHeight: height * 0.46 }]}>
+        <View style={[styles.panel, wide ? { width: panelWidth, maxHeight: undefined, borderTopRightRadius: 0 } : { maxHeight: height * 0.46 }]}>
           <ScrollView contentContainerStyle={{ padding: 18, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
             <Panel />
           </ScrollView>
