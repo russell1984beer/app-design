@@ -243,6 +243,11 @@ tree or roof near it (it blocks under 3 m and warns under 5 m), and checks the r
 clears the tallest thing in the area by 10 m. The LIDAR may be a few years old and its position is
 good to a few metres, so still look at the route yourself.
 
+**Put the drone on the yellow take-off point on the Plan map.** Every flight, and the fence round
+the plot, is placed from where the drone actually stands. The app checks this with the LIDAR: if
+your house shows up shifted, it says how far the drone is from the take-off point, offers to move
+the take-off point to the drone, and blocks take-off when it is 5 m or more out.
+
 Before it:
 
 1. The Met Office key is in `apps/flight/.env` and the app has been rebuilt (real take-offs are

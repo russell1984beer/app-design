@@ -14,10 +14,28 @@ import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
 import { recordScan } from "./survey";
 import { currentFlyZones } from "./flysafe";
-import { lidarFor, lidarStatus, obstacleHeights } from "./lidar";
+import { lidarFor, lidarStatus, obstacleHeights, takeoffOffset, type TakeoffOffset } from "./lidar";
 import { currentForecast } from "./weather";
 
 export const SIM_TEST_COUNT = 9;
+
+/** Is the drone really on the plan's take-off point? Judged by where the house shows up in the LIDAR. */
+export function takeoffMismatch(s: AppState, anchor: LatLng | null): TakeoffOffset | null {
+  if (s.mode !== "real" || !anchor) return null;
+  const site = lidarFor(anchor);
+  if (!site) return null;
+  const key = `${anchor.lat.toFixed(6)},${anchor.lng.toFixed(6)},${s.home.join(",")}`;
+  return takeoffOffset(site, s.plot, (p) => planToGps(s, anchor, p), key);
+}
+
+/** Plain words for which way the drone is off the marked take-off point. */
+export function offsetWords(alongM: number): string {
+  return `${Math.abs(alongM).toFixed(0)} m ${alongM > 0 ? "nearer the house" : "nearer the bottom of the garden"}`;
+}
+
+/** Beyond these, the drone is not where the plan thinks: warn, then block (all routes would be shifted). */
+export const OFFSET_WARN_M = 2.5;
+export const OFFSET_BLOCK_M = 5;
 
 /** A plan point as a GPS position, given the GPS position of the home point. */
 export function planToGps(s: AppState, anchor: LatLng, p: Pt): LatLng {
@@ -148,6 +166,19 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     else if ("error" in flyZones)
       // The drone itself still refuses to take off in DJI's restricted zones.
       extra.push({ id: "flySafe", status: "warn", message: `Could not check DJI's no-fly zones (${flyZones.error}). Check DJI Fly before you fly.` });
+    const off = takeoffMismatch(s, anchor);
+    if (off && Math.abs(off.alongM) >= OFFSET_BLOCK_M)
+      extra.push({
+        id: "takeoffPoint",
+        status: "block",
+        message: `The drone seems to be about ${offsetWords(off.alongM)} than the take-off point on the plan (the house shows up shifted in the LIDAR). The whole flight would be shifted too. Carry the drone to the take-off point, or move the take-off point (button above).`,
+      });
+    else if (off && Math.abs(off.alongM) >= OFFSET_WARN_M)
+      extra.push({
+        id: "takeoffPoint",
+        status: "warn",
+        message: `The drone may be about ${offsetWords(off.alongM)} than the take-off point on the plan. Check it is standing on the marked spot.`,
+      });
     if (!obstacles) {
       // Heights are an extra check: without them the flight is not blocked, but the pilot is told.
       const st = lidarStatus(anchor);

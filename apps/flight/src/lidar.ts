@@ -17,7 +17,7 @@ import type { Pt } from "../../../packages/garden-core/src/index.ts";
 
 import type { LidarSite } from "./lidarMath";
 
-export { lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath";
+export { lidarSurvey, obstacleHeights, takeoffOffset, type LidarSite, type TakeoffOffset } from "./lidarMath";
 
 const DTM_URL = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wcs";
 const DSM_URL = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-surface-model-first-return-dsm-1m/wcs";
@@ -151,6 +151,23 @@ export async function fetchLidar(anchor: LatLng, home: Pt): Promise<void> {
     loading = false;
     emit();
   }
+}
+
+/** Say where on the plan the drone was when the LIDAR was fetched (lines the levels up again). */
+export function setLidarHome(home: Pt): void {
+  if (!site) return;
+  site = { ...site, home };
+  try {
+    const f = new File(Paths.document, FILE);
+    if (f.exists) {
+      const stored = JSON.parse(f.textSync()) as Stored;
+      stored.home = home;
+      f.write(JSON.stringify(stored));
+    }
+  } catch {
+    // The change still holds until the app is closed.
+  }
+  emit();
 }
 
 /** The LIDAR for this take-off point, if fetched. */

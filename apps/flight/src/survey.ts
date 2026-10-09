@@ -33,7 +33,7 @@ export function currentSurvey(): SurveyPackage | null {
   if (drone) return drone;
   const l = currentLidar();
   if (!l) return null;
-  const key = `${l.fetchedAt}|${JSON.stringify(S.plot)}`;
+  const key = `${l.fetchedAt}|${l.home.join(",")}|${JSON.stringify(S.plot)}`;
   if (lidarCache?.key !== key) {
     let survey: SurveyPackage | null = null;
     try {

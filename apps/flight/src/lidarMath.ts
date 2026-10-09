@@ -107,7 +107,8 @@ export function lidarSurvey(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng):
   return {
     format: "plotwise-survey",
     version: 1,
-    createdAt: s.fetchedAt,
+    // Includes where it is lined up, so drawings cached by createdAt are redone when that changes.
+    createdAt: `${s.fetchedAt} @${s.home.join(",")}`,
     flownAt: s.fetchedAt,
     photoCount: 0,
     plot,
@@ -117,4 +118,58 @@ export function lidarSurvey(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng):
     label:
       "Levels from the Environment Agency's LIDAR (free, 1 m grid, ground heights to about 15 cm). Its position on the plan is good to a few metres, and it may be a few years old. A drone survey replaces it.",
   };
+}
+
+/** How far the drone is from the take-off point on the plan, judged by where the house shows up. */
+export type TakeoffOffset = {
+  /** Plan metres along the garden: positive means the drone is nearer the street than the marked point. */
+  alongM: number;
+  /** How clearly the house stands out in the LIDAR at the best match (0-1). */
+  score: number;
+};
+
+const offsetCache = new Map<string, TakeoffOffset | null>();
+
+/**
+ * Finds the house (the plan's house rectangle) in the LIDAR heights. If it shows up shifted along
+ * the garden, the drone is not on the take-off point the plan assumes, by that much. `toGps` places
+ * a plan point using the drone's position as the take-off point. Null when the house cannot be found
+ * clearly (no surface model, or nothing house-like).
+ */
+export function takeoffOffset(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng, cacheKey: string): TakeoffOffset | null {
+  const key = `${s.fetchedAt}|${cacheKey}|${JSON.stringify(plot)}`;
+  if (offsetCache.has(key)) return offsetCache.get(key)!;
+  const result = computeOffset(s, plot, toGps);
+  offsetCache.set(key, result);
+  return result;
+}
+
+function computeOffset(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng): TakeoffOffset | null {
+  if (!s.dsm) return null;
+  const dsm = s.dsm;
+  const W = Math.min(plot.houseWidthM, plot.widthM);
+  const y0 = plot.rearGardenM;
+  const y1 = plot.rearGardenM + plot.houseDepthM;
+  // Sample points inside the house, 1 m apart, kept a little in from its edges.
+  const pts: Pt[] = [];
+  for (let x = 0.75; x < W - 0.5; x += 1) for (let y = y0 + 0.75; y < y1 - 0.5; y += 1) pts.push([x, y]);
+  if (pts.length < 6) return null;
+  const tall = (p: Pt) => {
+    const g = toGps(p);
+    const top = at(dsm, g);
+    const ground = at(s.dtm, g);
+    return Number.isFinite(top) && Number.isFinite(ground) && top - ground >= 3;
+  };
+  const scores: { d: number; score: number }[] = [];
+  for (let d = -20; d <= 20; d += 0.5) {
+    // A feature at plan y shows up at y - d when the drone is d further along than assumed.
+    const hit = pts.filter(([x, y]) => tall([x, y - d])).length;
+    scores.push({ d, score: hit / pts.length });
+  }
+  const best = Math.max(...scores.map((x) => x.score));
+  if (best < 0.7) return null;
+  // The middle of the best-matching run of shifts (a house deeper than the plan says gives a plateau).
+  const good = scores.filter((x) => x.score >= best - 0.05).map((x) => x.d);
+  const mid = good[Math.floor(good.length / 2)];
+  return { alongM: mid, score: best };
 }

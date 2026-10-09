@@ -6,8 +6,8 @@ import { area, fmtLevel, gradientText, measureLine, perimeter } from "../../../.
 import { HEIGHT_BANDS, terrainFor } from "../MapView";
 import { S, commit, go, useApp } from "../store";
 import { useDrone } from "../drone";
-import { anchorFor } from "../flight";
-import { currentLidar, fetchLidar, useLidar } from "../lidar";
+import { anchorFor, offsetWords, OFFSET_WARN_M, planToGps } from "../flight";
+import { currentLidar, fetchLidar, setLidarHome, takeoffOffset, useLidar } from "../lidar";
 import { currentSurvey, droneSurvey, openSurveyFile, removeSurvey, shareScanDetails } from "../survey";
 import { Big, Btn, H2, Lead, Legend, Note, P, Readout, Row, Seg, Status } from "../ui";
 
@@ -67,8 +67,25 @@ function LidarFetch() {
   const anchor = s.mode === "real" ? anchorFor(s, d.telemetry) : null;
   const { site, loading, error } = useLidar(anchor, s.home);
   if (loading) return <Status status="warn" text="Getting the Environment Agency's LIDAR levels…" />;
-  if (site)
-    return anchor ? <Btn label="Get the LIDAR again (drone on the take-off point)" alt onPress={() => fetchLidar(anchor, s.home)} /> : null;
+  if (site) {
+    // Fetched with the drone somewhere other than the plan's take-off point? The house shows it.
+    const off = takeoffOffset(site, s.plot, (p) => planToGps({ ...s, home: site.home }, site.anchor, p), `stored,${site.home.join(",")}`);
+    const misplaced = off && Math.abs(off.alongM) >= OFFSET_WARN_M;
+    return (
+      <View>
+        {misplaced && (
+          <View>
+            <Status
+              status="warn"
+              text={`The LIDAR shows your house about ${Math.abs(off.alongM).toFixed(0)} m out of place: the drone was ${offsetWords(off.alongM)} than the take-off point when it was fetched.`}
+            />
+            <Btn label="Line the LIDAR up with the house" alt onPress={() => setLidarHome([site.home[0], site.home[1] + off.alongM])} />
+          </View>
+        )}
+        {anchor && <Btn label="Get the LIDAR again (drone on the take-off point)" alt onPress={() => fetchLidar(anchor, s.home)} />}
+      </View>
+    );
+  }
   return (
     <View>
       <Note>

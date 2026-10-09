@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { useDrone } from "../drone";
-import { anchorFor, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
+import { anchorFor, offsetWords, OFFSET_WARN_M, takeoffMismatch, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
 import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 import { shareScanDetails } from "../survey";
@@ -45,6 +45,36 @@ export function DroneStatus() {
         {s.mode === "real" && <FlyZoneLine />}
         {s.mode === "real" && <HeightsLine />}
       </Readout>
+      {s.mode === "real" && <TakeoffPointCheck />}
+    </View>
+  );
+}
+
+/**
+ * The flight plans assume the drone stands on the plan's take-off point. If the house shows up
+ * shifted in the LIDAR, it does not: offer to move the take-off point to where the drone is.
+ */
+function TakeoffPointCheck() {
+  const s = useApp();
+  const d = useDrone();
+  const off = takeoffMismatch(s, anchorFor(s, d.telemetry));
+  if (!off || Math.abs(off.alongM) < OFFSET_WARN_M || d.flying) return null;
+  const newY = Math.min(Math.max(s.home[1] + off.alongM, 1), s.plot.rearGardenM - 1);
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Status
+        status="block"
+        text={`The drone is not on the take-off point: going by where your house shows up in the LIDAR, it is about ${offsetWords(off.alongM)} than the yellow spot on the plan.`}
+      />
+      <Note>Either carry the drone to the yellow spot, or move the yellow spot to where the drone is. Every flight starts from the yellow spot.</Note>
+      <Btn
+        label={`Move the take-off point to the drone (${offsetWords(off.alongM)})`}
+        alt
+        onPress={() => {
+          S.home = [s.home[0], newY];
+          commit();
+        }}
+      />
     </View>
   );
 }

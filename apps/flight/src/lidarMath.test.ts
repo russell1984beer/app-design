@@ -62,3 +62,37 @@ test("LIDAR as a survey of the plot: ground levels and the tree on the plan", ()
   assert.ok(surf(3.5, 5) - g(3.5, 5) > 5);
   assert.ok(surf(3.5, 30) - g(3.5, 30) < 0.5);
 });
+
+test("take-off offset: the house shows where the drone really is", async () => {
+  const { takeoffOffset } = await import("./lidarMath.ts");
+  // Plot running north (bottom of the garden) to south (street): plan y grows towards the street.
+  // Rear garden 29.5 m, house 8 m deep, 7 m wide. The plan's take-off point is at (3.5, 14.75).
+  const plot = { widthM: 7, lengthM: 43, rearGardenM: 29.5, houseDepthM: 8, houseWidthM: 7, ridgeHeightM: 8.5, gardenBearingDeg: 0 } as never;
+  const planHome: [number, number] = [3.5, 14.75];
+  const c = wgs84ToGrid(HOME.lat, HOME.lng);
+  const size = 160;
+  const origin = { x: Math.floor(c.e) - size / 2, y: Math.floor(c.n) + size / 2 };
+  // The real take-off spot (where HOME is) is on the patio, 9 m nearer the house: plan y 23.75.
+  const realHomeY = 23.75;
+  // The house (and next door's half) occupy plan y 29.5-37.5, i.e. 5.75-13.75 m south of HOME.
+  const make = (f: (e: number, n: number) => number): Raster => {
+    const values = new Float64Array(size * size);
+    for (let r = 0; r < size; r++) for (let k = 0; k < size; k++) values[r * size + k] = f(origin.x + k + 0.5, origin.y - r - 0.5);
+    return { width: size, height: size, values, origin, pixelSize: { x: 1, y: 1 } };
+  };
+  const south = (n: number) => c.n - n; // metres south of HOME
+  const dtm = make(() => 20);
+  const dsm = make((e, n) => 20 + (south(n) > 29.5 - realHomeY && south(n) < 37.5 - realHomeY && Math.abs(e - c.e) < 10 ? 8 : 0));
+  const site: LidarSite = { fetchedAt: "x", anchor: HOME, home: planHome, dtm, dsm };
+  // The plan places points assuming HOME is at planHome.
+  const toGps = ([x, y]: [number, number]) => at(planHome[1] - y, x - planHome[0]);
+  const off = takeoffOffset(site, plot, toGps, "patio")!;
+  assert.ok(Math.abs(off.alongM - (realHomeY - planHome[1])) <= 1, `along ${off.alongM}`);
+  // With the take-off point moved to the patio, the house lines up.
+  const moved: [number, number] = [3.5, realHomeY];
+  const toGps2 = ([x, y]: [number, number]) => at(moved[1] - y, x - moved[0]);
+  const ok = takeoffOffset(site, plot, toGps2, "moved")!;
+  assert.ok(Math.abs(ok.alongM) <= 1, `after moving ${ok.alongM}`);
+  // No house-like block at all: no answer.
+  assert.equal(takeoffOffset({ ...site, fetchedAt: "flat", dsm: make(() => 20) }, plot, toGps, "flat"), null);
+});

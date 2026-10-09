@@ -141,7 +141,12 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     warns; return height must clear the area's tallest + 10 m); `lidarSurvey` makes it the Survey tab's
     levels until a drone survey is opened (`currentSurvey` falls back to it). Survey tab "Heights" layer
     and Plan-map labels show tree/roof heights. Without LIDAR the flight only warns. Fetched on the phone at the
-    test property (9 October 2026).
+    test property (9 October 2026): the house showed up about 9 m down the garden because the drone was
+    on the patio, not the plan's take-off point. So `takeoffOffset` (lidarMath) finds the plan's house
+    rectangle in the LIDAR heights and measures the shift along the garden: in real mode the Scan tab
+    offers to move the take-off point to the drone, and the pre-flight check warns from 2.5 m and blocks
+    from 5 m (every route and the geofence are placed from the drone's position, so a misplaced drone
+    shifts them all). The Survey tab can re-line the stored LIDAR (`setLidarHome`).
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
