@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import { area, fmtLevel, gradientText, measureLine, perimeter, type Pt } from "../../../../packages/garden-core/src/index.ts";
+import { area, fmtLevel, gradientText, inHouse, measureLine, perimeter, type Pt } from "../../../../packages/garden-core/src/index.ts";
 
 import { HEIGHT_BANDS, tallSpots, terrainFor } from "../MapView";
 import { S, commit, go, useApp } from "../store";
@@ -104,7 +104,8 @@ function LidarFetch() {
  */
 function GoneSpots() {
   const s = useApp();
-  const spots = tallSpots(s).filter((p) => p.h >= 3);
+  // The house is not going anywhere: only trees, sheds and the like can be marked as gone.
+  const spots = tallSpots(s).filter((p) => p.h >= 3 && !inHouse(s.plot, p.at[0], p.at[1]));
   const where = (p: Pt) => {
     const side = p[0] < s.plot.widthM / 3 ? "left side" : p[0] > (2 * s.plot.widthM) / 3 ? "right side" : "middle";
     const area = p[1] > s.plot.rearGardenM + s.plot.houseDepthM ? "front garden" : p[1] > s.plot.rearGardenM ? "house" : `${p[1].toFixed(0)} m from the bottom of the garden`;

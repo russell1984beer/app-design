@@ -6,6 +6,8 @@ import { planGrid } from "../../../packages/flight-core/src/planner.ts";
 import { wgs84ToGrid } from "../../../packages/garden-core/src/bng.ts";
 import type { Raster } from "../../../packages/garden-core/src/raster.ts";
 
+import { slopeCells, terrainFromSurvey } from "../../../packages/garden-core/src/index.ts";
+
 import { lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath.ts";
 
 const HOME: LatLng = { lat: 52.0, lng: -1.0 };
@@ -131,4 +133,18 @@ test("a drone survey replaces the LIDAR inside the plot; the LIDAR still covers 
   // Widen the area to reach the mast 45 m east (outside the plot): the LIDAR still sees it.
   const wide = obstaclesFrom([survey, lidar], HOME, mission, [at(-5, -3), at(25, -3), at(25, 50), at(-5, 50)], "x")!;
   assert.ok(wide.areaTallestM > 17, `area ${wide.areaTallestM}`);
+});
+
+test("LIDAR as a survey: a steady 2% slope shows as gentle everywhere, not as 1 m steps", () => {
+  const plot = { widthM: 7, lengthM: 43, rearGardenM: 29.5, houseDepthM: 8, houseWidthM: 7, ridgeHeightM: 8.5, gardenBearingDeg: 0 } as never;
+  // Turned 30 degrees to the grid, so the 0.5 m squares fall across the 1 m pixels unevenly.
+  const toGps = ([x, y]: [number, number]) => {
+    const a = (30 * Math.PI) / 180;
+    const n = 20 - y;
+    const e = x - 3.5;
+    return at(n * Math.cos(a) - e * Math.sin(a), n * Math.sin(a) + e * Math.cos(a));
+  };
+  const sv = lidarSurvey(site(), plot, toGps);
+  const bands = slopeCells(sv.plot, terrainFromSurvey(sv)).map((c) => c.band);
+  assert.ok(bands.every((b) => b === "under4"), `bands: ${[...new Set(bands)].join(", ")}`);
 });

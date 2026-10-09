@@ -116,8 +116,9 @@ export function contours(p: Plot, z: Terrain): Contour[] {
   return out;
 }
 
-export function slopePercent(z: Terrain, x: number, y: number): number {
-  const e = 0.05;
+/** Slope at a point, measured across `spanM` (1 m: the size of the slope map's squares, so survey noise does not show as steep). */
+export function slopePercent(z: Terrain, x: number, y: number, spanM = 1): number {
+  const e = spanM / 2;
   return Math.hypot((z(x + e, y) - z(x - e, y)) / (2 * e), (z(x, y + e) - z(x, y - e)) / (2 * e)) * 100;
 }
 

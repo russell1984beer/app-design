@@ -232,6 +232,26 @@ export function lzwDecode(input: Uint8Array): Uint8Array {
   return Uint8Array.from(out);
 }
 
+/**
+ * Height at a grid position, blended between the four nearest pixel centres (smooth ground for
+ * levels and slope: the nearest pixel alone makes 1 m steps). Falls back to the nearest pixel next
+ * to missing data or at the edge.
+ */
+export function rasterAtSmooth(r: Raster, x: number, y: number): number {
+  if (!r.origin || !r.pixelSize) return NaN;
+  const fx = (x - r.origin.x) / r.pixelSize.x - 0.5;
+  const fy = (r.origin.y - y) / r.pixelSize.y - 0.5;
+  const c0 = Math.floor(fx);
+  const r0 = Math.floor(fy);
+  if (c0 < 0 || r0 < 0 || c0 + 1 >= r.width || r0 + 1 >= r.height) return rasterAt(r, x, y);
+  const v = (c: number, row: number) => r.values[row * r.width + c];
+  const a = v(c0, r0), b = v(c0 + 1, r0), c = v(c0, r0 + 1), d = v(c0 + 1, r0 + 1);
+  if (!(Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c) && Number.isFinite(d))) return rasterAt(r, x, y);
+  const tx = fx - c0;
+  const ty = fy - r0;
+  return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+}
+
 /** Height at a grid position (e.g. National Grid metres), nearest pixel; NaN outside or no data. */
 export function rasterAt(r: Raster, x: number, y: number): number {
   if (!r.origin || !r.pixelSize) return NaN;

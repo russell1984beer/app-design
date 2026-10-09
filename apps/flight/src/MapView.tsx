@@ -436,15 +436,22 @@ function T({
   px: (n: number) => number;
   children: ReactNode;
 }) {
-  const common = { x, y, fontSize: size, fontWeight: weight ?? "400", textAnchor: anchor ?? "start", fontFamily: "sans-serif" } as const;
+  // Laid out in screen pixels, then scaled onto the plan: letters laid out at a font size under 1
+  // (plan metres) come out jumbled on Android. Kept between 11 and 22 pixels so labels stay
+  // readable when zoomed out and do not balloon when zoomed in.
+  const k = px(1);
+  const fontPx = Math.min(22, Math.max(11, size / k));
+  const common = { x: 0, y: 0, fontSize: fontPx, fontWeight: weight ?? "400", textAnchor: anchor ?? "start", fontFamily: "sans-serif" } as const;
   return (
     <G transform={transform}>
-      <SText {...common} fill={C.paper} stroke={C.paper} strokeWidth={px(3)} strokeLinejoin="round">
-        {children}
-      </SText>
-      <SText {...common} fill={fill}>
-        {children}
-      </SText>
+      <G transform={`translate(${x ?? 0} ${y ?? 0}) scale(${k})`}>
+        <SText {...common} fill={C.paper} stroke={C.paper} strokeWidth={3} strokeLinejoin="round">
+          {children}
+        </SText>
+        <SText {...common} fill={fill}>
+          {children}
+        </SText>
+      </G>
     </G>
   );
 }
@@ -620,11 +627,13 @@ function heights(s: AppState): { cells: HeightCell[]; peaks: HeightCell[] } {
   let h = heightCache.get(key);
   if (!h) {
     const cells = heightCells(s);
-    const tall = cells.filter((c) => c.h >= 2);
-    const peaks = tall
-      .filter((c) => !tall.some((o) => o.h > c.h && Math.hypot(o.x - c.x, o.y - c.y) < 3))
-      .sort((a, b) => b.h - a.h)
-      .slice(0, 10);
+    // Tallest first; a spot within 4 m of one already picked is the same tree or roof (the 1 m
+    // LIDAR gives several equal 0.5 m squares per pixel, which used to be labelled twice).
+    const peaks: HeightCell[] = [];
+    for (const c of cells.filter((c) => c.h >= 2).sort((a, b) => b.h - a.h)) {
+      if (peaks.length >= 10) break;
+      if (!peaks.some((o) => Math.hypot(o.x - c.x, o.y - c.y) < 4)) peaks.push(c);
+    }
     h = { cells, peaks };
     heightCache.clear();
     heightCache.set(key, h);

@@ -5,7 +5,7 @@ import { fromLocal, toLocal, type LatLng } from "../../../packages/flight-core/s
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import type { ObstacleHeights } from "../../../packages/flight-core/src/safety.ts";
 import { wgs84ToGrid } from "../../../packages/garden-core/src/bng.ts";
-import { rasterAt, type Raster } from "../../../packages/garden-core/src/raster.ts";
+import { rasterAt, rasterAtSmooth, type Raster } from "../../../packages/garden-core/src/raster.ts";
 import { fillHoles, type Plot, type Pt, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
 
 /** `anchor` is the GPS position of the take-off point, which was at `home` on the plan. */
@@ -131,7 +131,10 @@ export function lidarSurvey(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng, 
         const q: Pt = [(c + 0.5) * cellM, (row + 0.5) * cellM];
         // A spot the owner marked as gone shows the ground, not the old tree.
         const isGone = isSurface && gone.some((g) => Math.hypot(g[0] - q[0], g[1] - q[1]) < GONE_RADIUS_M);
-        const v = at(isGone ? s.dtm : r, toGps(q));
+        // Ground blended between pixels (smooth levels and slope); surface by nearest pixel (sharp roof edges).
+        const g = toGps(q);
+        const grid = wgs84ToGrid(g.lat, g.lng);
+        const v = isSurface && !isGone ? rasterAt(r, grid.e, grid.n) : rasterAtSmooth(s.dtm, grid.e, grid.n);
         raw.push(Number.isFinite(v) ? v : null);
       }
     return fillHoles(cols, rows, raw);
