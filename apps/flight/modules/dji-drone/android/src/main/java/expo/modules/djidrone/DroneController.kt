@@ -115,18 +115,25 @@ class DroneController(
 
   // Listeners set up before the app was registered or the drone connected may never report, so
   // they are set up again each time either happens.
+  // Seen on the phone after the cable was unplugged and plugged back in: listeners renewed at the
+  // moment of reconnection stayed silent, so they are renewed again a few seconds later.
   private val onConnect: () -> Unit = {
-    scheduler.post {
-      if (running && listening) {
-        Log.i(TAG, "Renewing drone listeners.")
-        keys.cancelListen(this)
-        sticks.removeVirtualStickStateListener(stickListener)
-        removeHealthListener()
-        listening = false
-        startListening()
-      }
-    }
+    scheduler.post { renewListeners() }
+    scheduler.postDelayed(RELISTEN_AGAIN_MS) { renewListeners() }
   }
+
+  private fun renewListeners() {
+    if (!running || !listening) return
+    Log.i(TAG, "Renewing drone listeners.")
+    keys.cancelListen(listenHolder)
+    sticks.removeVirtualStickStateListener(stickListener)
+    removeHealthListener()
+    listening = false
+    startListening()
+  }
+
+  /** Owner of the key listeners; a new one each time they are renewed, so cancelling the old ones cannot touch the new. */
+  private var listenHolder = Any()
 
   /** Backup to the listeners: read the SDK's latest values directly, once a second. */
   private fun readLatest() {
@@ -134,29 +141,46 @@ class DroneController(
       keys.getValue(KeyTools.createKey(RemoteControllerKey.KeyConnection))?.let { rcConnected = it }
       keys.getValue(KeyTools.createKey(FlightControllerKey.KeyConnection))?.let { aircraftConnected = it }
       keys.getValue(KeyTools.createKey(BatteryKey.KeyChargeRemainingInPercent))?.let { battery = it }
-      // A cached position only counts while both links are up (signalOk checks them too).
-      if (rcConnected && aircraftConnected) {
-        keys.getValue(KeyTools.createKey(FlightControllerKey.KeyAircraftLocation3D))?.let {
-          location = it
-          locationAtMs = scheduler.nowMs()
-        }
-      }
     } catch (e: Exception) {
       Log.w(TAG, "Could not read drone values: ${e.message}")
     }
   }
+
+  /** The same for what the flight needs fresh: position, heading and flying state, every tick. */
+  private fun readFlightState(now: Long) {
+    // A cached position only counts while both links are up (signalOk checks them too).
+    if (!rcConnected || !aircraftConnected) return
+    try {
+      keys.getValue(KeyTools.createKey(FlightControllerKey.KeyAircraftLocation3D))?.let {
+        location = it
+        locationAtMs = now
+      }
+      keys.getValue(KeyTools.createKey(FlightControllerKey.KeyCompassHeading))?.let { compassHeading = it }
+      keys.getValue(KeyTools.createKey(FlightControllerKey.KeyIsFlying))?.let { isFlying = it }
+      keys.getValue(KeyTools.createKey(FlightControllerKey.KeyAreMotorsOn))?.let { motorsOn = it }
+      keys.getValue(KeyTools.createKey(FlightControllerKey.KeyFlightMode))?.let { onFlightMode(it) }
+    } catch (e: Exception) {
+      if (now - lastReadWarnMs > 5000) {
+        lastReadWarnMs = now
+        Log.w(TAG, "Could not read flight state: ${e.message}")
+      }
+    }
+  }
+
+  private var lastReadWarnMs = 0L
 
   private var listening = false
 
   private fun startListening() {
     if (listening) return
     listening = true
-    listen(FlightControllerKey.KeyAircraftLocation3D) { location = it; locationAtMs = scheduler.nowMs() }
+    listenHolder = Any()
+    listen(FlightControllerKey.KeyAircraftLocation3D) { if (it != null) { location = it; locationAtMs = scheduler.nowMs() } }
     listen(FlightControllerKey.KeyCompassHeading) { compassHeading = it ?: compassHeading }
-    listen(FlightControllerKey.KeyFlightMode) { onFlightMode(it) }
+    listen(FlightControllerKey.KeyFlightMode) { if (it != null) onFlightMode(it) }
     listen(FlightControllerKey.KeyLowBatteryRTHInfo) { lowBatteryInfo = it }
-    listen(FlightControllerKey.KeyIsFlying) { isFlying = it == true }
-    listen(FlightControllerKey.KeyAreMotorsOn) { motorsOn = it == true }
+    listen(FlightControllerKey.KeyIsFlying) { if (it != null) isFlying = it }
+    listen(FlightControllerKey.KeyAreMotorsOn) { if (it != null) motorsOn = it }
     listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
     listen(FlightControllerKey.KeyWindSpeed) { windSpeed = it }
     listen(FlightControllerKey.KeyWindDirection) { windDirection = it }
@@ -178,7 +202,7 @@ class DroneController(
     running = false
     DjiSdk.removeConnectHook(onConnect)
     if (listening) {
-      keys.cancelListen(this)
+      keys.cancelListen(listenHolder)
       sticks.removeVirtualStickStateListener(stickListener)
       removeHealthListener()
       listening = false
@@ -440,6 +464,8 @@ class DroneController(
       }
     }
 
+    if (listening) readFlightState(now)
+    trackLinkLoss(now)
     sendSticks(now)
     pendingPhoto?.let { if (now > it.deadlineMs) { pendingPhoto = null; photoFailed(it.waypointIndex, "no photo reported by the camera") } }
     emitTelemetry(now)
@@ -551,6 +577,31 @@ class DroneController(
     }
   }
 
+  // The app had the sticks and lost them because the link went (cable out, controller off), not
+  // because the pilot took over: the drone holds position by itself. That still counts as the app's
+  // flight ("app"), so when the link is back FlightSession brings the drone home (it does not
+  // retake the sticks). The pilot can still stop that with the controller's Pause button.
+  private var hadSticks = false
+  private var sticksLostToLink = false
+  private var linkDownAtMs = -1_000_000L
+  private var sticksLostAtMs = -1_000_000L
+
+  private fun trackLinkLoss(now: Long) {
+    val linkUp = DjiSdk.productConnected && rcConnected && aircraftConnected
+    if (!linkUp) linkDownAtMs = now
+    val inControl = appInControl()
+    if (hadSticks && !inControl && !pilotTookOver && appRequested == null) sticksLostAtMs = now
+    // The sticks and the link went within 3 s of each other (either can be reported first).
+    if (!sticksLostToLink && !inControl && !pilotTookOver && appRequested == null &&
+      now - sticksLostAtMs < 3000 && now - linkDownAtMs < 3000
+    ) {
+      Log.i(TAG, "App lost the sticks with the link; the drone is holding position by itself.")
+      sticksLostToLink = true
+    }
+    if (inControl || pilotTookOver || appRequested != null || (!isFlying && !motorsOn) || droneFlyingItself()) sticksLostToLink = false
+    hadSticks = inControl
+  }
+
   private fun appInControl(): Boolean =
     virtualStickEnabled && authority == FlightControlAuthority.MSDK && !pilotTookOver
 
@@ -587,7 +638,7 @@ class DroneController(
         "lng" to loc?.longitude,
         "altitudeM" to (loc?.altitude ?: 0.0),
         "batteryPercent" to battery,
-        "flightMode" to TelemetryRules.flightMode(djiFlightMode?.name, isFlying, motorsOn, appInControl(), appTakeoffInProgress || handingOverAtMs != null, pendingRequest(now)),
+        "flightMode" to TelemetryRules.flightMode(djiFlightMode?.name, isFlying, motorsOn, appInControl() || sticksLostToLink, appTakeoffInProgress || handingOverAtMs != null, pendingRequest(now)),
         "signalOk" to TelemetryRules.signalOk(rcConnected, aircraftConnected, now - locationAtMs),
         "windSpeedMs" to TelemetryRules.windSpeedMs(windSpeed),
         "windFromDeg" to TelemetryRules.windDirectionDeg(windDirection?.name),
@@ -622,7 +673,7 @@ class DroneController(
 
   private fun <T> listen(info: DJIKeyInfo<T>, onChange: (T?) -> Unit) {
     val key: DJIKey<T> = KeyTools.createKey(info)
-    keys.listen(key, this, true, CommonCallbacks.KeyListener<T> { _, value -> scheduler.post { onChange(value) } })
+    keys.listen(key, listenHolder, true, CommonCallbacks.KeyListener<T> { _, value -> scheduler.post { onChange(value) } })
   }
 
   private fun <T> set(info: DJIKeyInfo<T>, value: T, done: (IDJIError?) -> Unit) {
@@ -656,6 +707,7 @@ class DroneController(
     const val HOME_POINT_TRIES = 20
     const val REQUEST_WAIT_MS = 10_000L
     const val SIMULATOR_RETRY_MS = 2_000L
+    const val RELISTEN_AGAIN_MS = 3_000L
     const val SIMULATOR_SATELLITES = 15
   }
 }

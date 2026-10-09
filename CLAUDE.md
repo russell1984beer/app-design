@@ -135,7 +135,11 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     the test area is now 20 x 12 m (28 photos, about 2 minutes), placed where the simulated drone is.
     Tests 1-5 passed in DJI's simulator. Test 6 (gust): DJI's simulator wind does not reach the drone's wind
     reading (0 m/s), so the test feeds a 9 m/s wind into the app (`setTestWind`, test bench only); U2/U3
-    (wind unit and direction) must be checked against DJI Fly on the first real flights. Test 7 (cable unplugged): signal lost, then no recovery seen yet. The drone refuses a
+    (wind unit and direction) must be checked against DJI Fly on the first real flights. Test 7 (cable unplugged): the drone hovers (U8); after replugging, the
+    key listeners went silent again and the app read the drone's hover as the pilot, so listeners now
+    get a fresh owner and are renewed again 3 s after reconnecting, position/flying state are also read
+    directly every tick, and sticks lost with the link count as the app's flight (FlightSession then
+    brings the drone home). The drone refuses a
     new home point until it has recorded its own, so the app retries for 20 s. Until a survey file is opened, the Survey uses a
     draft of the garden from the title plan with estimated levels. Roof damage detection is not
     built: the roof report is a labelled example.
