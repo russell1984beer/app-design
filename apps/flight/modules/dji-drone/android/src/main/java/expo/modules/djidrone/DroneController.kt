@@ -33,7 +33,6 @@ import dji.v5.manager.KeyManager
 import dji.v5.manager.aircraft.perception.PerceptionManager
 import dji.v5.manager.aircraft.perception.data.ObstacleAvoidanceType
 import dji.v5.manager.aircraft.perception.data.ObstacleData
-import dji.v5.manager.aircraft.perception.data.PerceptionDirection
 import dji.v5.manager.aircraft.perception.listener.ObstacleDataListener
 import dji.v5.manager.diagnostic.DJIDeviceHealthInfoChangeListener
 import dji.v5.manager.diagnostic.DeviceHealthManager
@@ -564,9 +563,10 @@ class DroneController(
   // ---- Obstacle sensing ---------------------------------------------------------------------------
 
   /**
-   * The drone's own obstacle sensing set to brake (stop in front of things, not steer round them)
-   * sideways and upwards. Downwards stays as the pilot set it (it would stop the landing). A failure
-   * only warns: the app's own obstacle stop (flight-core) and the pilot still apply.
+   * The drone's own obstacle sensing switched on and set to brake (stop in front of things, not steer
+   * round them). The Mini 4 Pro refuses settings per direction (UNSUPPORTED, seen on the phone), so
+   * only the overall switch and the type are set. A refusal the drone does not support is only logged;
+   * other failures warn. The app's own obstacle stop (flight-core) and the pilot still apply.
    */
   private fun setObstacleBraking() {
     val p = try { PerceptionManager.getInstance() } catch (e: Exception) {
@@ -574,13 +574,15 @@ class DroneController(
       return
     }
     val warn = { what: String -> { e: IDJIError? ->
-      if (e != null) status("warning", "Could not $what: ${e.text()}. The app still stops for close obstacles it is told about.")
-      else Log.i(TAG, "Obstacle sensing: $what done.")
+      when {
+        e == null -> Log.i(TAG, "Obstacle sensing: $what done.")
+        e.errorCode() == "UNSUPPORTED" -> Log.i(TAG, "Obstacle sensing: $what not supported by this drone.")
+        else -> status("warning", "Could not $what: ${e.text()}. The app still stops for close obstacles it is told about.")
+      }
       Unit
     } }
+    p.setOverallObstacleAvoidanceEnabled(true, completion(warn("switch on the drone's obstacle sensing")))
     p.setObstacleAvoidanceType(ObstacleAvoidanceType.BRAKE, completion(warn("set the drone's obstacle avoidance to Brake")))
-    p.setObstacleAvoidanceEnabled(true, PerceptionDirection.HORIZONTAL, completion(warn("switch on sideways obstacle sensing")))
-    p.setObstacleAvoidanceEnabled(true, PerceptionDirection.UPWARD, completion(warn("switch on upward obstacle sensing")))
   }
 
   private val obstacleListener = ObstacleDataListener { data -> scheduler.post { onObstacleData(data) } }
@@ -591,7 +593,11 @@ class DroneController(
     val up = data.upwardObstacleDistance
     // Raw numbers in the 5 s log summary, to confirm the units on the first flights (DJI: millimetres).
     obstacleRaw = "h=${horizontal.filter { TelemetryRules.obstacleM(it) != null }.minOrNull() ?: "-"}/${horizontal.size}@${data.horizontalAngleInterval} up=$up"
-    obstacleM = TelemetryRules.nearestObstacleM(horizontal, up)
+    // In DJI's simulator the real sensors still look round the room (the table, walls: 0.3 m seen on
+    // the phone), which says nothing about the simulated flight, so their distances are not used there.
+    val simulating = try { SimulatorManager.getInstance().isSimulatorEnabled } catch (_: Exception) { false }
+    if (simulating) obstacleRaw += " (simulator: ignored)"
+    obstacleM = if (simulating) null else TelemetryRules.nearestObstacleM(horizontal, up)
     obstacleAtMs = scheduler.nowMs()
   }
 

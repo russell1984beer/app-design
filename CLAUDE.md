@@ -111,11 +111,12 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
     Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
     can still take the sticks.
-  - Obstacle stop: before take-off the Kotlin module sets the drone's own obstacle avoidance to Brake
-    (sideways and up) and passes the nearest sensor distance on as Telemetry `obstacleM` (read as mm,
+  - Obstacle stop: before take-off the Kotlin module switches the drone's own obstacle sensing on and sets
+    it to Brake (per-direction settings are UNSUPPORTED on the Mini 4 Pro, seen on the phone) and passes the nearest sensor distance on as Telemetry `obstacleM` (read as mm,
     raw values in the 5 s log line; U9). FlightSession holds (like STOP, `holdReason` "obstacle") when
     something is within 3 m while scanning (1.5 m on roof circles), with 15 s grace after Resume.
-    Test bench test 10 feeds a 2 m obstacle in (`setTestObstacle`).
+    Test bench test 10 feeds a 2 m obstacle in (`setTestObstacle`). In DJI's simulator the real sensors
+    are ignored: on the table they saw the room (0.3-0.4 m) and stopped test 1 twice (9 October 2026).
   - Materials tab: editable unit prices (saved on the phone), Export PDF quote (expo-print) and
     Export DXF plan (R12, metres), both through the share sheet. Generators in garden-core `export.ts`.
   - iPad: `app.json` has iOS (`com.plotwise.app`, tablet); `eas.json` profile `ipad`;
