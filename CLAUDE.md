@@ -125,7 +125,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     turns them into flight-core `NoFlyZone`s (restricted and authorisation block, warning warns, height
     zones allow a flight whose highest point, including the return height, stays below the limit);
     `src/flysafe.ts` keeps them 6 h per place. Take-off waits for the lookup; if it fails it only warns
-    (the drone still enforces DJI's zones itself). Not yet tried on the phone.
+    (the drone still enforces DJI's zones itself). On the phone at the test property (9 October 2026): "none
+    nearby" (to be cross-checked once against DJI Fly's GEO map).
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
@@ -157,8 +158,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
 - Next: the first flight check
-  (built) in the garden, which also checks U2/U3 (wind) and U8 (cable out while hovering); check the
-  FlySafe lookup on the phone; cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
+  (built) in the garden, which also checks U2/U3 (wind) and U8 (cable out while hovering); cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
 
 ## Build phases
 1. **Flight app (Android)**: connect via MSDK, home point, automatic grid mission over a
