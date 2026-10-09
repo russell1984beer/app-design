@@ -520,6 +520,11 @@ function heights(s: AppState): { cells: HeightCell[]; peaks: HeightCell[] } {
   return h;
 }
 
+/** The labelled tall spots (plan position of their middle, and height). */
+export function tallSpots(s: AppState): { at: Pt; h: number }[] {
+  return heights(s).peaks.map((p) => ({ at: [p.x + p.cell / 2, p.y + p.cell / 2] as Pt, h: p.h }));
+}
+
 function heightCells(s: AppState): HeightCell[] {
   const sv = currentSurvey();
   if (!sv?.surface || sv.surface.cols !== sv.ground.cols || sv.surface.rows !== sv.ground.rows) return [];

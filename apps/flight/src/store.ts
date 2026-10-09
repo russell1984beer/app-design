@@ -58,6 +58,8 @@ export type AppState = {
   testsPassed: string[];
   /** When the first flight check was last completed for real (not in the simulator). */
   firstFlightDoneAt: string | null;
+  /** Tall spots in the LIDAR the owner says are gone (e.g. trees cut down since), on the plan. */
+  goneSpots: Pt[];
   showBench: boolean;
   /** Bumped on every change; the map redraws when it changes. */
   v: number;
@@ -99,6 +101,7 @@ export const S: AppState = {
   lastScan: null,
   testsPassed: [],
   firstFlightDoneAt: null,
+  goneSpots: [],
   showBench: false,
   v: 0,
 };
@@ -117,7 +120,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();

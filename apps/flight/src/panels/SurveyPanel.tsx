@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 
-import { area, fmtLevel, gradientText, measureLine, perimeter } from "../../../../packages/garden-core/src/index.ts";
+import { area, fmtLevel, gradientText, measureLine, perimeter, type Pt } from "../../../../packages/garden-core/src/index.ts";
 
-import { HEIGHT_BANDS, terrainFor } from "../MapView";
+import { HEIGHT_BANDS, tallSpots, terrainFor } from "../MapView";
 import { S, commit, go, useApp } from "../store";
 import { useDrone } from "../drone";
 import { anchorFor, offsetWords, OFFSET_WARN_M, planToGps } from "../flight";
@@ -98,6 +98,46 @@ function LidarFetch() {
   );
 }
 
+/**
+ * The LIDAR can be years old. The owner can say a tall spot has gone (a tree cut down); the map and
+ * the pre-flight clearance check then use the ground there instead.
+ */
+function GoneSpots() {
+  const s = useApp();
+  const spots = tallSpots(s).filter((p) => p.h >= 3);
+  const where = (p: Pt) => {
+    const side = p[0] < s.plot.widthM / 3 ? "left side" : p[0] > (2 * s.plot.widthM) / 3 ? "right side" : "middle";
+    const area = p[1] > s.plot.rearGardenM + s.plot.houseDepthM ? "front garden" : p[1] > s.plot.rearGardenM ? "house" : `${p[1].toFixed(0)} m from the bottom of the garden`;
+    return `${area}, ${side}`;
+  };
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Note>The LIDAR may be a few years old. If a tall spot has gone (a tree cut down), mark it so the map and the safety check ignore it.</Note>
+      {spots.map((p) => (
+        <Btn
+          key={`${p.at[0]},${p.at[1]}`}
+          label={`${p.h.toFixed(1)} m, ${where(p.at)}: gone`}
+          alt
+          onPress={() => {
+            S.goneSpots = [...S.goneSpots, p.at];
+            commit();
+          }}
+        />
+      ))}
+      {s.goneSpots.length > 0 && (
+        <Btn
+          label={`Bring back the ${s.goneSpots.length === 1 ? "spot" : `${s.goneSpots.length} spots`} marked as gone`}
+          alt
+          onPress={() => {
+            S.goneSpots = [];
+            commit();
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
 export function EmptyState({ what }: { what: string }) {
   return (
     <View>
@@ -170,6 +210,7 @@ export function SurveyPanel() {
           <View>
             <Legend items={HEIGHT_BANDS.map(([, colour, label]) => [colour, label] as [string, string])} />
             <Note style={{ marginBottom: 10 }}>How tall trees, sheds and roofs stand above the ground, with the tallest spots labelled.</Note>
+            {!droneSurvey() && <GoneSpots />}
           </View>
         ) : (
           <Note style={{ marginBottom: 10 }}>No heights yet: they come with the LIDAR levels or a drone survey.</Note>

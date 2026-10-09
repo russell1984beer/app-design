@@ -142,7 +142,8 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
   // Tree and roof heights from the Environment Agency's LIDAR (real flights only: the simulator's
   // field is made up).
   const lidar = s.mode === "real" ? lidarFor(anchor) : null;
-  const obstacles = lidar ? obstacleHeights(lidar, anchor, mission, boundary) : null;
+  const gone = s.goneSpots.map((p) => planToGps(s, anchor, p));
+  const obstacles = lidar ? obstacleHeights(lidar, anchor, mission, boundary, gone) : null;
   const forecast = s.mode === "sim" ? { speedMs: 0, gustMs: 0, fromDeg: 0, source: "DJI simulator" } : weather && "forecast" in weather ? weather.forecast : undefined;
   const check = preflightCheck({
     settings: s.safety,
@@ -178,6 +179,12 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
         id: "takeoffPoint",
         status: "warn",
         message: `The drone may be about ${offsetWords(off.alongM)} than the take-off point on the plan. Check it is standing on the marked spot.`,
+      });
+    if (obstacles && s.goneSpots.length)
+      extra.push({
+        id: "goneSpots",
+        status: "warn",
+        message: `The clearance check ignores ${s.goneSpots.length === 1 ? "a tall spot" : `${s.goneSpots.length} tall spots`} in the LIDAR that you marked as gone (Survey tab, Heights). Make sure nothing has grown back there.`,
       });
     if (!obstacles) {
       // Heights are an extra check: without them the flight is not blocked, but the pilot is told.

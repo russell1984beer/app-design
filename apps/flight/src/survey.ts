@@ -33,12 +33,12 @@ export function currentSurvey(): SurveyPackage | null {
   if (drone) return drone;
   const l = currentLidar();
   if (!l) return null;
-  const key = `${l.fetchedAt}|${l.home.join(",")}|${JSON.stringify(S.plot)}`;
+  const key = `${l.fetchedAt}|${l.home.join(",")}|${JSON.stringify(S.plot)}|${JSON.stringify(S.goneSpots)}`;
   if (lidarCache?.key !== key) {
     let survey: SurveyPackage | null = null;
     try {
       // The plot placed on GPS as it was when the LIDAR was fetched.
-      survey = lidarSurvey(l, S.plot, (p) => planToGps({ ...S, home: l.home }, l.anchor, p));
+      survey = lidarSurvey(l, S.plot, (p) => planToGps({ ...S, home: l.home }, l.anchor, p), S.goneSpots);
     } catch {
       survey = null;
     }

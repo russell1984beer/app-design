@@ -96,3 +96,18 @@ test("take-off offset: the house shows where the drone really is", async () => {
   // No house-like block at all: no answer.
   assert.equal(takeoffOffset({ ...site, fetchedAt: "flat", dsm: make(() => 20) }, plot, toGps, "flat"), null);
 });
+
+test("a tall spot marked as gone (tree cut down) is ignored by the clearance check and the map", () => {
+  const area = [at(5, -3), at(25, -3), at(25, 3), at(5, 3)];
+  const mission = planGrid(area, { altitudeM: 10 });
+  const s = { ...site(), fetchedAt: "gone-test" };
+  const before = obstacleHeights(s, HOME, mission, area)!;
+  const after = obstacleHeights(s, HOME, mission, area, [at(15, 0)])!;
+  assert.ok(before.routeTallestM > 5);
+  assert.ok(after.routeTallestM < 1, `after ${after.routeTallestM}`);
+  const plot = { widthM: 7, lengthM: 43, rearGardenM: 29.5, houseDepthM: 8, houseWidthM: 7, ridgeHeightM: 8.5, gardenBearingDeg: 0 } as never;
+  const toGps = ([x, y]: [number, number]) => at(20 - y, x - 3.5);
+  const sv = lidarSurvey(s, plot, toGps, [[3.5, 5]]);
+  const k = Math.floor(5 / 0.5) * sv.ground.cols + Math.floor(3.5 / 0.5);
+  assert.ok(sv.surface!.values[k] - sv.ground.values[k] < 0.5);
+});

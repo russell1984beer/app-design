@@ -147,7 +147,10 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     offers to move the take-off point to the drone, and the pre-flight check warns from 2.5 m and blocks
     from 5 m (every route and the geofence are placed from the drone's position, so a misplaced drone
     shifts them all). The Survey tab can re-line the stored LIDAR (`setLidarHome`); on the phone this put the 9.6 m block
-    on the house (9 October 2026).
+    on the house (9 October 2026). The LIDAR is years old (an 8.5 m tree near the take-off point was cut
+    down long ago), so the owner can mark tall spots as gone (Survey tab, Heights; `goneSpots` on the plan):
+    within 4 m of them the map and the clearance check use the ground, and the pre-flight list warns that
+    they are being ignored.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
