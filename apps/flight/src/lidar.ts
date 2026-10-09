@@ -17,7 +17,7 @@ import type { Pt } from "../../../packages/garden-core/src/index.ts";
 
 import type { LidarSite } from "./lidarMath";
 
-export { lidarSurvey, obstacleHeights, takeoffOffset, type LidarSite, type TakeoffOffset } from "./lidarMath";
+export { aboveSeaLevelM, lidarSurvey, obstacleHeights, takeoffOffset, type LidarSite, type TakeoffOffset } from "./lidarMath";
 
 const DTM_URL = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wcs";
 const DSM_URL = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-surface-model-first-return-dsm-1m/wcs";

@@ -147,7 +147,7 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     take-off ground) feeds flight-core's clearance checks (`obstacles`: under 3 m clear blocks, under 5 m
     warns; return height must clear the area's tallest + 10 m); `lidarSurvey` makes it the Survey tab's
     levels until a drone survey is opened (`currentSurvey` falls back to it). Survey tab "Heights" layer
-    and Plan-map labels show tree/roof heights. Without LIDAR the flight only warns. Fetched on the phone at the
+    and Plan-map labels show tree/roof heights; the map's street shows its ground height above sea level (LIDAR, ODN; `aboveSeaLevelM`). Without LIDAR the flight only warns. Fetched on the phone at the
     test property (9 October 2026): the house showed up about 9 m down the garden because the drone was
     on the patio, not the plan's take-off point. So `takeoffOffset` (lidarMath) finds the plan's house
     rectangle in the LIDAR heights and measures the shift along the garden: in real mode the Scan tab

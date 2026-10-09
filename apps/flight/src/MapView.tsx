@@ -46,9 +46,10 @@ import {
 } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone, useDrone } from "./drone";
-import { firstFlightMission, gpsToPlan, missionOnPlan, roofScan, surveyMission } from "./flight";
+import { firstFlightMission, gpsToPlan, missionOnPlan, planToGps, roofScan, surveyMission } from "./flight";
 import { S, commit, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
+import { aboveSeaLevelM, currentLidar } from "./lidar";
 import { MAX_ZOOM, NO_ZOOM, fit, toPlan, zoomAt, zoomedView, type Zoom } from "./mapZoom";
 import { C } from "./theme";
 
@@ -107,7 +108,8 @@ export function MapView() {
   // Line widths and labels follow the zoom in steps, so a pinch does not redraw everything each frame.
   const step = Math.round(Math.log2(scale) * 4);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const content = useMemo(() => layers(s, px), [s.v, step, size.w, size.h]);
+  const lidar = currentLidar();
+  const content = useMemo(() => layers(s, px), [s.v, step, size.w, size.h, lidar?.fetchedAt, lidar?.home.join()]);
 
   /** Two fingers on the map: where they are on screen (relative to the map) and how far apart. */
   const fingers = (e: GestureResponderEvent) => {
@@ -533,14 +535,30 @@ function defs(s: AppState, px: (n: number) => number) {
 
 function street(s: AppState, px: (n: number) => number) {
   const { widthM: W, lengthM: H } = s.plot;
+  const sea = streetAboveSea(s);
   return (
     <>
       <Rect x={-1.2} y={H} width={W + 2.4} height={3} fill="#9BA19D" />
-      <T x={W / 2} y={H + 2} size={1.55} anchor="middle" fill="#2E3836" px={px}>
+      <T x={W / 2} y={sea === null ? H + 2 : H + 1.45} size={1.55} anchor="middle" fill="#2E3836" px={px}>
         Street
       </T>
+      {sea !== null && (
+        <T x={W / 2} y={H + 2.75} size={1} anchor="middle" fill="#2E3836" px={px}>
+          {`${sea.toFixed(1)} m above sea level`}
+        </T>
+      )}
     </>
   );
+}
+
+/**
+ * The street's ground height above sea level, from the Environment Agency's LIDAR (its heights are
+ * above mean sea level; a drone survey's are not, so the LIDAR is used even when one is open).
+ */
+function streetAboveSea(s: AppState): number | null {
+  const l = currentLidar();
+  if (!l) return null;
+  return aboveSeaLevelM(l, (p) => planToGps({ ...s, home: l.home }, l.anchor, p), [s.plot.widthM / 2, s.plot.lengthM + 1.5]);
 }
 
 function photoLayer(s: AppState, px: (n: number) => number) {

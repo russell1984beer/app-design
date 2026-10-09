@@ -8,7 +8,7 @@ import type { Raster } from "../../../packages/garden-core/src/raster.ts";
 
 import { slopeCells, terrainFromSurvey } from "../../../packages/garden-core/src/index.ts";
 
-import { lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath.ts";
+import { aboveSeaLevelM, lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath.ts";
 
 const HOME: LatLng = { lat: 52.0, lng: -1.0 };
 const at = (north: number, east: number) => fromLocal(HOME, { x: east, y: north });
@@ -147,4 +147,12 @@ test("LIDAR as a survey: a steady 2% slope shows as gentle everywhere, not as 1 
   const sv = lidarSurvey(site(), plot, toGps);
   const bands = slopeCells(sv.plot, terrainFromSurvey(sv)).map((c) => c.band);
   assert.ok(bands.every((b) => b === "under4"), `bands: ${[...new Set(bands)].join(", ")}`);
+});
+
+test("height above sea level comes straight from the LIDAR ground", () => {
+  // The test site's ground is 30 m at the take-off point, rising 2 cm per metre northwards.
+  const toGps = ([x, y]: [number, number]) => at(20 - y, x - 3.5);
+  const v = aboveSeaLevelM(site(), toGps, [3.5, 45])!;
+  assert.ok(Math.abs(v - (30 - 25 * 0.02)) < 0.05, `${v}`);
+  assert.equal(aboveSeaLevelM(site(), toGps, [3.5, 500]), null);
 });

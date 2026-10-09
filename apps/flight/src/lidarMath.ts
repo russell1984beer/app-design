@@ -158,6 +158,17 @@ export function lidarSurvey(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng, 
   };
 }
 
+/**
+ * Ground height above sea level (the LIDAR's heights are above Ordnance Datum Newlyn, mean sea level
+ * at Newlyn) at a plan point; null where the LIDAR has none. `toGps` as for lidarSurvey.
+ */
+export function aboveSeaLevelM(s: LidarSite, toGps: (p: Pt) => LatLng, p: Pt): number | null {
+  const g = toGps(p);
+  const grid = wgs84ToGrid(g.lat, g.lng);
+  const v = rasterAtSmooth(s.dtm, grid.e, grid.n);
+  return Number.isFinite(v) ? v : null;
+}
+
 /** How far the drone is from the take-off point on the plan, judged by where the house shows up. */
 export type TakeoffOffset = {
   /** Plan metres along the garden: positive means the drone is nearer the street than the marked point. */
