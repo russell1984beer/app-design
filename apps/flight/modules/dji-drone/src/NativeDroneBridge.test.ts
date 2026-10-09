@@ -99,6 +99,7 @@ class FakeNative implements DjiDroneNative {
   }
   async enableSimulator() {}
   async disableSimulator() {}
+  async formatStorage() {}
   setSimulatorWind(northMs: number, eastMs: number) {
     const speed = Math.hypot(northMs, eastMs);
     this.sim.setWind({ speedMs: speed, fromDeg: ((Math.atan2(-eastMs, -northMs) * 180) / Math.PI + 360) % 360 });

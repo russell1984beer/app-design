@@ -11,6 +11,7 @@ import { emptyProgress, type Mission, type ScanProgress } from "../../../package
 import { planGrid } from "../../../packages/flight-core/src/planner.ts";
 import { DEFAULT_SAFETY, preflightCheck, type CheckItem } from "../../../packages/flight-core/src/safety.ts";
 import { DjiDrone } from "../modules/dji-drone";
+import { DroneStorage } from "./DroneStorage";
 import { SIM_HOME, drone, useDrone } from "./drone";
 import { S, commit, commitNow } from "./store";
 /**
@@ -252,6 +253,7 @@ export function TestBench() {
           Passed: {S.testsPassed.length} of {SCENARIOS.length}. Real flights unlock when all have passed.
         </Text>
         <Text style={[styles.note, { color: c.warn }]}>Propellers OFF. Drone on a table. Controller on, phone plugged into it.</Text>
+        <DroneStorage />
 
         <View style={[styles.card, { backgroundColor: c.card }]}>
           <Text style={[styles.label, { color: c.muted }]}>Drone</Text>

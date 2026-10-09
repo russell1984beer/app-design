@@ -65,6 +65,10 @@ class DjiDroneModule : Module() {
       val c = controller ?: return@AsyncFunction promise.reject("NO_CONTROLLER", "Drone module not ready", null)
       c.disableSimulator { error -> if (error == null) promise.resolve(null) else promise.reject("SIMULATOR", error, null) }
     }
+    AsyncFunction("formatStorage") { promise: Promise ->
+      val c = controller ?: return@AsyncFunction promise.reject("NO_CONTROLLER", "Drone module not ready", null)
+      c.formatStorage { error -> if (error == null) promise.resolve(null) else promise.reject("FORMAT", error, null) }
+    }
     AsyncFunction("getFlyZones") { lat: Double, lng: Double, promise: Promise ->
       FlyZones.around(lat, lng) { zones, error -> if (zones != null) promise.resolve(zones) else promise.reject("FLYSAFE", error, null) }
     }

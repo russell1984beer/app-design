@@ -72,5 +72,7 @@ export interface DjiDroneNative {
   /** DJI FlySafe (GEO) zones round a position, from the DJI SDK's database. */
   getFlyZones(lat: number, lng: number): Promise<NativeFlyZone[]>;
   disableSimulator(): Promise<void>;
+  /** Erase every photo on the drone's storage (on the ground, motors off). */
+  formatStorage(): Promise<void>;
   setSimulatorWind(northMs: number, eastMs: number): void;
 }

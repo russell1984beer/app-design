@@ -742,8 +742,27 @@ class DroneController(
     )
   }
 
+  private var storageInUse: dji.sdk.keyvalue.value.camera.CameraStorageLocation? = null
+
   private fun onStorage(info: dji.sdk.keyvalue.value.camera.CameraStorageInfos) {
     photosLeft = info.currentCameraStorageInfo?.availablePhotoCount
+    storageInUse = info.currentStorageType
+  }
+
+  /**
+   * Erases every photo and video on the storage the drone is using (its card, or its own memory
+   * without one). Only with the drone on the ground and the motors off. `done` gets null or the reason.
+   */
+  fun formatStorage(done: (String?) -> Unit) = scheduler.post {
+    if (!sdkReady()) return@post done("The DJI SDK is still starting.")
+    if (isFlying || motorsOn) return@post done("Only with the drone landed and its motors off.")
+    if (!aircraftConnected) return@post done("The drone is not connected.")
+    val where = storageInUse ?: return@post done("The drone has not said which storage it is using yet. Wait a few seconds and try again.")
+    Log.i(TAG, "Formatting the drone's storage (${where.name}).")
+    action(CameraKey.KeyFormatStorage, where) { e ->
+      if (e == null) keys.getValue(KeyTools.createKey(CameraKey.KeyCameraStorageInfos))?.let { onStorage(it) }
+      done(e?.text())
+    }
   }
 
   // Seen on the phone: with the storage full the camera answers "weak GPS" (-472), so say what is meant.

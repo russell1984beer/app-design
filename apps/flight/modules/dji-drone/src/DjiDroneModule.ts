@@ -28,6 +28,9 @@ const NO_DRONE: DjiDroneNative = {
     throw new Error("No drone module on this device.");
   },
   disableSimulator: async () => {},
+  formatStorage: async () => {
+    throw new Error("No drone module on this device.");
+  },
   getFlyZones: async () => {
     throw new Error("No drone module on this device.");
   },

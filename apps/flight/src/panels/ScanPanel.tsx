@@ -10,6 +10,7 @@ import { refreshFlyZones, useFlyZones } from "../flysafe";
 import { useLidar } from "../lidar";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
+import { DroneStorage } from "../DroneStorage";
 import { FirstFlightProgress, FirstFlightStart } from "./FirstFlight";
 import { surveyStatItems } from "./PlanPanel";
 
@@ -46,6 +47,7 @@ export function DroneStatus() {
         {s.mode === "real" && <HeightsLine />}
       </Readout>
       {s.mode === "real" && <TakeoffPointCheck />}
+      <DroneStorage />
     </View>
   );
 }
