@@ -1,7 +1,7 @@
 // The plan of the garden, drawn like the prototype's map, with touch for measuring and designing.
 
 import { useMemo, useReducer, useRef, useState, type ReactNode } from "react";
-import { View, type GestureResponderEvent } from "react-native";
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, Image as SvgImage, Line, Path, Pattern, Polygon, Polyline, RadialGradient, Rect, Stop, Text as SText } from "react-native-svg";
 
 import { footprintM, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
@@ -49,6 +49,7 @@ import { SIM_HOME, drone, useDrone } from "./drone";
 import { firstFlightMission, gpsToPlan, missionOnPlan, roofScan, surveyMission } from "./flight";
 import { S, commit, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
+import { MAX_ZOOM, NO_ZOOM, fit, toPlan, zoomAt, zoomedView, type Zoom } from "./mapZoom";
 import { C } from "./theme";
 
 type VB = [number, number, number, number];
@@ -91,40 +92,81 @@ export function MapView() {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [, redraw] = useReducer((n: number) => n + 1, 0);
   const drag = useRef<Drag | null>(null);
+  // Zoom is kept per tab (each tab has its own whole view); a new tab starts with the whole plot.
+  const [zooms, setZooms] = useState<Partial<Record<string, Zoom>>>({});
+  const zoom = zooms[s.tab] ?? NO_ZOOM;
+  const setZoom = (z: Zoom) => setZooms((all) => ({ ...all, [s.tab]: z }));
+  const gesture = useRef<Gesture | null>(null);
 
-  const vb = viewBoxFor(s);
-  const scale = size.w > 0 ? Math.min(size.w / vb[2], size.h / vb[3]) : 1;
-  const ox = (size.w - vb[2] * scale) / 2;
-  const oy = (size.h - vb[3] * scale) / 2;
+  const base = viewBoxFor(s);
+  const vb = zoomedView(base, zoom);
+  const { scale, ox, oy } = fit(vb, size.w, size.h);
   const px = (n: number) => n / scale;
   const toM = (e: GestureResponderEvent): Pt => [vb[0] + (e.nativeEvent.locationX - ox) / scale, vb[1] + (e.nativeEvent.locationY - oy) / scale];
 
+  // Line widths and labels follow the zoom in steps, so a pinch does not redraw everything each frame.
+  const step = Math.round(Math.log2(scale) * 4);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const content = useMemo(() => layers(s, px), [s.v, scale, size.w]);
+  const content = useMemo(() => layers(s, px), [s.v, step, size.w, size.h]);
+
+  /** Two fingers on the map: where they are on screen (relative to the map) and how far apart. */
+  const fingers = (e: GestureResponderEvent) => {
+    const t = e.nativeEvent.touches;
+    if (t.length < 2 || !gesture.current) return null;
+    const [dx, dy] = gesture.current.pageToMap;
+    const a = [t[0].pageX - dx, t[0].pageY - dy];
+    const b = [t[1].pageX - dx, t[1].pageY - dy];
+    return { mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as [number, number], spread: Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1])) };
+  };
+
+  const zoomBy = (f: number) => {
+    const mid = toPlan(vb, size.w, size.h, size.w / 2, size.h / 2);
+    setZoom(zoomAt(base, size.w, size.h, zoom.k * f, mid, size.w / 2, size.h / 2));
+  };
 
   return (
     <View
       style={{ flex: 1 }}
       onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       onStartShouldSetResponder={() => true}
-      onResponderTerminationRequest={() => !drag.current}
+      onResponderTerminationRequest={() => !drag.current && !gesture.current?.pinch}
       onResponderGrant={(e) => {
+        const n = e.nativeEvent;
+        // Taps act straight away; if a second finger follows, the tap is taken back (see below).
+        gesture.current = { pageToMap: [n.pageX - n.locationX, n.pageY - n.locationY], before: snapshot(), pinch: null };
+        if (n.touches.length >= 2) return;
         drag.current = pointerDown(toM(e), px);
         if (drag.current) redraw();
       }}
       onResponderMove={(e) => {
+        const g = gesture.current;
+        const f = fingers(e);
+        if (g && f && !g.pinch) {
+          // A second finger: this is a pinch, not a tap or a drag. Undo what the first finger did.
+          drag.current = null;
+          restore(g.before);
+          g.pinch = { spread: f.spread, k: zoom.k, at: toPlan(vb, size.w, size.h, f.mid[0], f.mid[1]) };
+          return;
+        }
+        if (g?.pinch) {
+          // Spread to zoom, move both fingers to slide the map; the spot between them stays put.
+          if (f) setZoom(zoomAt(base, size.w, size.h, (g.pinch.k * f.spread) / g.pinch.spread, g.pinch.at, f.mid[0], f.mid[1]));
+          return;
+        }
         if (drag.current && pointerMove(drag.current, toM(e))) {
           S.v++;
           redraw();
         }
       }}
       onResponderRelease={() => {
+        gesture.current = null;
         if (drag.current) {
           drag.current = null;
           commit();
         }
       }}
       onResponderTerminate={() => {
+        gesture.current = null;
         drag.current = null;
         commit();
       }}
@@ -137,8 +179,78 @@ export function MapView() {
           <DroneOverlay px={px} />
         </Svg>
       )}
+      <View style={zoomStyles.buttons}>
+        <ZoomButton label="+" hint="Zoom in" disabled={zoom.k >= MAX_ZOOM} onPress={() => zoomBy(1.6)} />
+        <ZoomButton label="−" hint="Zoom out" disabled={zoom.k <= 1} onPress={() => zoomBy(1 / 1.6)} />
+        {zoom.k > 1 && <ZoomButton label="Fit" hint="Show the whole plot" onPress={() => setZoom(NO_ZOOM)} />}
+      </View>
     </View>
   );
+}
+
+function ZoomButton({ label, hint, onPress, disabled }: { label: string; hint: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={hint}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [zoomStyles.button, disabled && { opacity: 0.35 }, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={[zoomStyles.label, label.length > 1 && { fontSize: 13 }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const zoomStyles = StyleSheet.create({
+  buttons: { position: "absolute", right: 8, top: 8, gap: 8 },
+  button: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: { fontSize: 22, fontWeight: "700", color: C.ink },
+});
+
+type Gesture = {
+  /** Page position of the map's top-left corner (touch positions arrive relative to the page). */
+  pageToMap: [number, number];
+  /** What the first finger's tap may change, to put back if it turns into a pinch. */
+  before: Snapshot;
+  pinch: { spread: number; k: number; at: [number, number] } | null;
+};
+
+type Snapshot = { json: string; history: number };
+
+/** The parts of the state a tap on the map can change, as text. */
+const tapState = () => {
+  const s = S;
+  return JSON.stringify({ home: s.home, pts: s.pts, closed: s.closed, items: s.items, sel: s.sel, vsel: s.vsel, drawing: s.drawing, placing: s.placing, roofSel: s.roof.sel });
+};
+
+const snapshot = (): Snapshot => ({ json: tapState(), history: history.depth });
+
+function restore(b: Snapshot): void {
+  if (tapState() === b.json) return;
+  const s = S;
+  const o = JSON.parse(b.json);
+  s.home = o.home;
+  s.pts = o.pts;
+  s.closed = o.closed;
+  s.items = o.items;
+  s.sel = o.sel;
+  s.vsel = o.vsel;
+  s.drawing = o.drawing;
+  s.placing = o.placing;
+  s.roof.sel = o.roofSel;
+  history.dropTo(b.history);
+  commit();
 }
 
 /* ---------- touch ---------- */

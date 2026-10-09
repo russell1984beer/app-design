@@ -326,6 +326,14 @@ export class History {
     if (this.undoStack.length > 60) this.undoStack.shift();
     this.redoStack = [];
   }
+  /** How many changes can be undone (to take back an entry pushed by mistake, see `dropTo`). */
+  get depth() {
+    return this.undoStack.length;
+  }
+  /** Forget entries pushed since the stack was `depth` long (a tap that turned out to be a pinch). */
+  dropTo(depth: number): void {
+    this.undoStack.length = Math.min(this.undoStack.length, depth);
+  }
   undo(current: Item[]): Item[] | null {
     const prev = this.undoStack.pop();
     if (prev === undefined) return null;

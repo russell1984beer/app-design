@@ -102,6 +102,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     Scan and Roof have a DJI simulator / Real flight switch; real flights stay blocked until all
     10 simulator tests pass; the Met Office forecast (`src/weather.ts`) gates real take-offs. State and scan progress are
     saved on the phone (AsyncStorage), so a stopped scan can resume.
+  - Map zoom (`src/mapZoom.ts`, per tab): pinch with two fingers to zoom (up to 8x) and slide the map;
+    +, − and Fit buttons top right. One finger works as before; a tap that turns into a pinch is taken back.
   - `src/EmergencyBar.tsx`: big red STOP button on every tab while the app flies the drone.
     `FlightSession.pilotHold()` stops and hovers; it waits for Resume / Return home / Land here.
     Battery, wind, geofence and signal-loss rules keep working while it hovers, and the pilot
