@@ -13,6 +13,7 @@ import { eastNorthToPlan, planToEastNorth, type Pt } from "../../../packages/gar
 import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
 import { recordScan } from "./survey";
+import { currentFlyZones } from "./flysafe";
 import { currentForecast } from "./weather";
 
 export const SIM_TEST_COUNT = 9;
@@ -106,6 +107,8 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
   }
   // The simulator has no weather. Real flights use the Met Office forecast for the take-off point.
   const weather = s.mode === "real" ? currentForecast(anchor) : null;
+  // DJI's no-fly zones round the take-off point (the simulator's made-up field has none to check).
+  const flyZones = s.mode === "real" ? currentFlyZones(anchor) : null;
   const forecast = s.mode === "sim" ? { speedMs: 0, gustMs: 0, fromDeg: 0, source: "DJI simulator" } : weather && "forecast" in weather ? weather.forecast : undefined;
   const check = preflightCheck({
     settings: s.safety,
@@ -114,7 +117,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     home: anchor,
     mission,
     forecast,
-    noFlyZones: [],
+    noFlyZones: flyZones && "zones" in flyZones ? flyZones.zones : [],
     batteryPercent: t?.batteryPercent ?? 0,
   });
   const extra: CheckItem[] = [];
@@ -124,7 +127,10 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
     }
     if (weather && "error" in weather) extra.push({ id: "forecast", status: "block", message: weather.error });
-    extra.push({ id: "noFlyZones", status: "warn", message: "DJI FlySafe zones are not checked by the app yet. Check DJI Fly before you fly." });
+    if (!flyZones) extra.push({ id: "flySafe", status: "block", message: "Checking DJI's no-fly zones for this place…" });
+    else if ("error" in flyZones)
+      // The drone itself still refuses to take off in DJI's restricted zones.
+      extra.push({ id: "flySafe", status: "warn", message: `Could not check DJI's no-fly zones (${flyZones.error}). Check DJI Fly before you fly.` });
   }
   if (!s.checks.every(Boolean)) extra.push({ id: "checklist", status: "block", message: "Tick every item in Before you fly (Plan tab)." });
   const items = [...extra, ...check.items];

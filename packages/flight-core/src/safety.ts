@@ -57,6 +57,8 @@ export type NoFlyZone = {
   kind: "restricted" | "authorisation" | "warning";
   circle?: { center: LatLng; radiusM: number };
   polygon?: LatLng[];
+  /** Height zones: flying is allowed below this height (metres above take-off), not above it. */
+  heightLimitM?: number;
 };
 
 export type CheckStatus = "pass" | "warn" | "block";
@@ -198,7 +200,9 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
     items.push(pass("wind", `Gusts of ${forecast.gustMs} m/s are within your limit.`));
   }
 
-  items.push(...noFlyZoneChecks(input.noFlyZones, boundary, s.geofenceMarginM));
+  // Highest the drone can go: the mission, or the climb to the return height on the way home.
+  const maxHeightM = Math.max(s.returnHeightM, ...mission.waypoints.map((w) => w.altitudeM));
+  items.push(...noFlyZoneChecks(input.noFlyZones, boundary, s.geofenceMarginM, maxHeightM));
 
   const reserveFloor = s.landingReservePercent + 10;
   if (input.batteryPercent < reserveFloor) {
@@ -222,7 +226,7 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
   return { canTakeOff: items.every((i) => i.status !== "block"), items };
 }
 
-function noFlyZoneChecks(zones: NoFlyZone[], boundary: LatLng[], marginM: number): CheckItem[] {
+function noFlyZoneChecks(zones: NoFlyZone[], boundary: LatLng[], marginM: number, maxHeightM: number): CheckItem[] {
   const hits = zones.filter((z) => {
     if (z.circle) return distanceToPolygonM(z.circle.center, boundary) <= z.circle.radiusM + marginM;
     if (z.polygon) return polygonsNear(boundary, z.polygon, marginM);
@@ -230,7 +234,14 @@ function noFlyZoneChecks(zones: NoFlyZone[], boundary: LatLng[], marginM: number
   });
   if (hits.length === 0) return [pass("noFlyZones", "No restricted airspace over the property.")];
   return hits.map((z) =>
-    z.kind === "restricted"
+    z.heightLimitM !== undefined
+      ? maxHeightM <= z.heightLimitM
+        ? warn("noFlyZones", `${z.name}: height limit ${z.heightLimitM} m. This flight stays below it (highest ${maxHeightM} m).`)
+        : block(
+            "noFlyZones",
+            `${z.name}: height limit ${z.heightLimitM} m, but this flight can go up to ${maxHeightM} m (including the return height). Lower the return height or the scan height.`,
+          )
+      : z.kind === "restricted"
       ? block("noFlyZones", `${z.name}: restricted airspace. Flying here is not allowed.`)
       : z.kind === "authorisation"
         ? block("noFlyZones", `${z.name}: needs permission. Unlock it in DJI Fly / FlySafe first.`)

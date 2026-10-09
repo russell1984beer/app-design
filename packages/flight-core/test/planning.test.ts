@@ -243,6 +243,15 @@ test("preflight: no-fly zones", () => {
   assert.ok(blocked({ ...goodPreflight(), noFlyZones: [{ name: "Square", kind: "restricted", polygon: square }] }, "noFlyZones"));
 });
 
+test("preflight: height-limited zones allow flights that stay below the limit", () => {
+  const over = { name: "Aerodrome", kind: "restricted" as const, circle: { center: alongAxis(ORIGIN, 45, 500), radiusM: 600 } };
+  // Default return height 30 m: a 60 m limit is fine, a 20 m limit is not.
+  const low = preflightCheck({ ...goodPreflight(), noFlyZones: [{ ...over, heightLimitM: 60 }] });
+  assert.ok(low.canTakeOff);
+  assert.equal(low.items.find((i) => i.id === "noFlyZones")?.status, "warn");
+  assert.ok(blocked({ ...goodPreflight(), noFlyZones: [{ ...over, heightLimitM: 20 }] }, "noFlyZones"));
+});
+
 test("preflight: warns when passes are too far apart for the photos to overlap", () => {
   const ok = preflightCheck(goodPreflight());
   assert.equal(ok.items.find((i) => i.id === "passSpacing")?.status, "pass");

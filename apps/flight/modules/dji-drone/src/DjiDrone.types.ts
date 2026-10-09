@@ -29,6 +29,23 @@ export type NativeDroneEvent =
 
 export type NativeStatus = { kind: string; message: string };
 
+type NativeCircle = { lat: number; lng: number; radiusM: number };
+
+/** One DJI FlySafe zone, as the Android module reports it (FlyZones.kt). */
+export type NativeFlyZone = {
+  id: number;
+  name: string | null;
+  /** RESTRICTED, AUTHORIZATION, WARNING, ENHANCED_WARNING, ... */
+  category: string | null;
+  /** AIRPORT, MILITARY, PRISON, ... */
+  type: string | null;
+  lowerM: number;
+  upperM: number;
+  circle: NativeCircle | null;
+  /** Parts of a polygon zone, each with its own height limit (0 = no flying at all). */
+  areas: { points: [number, number][]; circle: NativeCircle | null; limitM: number }[];
+};
+
 export type Subscription = { remove(): void };
 
 export interface DjiDroneNative {
@@ -48,6 +65,8 @@ export interface DjiDroneNative {
   land(): void;
 
   enableSimulator(lat: number, lng: number): Promise<void>;
+  /** DJI FlySafe (GEO) zones round a position, from the DJI SDK's database. */
+  getFlyZones(lat: number, lng: number): Promise<NativeFlyZone[]>;
   disableSimulator(): Promise<void>;
   setSimulatorWind(northMs: number, eastMs: number): void;
 }

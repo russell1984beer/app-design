@@ -260,7 +260,6 @@ Try it in DJI's simulator first if you like (propellers off): the same button wo
 
 ## Not built yet
 
-- **DJI no-fly-zone data.** The FlySafe check is not wired in yet; check DJI Fly yourself.
 - **Uploading photos to the cloud and processing them into a survey.** The Survey tab uses a
   draft of the garden from the title plan with estimated levels.
 - **Roof damage detection.** The Roof tab shows a labelled example report.

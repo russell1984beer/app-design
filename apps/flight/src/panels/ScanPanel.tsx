@@ -6,6 +6,7 @@ import { anchorFor, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFl
 import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 import { shareScanDetails } from "../survey";
+import { refreshFlyZones, useFlyZones } from "../flysafe";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
 import { FirstFlightProgress, FirstFlightStart } from "./FirstFlight";
@@ -40,9 +41,30 @@ export function DroneStatus() {
           Link {t?.signalOk ? "OK" : "none"} · Battery {t?.batteryPercent ? `${t.batteryPercent}%` : "–"} · Height {t ? `${t.altitudeM.toFixed(1)} m` : "–"}
         </P>
         {s.mode === "real" && <WeatherLine />}
+        {s.mode === "real" && <FlyZoneLine />}
       </Readout>
     </View>
   );
+}
+
+/** DJI's no-fly zones near the take-off point. What they mean for this flight is in the pre-flight list. */
+function FlyZoneLine() {
+  const s = useApp();
+  const d = useDrone();
+  const pos = anchorFor(s, d.telemetry);
+  const { result, loading } = useFlyZones(pos);
+  if (!pos) return <P>No-fly zones: waiting for the drone's GPS position.</P>;
+  if (loading && !result) return <P>No-fly zones: checking DJI's FlySafe map…</P>;
+  if (!result) return null;
+  if ("error" in result)
+    return (
+      <View>
+        <P>No-fly zones: could not check ({result.error}). Check DJI Fly before you fly.</P>
+        <Btn label="Check the no-fly zones again" alt onPress={() => refreshFlyZones(pos)} />
+      </View>
+    );
+  const n = new Set(result.zones.map((z) => z.name)).size;
+  return <P>No-fly zones: {n === 0 ? "none nearby on DJI's FlySafe map." : `${n} DJI zone${n > 1 ? "s" : ""} nearby. Any that affect this flight are listed below.`}</P>;
 }
 
 /** The Met Office wind forecast for where the drone is sitting (the take-off point). */

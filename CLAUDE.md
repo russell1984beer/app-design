@@ -120,6 +120,12 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     `test/first-flight.test.ts`): 5 m up, 60 s hover (wind reading vs Met Office for U2/U3, optional
     cable unplug for U8, "carry on" button), a 4 m square with 4 photos, then lands straight down
     (`Mission.endWith = "land"`, waypoint `holdS`). Recorded in `firstFlightDoneAt`. Not flown yet.
+  - DJI FlySafe no-fly zones (real mode): `FlyZones.kt` asks the DJI SDK (`FlyZoneManager.
+    getFlyZonesInSurroundingArea`) for the zones round the take-off point; `modules/dji-drone/src/flyZones.ts`
+    turns them into flight-core `NoFlyZone`s (restricted and authorisation block, warning warns, height
+    zones allow a flight whose highest point, including the return height, stays below the limit);
+    `src/flysafe.ts` keeps them 6 h per place. Take-off waits for the lookup; if it fails it only warns
+    (the drone still enforces DJI's zones itself). Not yet tried on the phone.
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
@@ -151,8 +157,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - The clickable prototype is in `prototype/plotwise-prototype.html` (address removed; keep it that way).
 - The app must be built on the owner's Windows PC.
 - Next: the first flight check
-  (built) in the garden, which also checks U2/U3 (wind) and U8 (cable out while hovering); DJI FlySafe
-  no-fly zones, cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
+  (built) in the garden, which also checks U2/U3 (wind) and U8 (cable out while hovering); check the
+  FlySafe lookup on the phone; cloud upload and sync, the first iPad build (owner needs Apple Developer + Expo accounts).
 
 ## Build phases
 1. **Flight app (Android)**: connect via MSDK, home point, automatic grid mission over a
