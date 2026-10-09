@@ -127,8 +127,9 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     turns them into flight-core `NoFlyZone`s (restricted and authorisation block, warning warns, height
     zones allow a flight whose highest point, including the return height, stays below the limit);
     `src/flysafe.ts` keeps them 6 h per place. Take-off waits for the lookup; if it fails it only warns
-    (the drone still enforces DJI's zones itself). On the phone at the test property (9 October 2026): "none
-    nearby" (to be cross-checked once against DJI Fly's GEO map).
+    (the drone still enforces DJI's zones itself). On the phone at the test property: first "none nearby", later "14 DJI
+    zones nearby" (DJI's database had probably not downloaded the first time); still to be cross-checked
+    against DJI Fly's GEO map.
   - Environment Agency LIDAR (free, England, Open Government Licence), real mode: `src/lidar.ts` fetches
     the 1 m DTM and first-return DSM from the Defra WCS services (coverage id, axis names and format read
     from GetCapabilities/DescribeCoverage at run time, as they could not be checked from the cloud
@@ -139,8 +140,8 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
     take-off ground) feeds flight-core's clearance checks (`obstacles`: under 3 m clear blocks, under 5 m
     warns; return height must clear the area's tallest + 10 m); `lidarSurvey` makes it the Survey tab's
     levels until a drone survey is opened (`currentSurvey` falls back to it). Survey tab "Heights" layer
-    and Plan-map labels show tree/roof heights. Without LIDAR the flight only warns. Not yet tried on the
-    phone.
+    and Plan-map labels show tree/roof heights. Without LIDAR the flight only warns. Fetched on the phone at the
+    test property (9 October 2026).
   - `src/TestBench.tsx` (Scan tab > Simulator tests): runs the same scenarios as
     `test/flight.test.ts` and records which have passed.
   - `npm test` there runs the adapter and plugin tests; `control-tests/` runs the Kotlin
