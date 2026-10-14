@@ -26,6 +26,11 @@ export type HeightGrid = {
   rows: number;
   /** Heights in metres (any datum), row by row from the far end of the garden. */
   values: number[];
+  /**
+   * Which squares the drone actually measured, one character per square in the same order: "1"
+   * measured, "0" filled in from nearby (a scan that stopped part-way). Missing in older files.
+   */
+  measured?: string;
 };
 
 export type SurveyPackage = {
@@ -60,6 +65,14 @@ export function gridHeight(g: HeightGrid, x: number, y: number): number {
   const ty = fy - r0;
   const v = (c: number, r: number) => g.values[r * g.cols + c];
   return (v(c0, r0) * (1 - tx) + v(c1, r0) * tx) * (1 - ty) + (v(c0, r1) * (1 - tx) + v(c1, r1) * tx) * ty;
+}
+
+/** Did the drone measure the square at plan point (x, y)? True for files without the record. */
+export function measuredAt(g: HeightGrid, x: number, y: number): boolean {
+  if (!g.measured) return true;
+  const c = Math.min(g.cols - 1, Math.max(0, Math.floor(x / g.cellM)));
+  const r = Math.min(g.rows - 1, Math.max(0, Math.floor(y / g.cellM)));
+  return g.measured[r * g.cols + c] === "1";
 }
 
 export function terrainFromSurvey(s: SurveyPackage): Terrain {
@@ -120,5 +133,6 @@ export function readSurvey(text: string): SurveyPackage {
     throw new Error("The survey file is damaged (the ground heights are incomplete).");
   }
   if (!data.plot) throw new Error("The survey file is damaged (no plot).");
+  if (g.measured !== undefined && (typeof g.measured !== "string" || g.measured.length !== g.values.length)) delete g.measured;
   return data as SurveyPackage;
 }

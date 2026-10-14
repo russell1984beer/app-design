@@ -6,9 +6,9 @@ import { planGrid } from "../../../packages/flight-core/src/planner.ts";
 import { wgs84ToGrid } from "../../../packages/garden-core/src/bng.ts";
 import type { Raster } from "../../../packages/garden-core/src/raster.ts";
 
-import { slopeCells, terrainFromSurvey } from "../../../packages/garden-core/src/index.ts";
+import { gridHeight, slopeCells, terrainFromSurvey } from "../../../packages/garden-core/src/index.ts";
 
-import { aboveSeaLevelM, lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath.ts";
+import { aboveSeaLevelM, fillGapsFromLidar, lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath.ts";
 
 const HOME: LatLng = { lat: 52.0, lng: -1.0 };
 const at = (north: number, east: number) => fromLocal(HOME, { x: east, y: north });
@@ -155,4 +155,34 @@ test("height above sea level comes straight from the LIDAR ground", () => {
   const v = aboveSeaLevelM(site(), toGps, [3.5, 45])!;
   assert.ok(Math.abs(v - (30 - 25 * 0.02)) < 0.05, `${v}`);
   assert.equal(aboveSeaLevelM(site(), toGps, [3.5, 500]), null);
+});
+
+test("a part-flown drone survey: the unflown squares come from the LIDAR, lined up with the drone", () => {
+  const plot = { widthM: 7, lengthM: 43, rearGardenM: 29.5, houseDepthM: 8, houseWidthM: 7, ridgeHeightM: 8.5, gardenBearingDeg: 0 } as never;
+  const toGps = ([x, y]: [number, number]) => at(20 - y, x - 3.5);
+  const lidar = lidarSurvey(site(), plot, toGps);
+  // A drone survey of the far half only (y < 20), in its own datum: 47.3 m above the LIDAR's.
+  const cellM = 0.25;
+  const cols = 28;
+  const rows = 172;
+  const values: number[] = [];
+  let measured = "";
+  for (let r = 0; r < rows; r++)
+    for (let c = 0; c < cols; c++) {
+      const x = (c + 0.5) * cellM;
+      const y = (r + 0.5) * cellM;
+      const seen = y < 20;
+      measured += seen ? "1" : "0";
+      // Measured: the true ground plus the offset. Unmeasured: what filling from neighbours would give.
+      values.push(seen ? gridHeight(lidar.ground, x, y) + 47.3 : 999);
+    }
+  const drone = { ...lidar, createdAt: "drone", photoCount: 26, coverage: 0.46, ground: { cellM, cols, rows, values, measured }, surface: undefined, label: undefined };
+  const merged = fillGapsFromLidar(drone, lidar);
+  const g = (x: number, y: number) => merged.ground.values[Math.floor(y / cellM) * cols + Math.floor(x / cellM)];
+  assert.ok(Math.abs(g(3.5, 10) - (gridHeight(lidar.ground, 3.5, 10) + 47.3)) < 0.01, "measured kept");
+  assert.ok(Math.abs(g(3.5, 35) - (gridHeight(lidar.ground, 3.5, 35) + 47.3)) < 0.01, `filled from the LIDAR, lined up: ${g(3.5, 35)}`);
+  assert.match(merged.label!, /measured 46%/);
+  // A full survey is left alone.
+  const full = { ...drone, ground: { ...drone.ground, measured: "1".repeat(values.length) } };
+  assert.equal(fillGapsFromLidar(full, lidar), full);
 });

@@ -96,6 +96,10 @@ test("conversion: gaps in the model are filled and the coverage is reported", as
   const s = await makeSurvey({ scan, dtm, photoCount: 52 });
   assert.ok(s.coverage > 0.2 && s.coverage < 0.8, `${s.coverage}`);
   assert.ok(s.ground.values.every((v) => Math.abs(v - 10) < 1e-9), "filled from the known side");
+  // The file says which squares were measured, so the app can fill the rest from better heights.
+  const m = s.ground.measured!;
+  assert.equal(m.length, s.ground.values.length);
+  assert.ok(Math.abs([...m].filter((ch) => ch === "1").length / m.length - s.coverage) < 0.002);
 });
 
 test("conversion: the aerial photo is cut to the plot with the far end at the top", async () => {

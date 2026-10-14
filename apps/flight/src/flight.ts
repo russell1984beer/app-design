@@ -218,18 +218,20 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
   const saved = resume && kind !== "check" ? S.resume[kind] : undefined;
   const progress = saved && saved.progress.missionId === plan.mission.id ? saved.progress : undefined;
   if (!resume && kind !== "check") delete S.resume[kind];
+  const flownAt = new Date().toISOString();
   drone.startJob(plan.kind, plan.anchor, {
     mission: plan.mission,
     boundary: plan.boundary,
     settings: S.safety,
     progress,
     onProgress: (p) => {
-      if (kind === "check") return; // a first flight check is short: it is simply flown again
+      // Real garden photos can be made into a survey, even from a scan that stopped part-way.
+      if (S.mode === "real" && kind !== "roof") recordScan(plan.anchor, p.completedWaypoints.length, flownAt);
+      if (kind === "check") return commitNow(); // a first flight check is short: it is simply flown again
       S.resume[kind] = { anchor: plan.anchor, progress: p };
       if (plan.kind === "roof") S.roof.photosTaken = p.completedWaypoints.length;
       if (p.completedWaypoints.length >= plan.mission.waypoints.length) {
         delete S.resume[kind];
-        if (kind === "survey" && S.mode === "real") recordScan(plan.anchor, plan.mission.waypoints.length);
       }
       commitNow();
     },

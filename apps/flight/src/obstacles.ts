@@ -5,7 +5,7 @@
 import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import type { ObstacleHeights } from "../../../packages/flight-core/src/safety.ts";
-import { gridHeight } from "../../../packages/garden-core/src/index.ts";
+import { gridHeight, measuredAt } from "../../../packages/garden-core/src/index.ts";
 
 import { gpsToPlan, planToGps } from "./flight";
 import { lidarFor } from "./lidar";
@@ -23,9 +23,10 @@ export function obstacleHeightsFor(s: AppState, anchor: LatLng, mission: Mission
   if (cache.has(key)) return cache.get(key)!;
 
   const { widthM: W, lengthM: L } = s.plot;
+  // Inside the plot where the drone measured (a scan that stopped part-way leaves the rest to the LIDAR).
   const inPlot = (p: LatLng) => {
     const [x, y] = gpsToPlan(s, anchor, p);
-    return x >= 0 && x <= W && y >= 0 && y <= L;
+    return x >= 0 && x <= W && y >= 0 && y <= L && (!survey || measuredAt(survey.ground, x, y));
   };
   const sources: HeightAbove[] = [];
   const surface = survey?.surface;

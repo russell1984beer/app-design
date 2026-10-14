@@ -6,7 +6,7 @@ import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import type { ObstacleHeights } from "../../../packages/flight-core/src/safety.ts";
 import { wgs84ToGrid } from "../../../packages/garden-core/src/bng.ts";
 import { rasterAt, rasterAtSmooth, type Raster } from "../../../packages/garden-core/src/raster.ts";
-import { fillHoles, type Plot, type Pt, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
+import { fillHoles, gridHeight, type Plot, type Pt, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
 
 /** `anchor` is the GPS position of the take-off point, which was at `home` on the plan. */
 export type LidarSite = { fetchedAt: string; anchor: LatLng; home: Pt; dtm: Raster; dsm: Raster | null };
@@ -167,6 +167,48 @@ export function aboveSeaLevelM(s: LidarSite, toGps: (p: Pt) => LatLng, p: Pt): n
   const grid = wgs84ToGrid(g.lat, g.lng);
   const v = rasterAtSmooth(s.dtm, grid.e, grid.n);
   return Number.isFinite(v) ? v : null;
+}
+
+/**
+ * A drone survey from a scan that stopped part-way, with the squares the drone did not see filled
+ * from the LIDAR instead of stretched from the nearest measured ones. The drone's heights are not
+ * above sea level like the LIDAR's, so the LIDAR is first shifted to match the drone where both
+ * measured (the middle difference, so trees and odd squares do not pull it). Returns the drone
+ * survey unchanged when it covers the whole plot, records nothing, or barely overlaps the LIDAR.
+ */
+export function fillGapsFromLidar(drone: SurveyPackage, lidar: SurveyPackage): SurveyPackage {
+  const g = drone.ground;
+  const mask = g.measured;
+  if (!mask || !mask.includes("0")) return drone;
+  const at = (i: number): Pt => [((i % g.cols) + 0.5) * g.cellM, (Math.floor(i / g.cols) + 0.5) * g.cellM];
+  const diffs: number[] = [];
+  for (let i = 0; i < g.values.length; i++) {
+    if (mask[i] !== "1") continue;
+    const [x, y] = at(i);
+    diffs.push(g.values[i] - gridHeight(lidar.ground, x, y));
+  }
+  if (diffs.length < 20) return drone;
+  diffs.sort((a, b) => a - b);
+  const shift = diffs[Math.floor(diffs.length / 2)];
+  const fill = (grid: typeof g, from: typeof g) => ({
+    ...grid,
+    values: grid.values.map((v, i) => {
+      if (mask[i] === "1") return v;
+      const [x, y] = at(i);
+      return Math.round((gridHeight(from, x, y) + shift) * 1000) / 1000;
+    }),
+  });
+  const surface = drone.surface && lidar.surface && drone.surface.values.length === g.values.length ? fill(drone.surface, lidar.surface) : drone.surface;
+  const pct = Math.round(drone.coverage * 100);
+  return {
+    ...drone,
+    createdAt: `${drone.createdAt} + ${lidar.createdAt}`,
+    ground: fill(g, lidar.ground),
+    surface,
+    label:
+      `The drone measured ${pct}% of the plot (flown ${new Date(drone.flownAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}, ${drone.photoCount} photos). ` +
+      "The rest comes from the Environment Agency's LIDAR, lined up with the drone's heights; the grey part of the photo is where the drone has not flown yet.",
+  };
 }
 
 /** How far the drone is from the take-off point on the plan, judged by where the house shows up. */

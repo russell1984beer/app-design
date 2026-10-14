@@ -68,6 +68,15 @@ It shows each stage as it goes. When it finishes, it says where it saved the sur
 Send the survey file to the phone or iPad (email, Google Drive, or a USB cable). In Plotwise, go
 to the **Survey** tab and tap **Open survey file**, then pick it.
 
+### A scan that stopped part-way (wind, battery)
+
+The photos taken so far can be made into a survey the same way: the scan details are kept from the
+first photo, so **Send scan details to the PC** works after a stopped scan too (Scan tab, or Survey
+tab). The tool marks which parts of the plot the drone saw. In the app, the rest of the plot is
+filled from the Environment Agency's LIDAR (lined up with the drone's heights) instead of being
+guessed, and the photo is grey where the drone has not flown. When the scan is finished later
+(Resume scan), copy **all** its photos, from both flights, and run the tool again for the full survey.
+
 ## If something goes wrong
 
 - **"Docker is not installed" / "not running"**: open Docker Desktop and wait for

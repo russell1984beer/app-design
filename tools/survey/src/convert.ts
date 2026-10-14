@@ -90,7 +90,9 @@ export function heightGrid(scan: ScanDetails, dem: Raster, cellM = 0.25): { grid
     }
   }
   const { values, known } = fillHoles(cols, rows, raw);
-  return { grid: { cellM, cols, rows, values }, coverage: known };
+  // Which squares the drone saw: the app fills the rest from other heights (e.g. the LIDAR) when it can.
+  const measured = raw.map((v) => (v === null ? "0" : "1")).join("");
+  return { grid: { cellM, cols, rows, values, measured }, coverage: known };
 }
 
 /** The aerial photo cut to the plot rectangle and turned so the far end of the garden is at the top. */

@@ -64,6 +64,11 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   the owner: `docs/survey-processing.md`. Checked end to end in the cloud workspace with computer-drawn
   photos of a known garden (with raised houses) flown on the real plan: ground levels within 0.5 cm
   median, 2.7 cm worst; roof height 6.02 m against 6.00 m.
+  Part-flown scans (first real survey, 14 October 2026: stopped about halfway by wind): the app records the
+  scan details from the first photo (`recordScan`; `scanDetailsToSend` falls back to the stopped scan's
+  take-off point, then the LIDAR's); the tool writes `ground.measured` ("1" measured, "0" filled); the app
+  fills unmeasured squares from the LIDAR shifted to the drone's datum (lidarMath `fillGapsFromLidar`,
+  median difference) and the clearance check trusts the drone only where it measured (`measuredAt`).
   Cloud upload/sync of photos and surveys is not built yet.
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
   - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. `planSurvey` is

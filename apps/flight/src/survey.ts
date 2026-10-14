@@ -9,8 +9,9 @@ import * as Sharing from "expo-sharing";
 
 import { readSurvey, type ScanDetails, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
 
+import { SIM_HOME } from "./drone";
 import { planToGps } from "./flight";
-import { currentLidar, lidarSurvey } from "./lidar";
+import { currentLidar, fillGapsFromLidar, lidarSurvey } from "./lidar";
 import { S, commit } from "./store";
 
 const SURVEY_FILE = "survey.json";
@@ -27,10 +28,26 @@ export function droneSurvey(): SurveyPackage | null {
 
 let lidarCache: { key: string; survey: SurveyPackage | null } | null = null;
 
-/** The levels in use: the drone survey if one is open, otherwise the Environment Agency's LIDAR. */
+let mergedCache: { key: string; survey: SurveyPackage } | null = null;
+
+/**
+ * The levels in use: the drone survey if one is open (with any part it did not fly filled from the
+ * LIDAR), otherwise the Environment Agency's LIDAR.
+ */
 export function currentSurvey(): SurveyPackage | null {
   const drone = droneSurvey();
-  if (drone) return drone;
+  if (drone) {
+    if (!drone.ground.measured?.includes("0")) return drone;
+    const lidar = lidarOnlySurvey();
+    if (!lidar) return drone;
+    const key = `${drone.createdAt}|${lidar.createdAt}`;
+    if (mergedCache?.key !== key) mergedCache = { key, survey: fillGapsFromLidar(drone, lidar) };
+    return mergedCache.survey;
+  }
+  return lidarOnlySurvey();
+}
+
+function lidarOnlySurvey(): SurveyPackage | null {
   const l = currentLidar();
   if (!l) return null;
   const key = `${l.fetchedAt}|${l.home.join(",")}|${JSON.stringify(S.plot)}|${JSON.stringify(S.goneSpots)}`;
@@ -100,9 +117,29 @@ export function removeSurvey(): void {
   commit();
 }
 
-/** Record a finished garden scan, so its details can be sent to the PC for processing. */
-export function recordScan(anchor: { lat: number; lng: number }, photoCount: number): void {
-  S.lastScan = { format: "plotwise-scan", version: 1, flownAt: new Date().toISOString(), plot: S.plot, home: S.home, anchor, photoCount };
+/**
+ * Record a real garden scan (or first flight check) as its photos are taken, so its details can be
+ * sent to the PC for processing, also when it stopped part-way.
+ */
+export function recordScan(anchor: { lat: number; lng: number }, photoCount: number, flownAt: string): void {
+  S.lastScan = { format: "plotwise-scan", version: 1, flownAt, plot: S.plot, home: S.home, anchor, photoCount };
+}
+
+/**
+ * The scan details to send to the PC: the last recorded scan; for a scan stopped before the app
+ * recorded part-flown scans, the stopped scan's take-off point; or, failing that, the LIDAR's take-off
+ * point (lined up on the house), which places the plot on the map just as well.
+ */
+export function scanDetailsToSend(): ScanDetails | null {
+  if (S.lastScan) return S.lastScan;
+  const base = { format: "plotwise-scan" as const, version: 1 as const, flownAt: new Date().toISOString(), plot: S.plot };
+  const stopped = S.resume.survey;
+  if (stopped && !(stopped.anchor.lat === SIM_HOME.lat && stopped.anchor.lng === SIM_HOME.lng)) {
+    return { ...base, home: S.home, anchor: stopped.anchor, photoCount: stopped.progress.completedWaypoints.length };
+  }
+  const l = currentLidar();
+  if (l) return { ...base, home: l.home, anchor: l.anchor, photoCount: 0 };
+  return null;
 }
 
 export async function shareScanDetails(scan: ScanDetails): Promise<void> {

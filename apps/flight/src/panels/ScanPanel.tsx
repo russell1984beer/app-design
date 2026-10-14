@@ -5,7 +5,7 @@ import { useDrone } from "../drone";
 import { anchorFor, offsetWords, OFFSET_WARN_M, takeoffMismatch, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
 import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
-import { shareScanDetails } from "../survey";
+import { scanDetailsToSend, shareScanDetails } from "../survey";
 import { refreshFlyZones, useFlyZones } from "../flysafe";
 import { useLidar } from "../lidar";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
@@ -215,6 +215,9 @@ export function ScanPanel() {
           <>
             <PreflightList plan={plan} />
             {resume && <Btn label={`Resume scan (${resume.done} of ${resume.total} photos done)`} onPress={() => takeOff(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
+            {s.mode === "real" && s.lastScan && (
+              <Btn label="Make a survey from the photos so far: send the scan details to the PC" alt onPress={() => shareScanDetails(scanDetailsToSend()!).catch(() => {})} />
+            )}
             <Btn label="Edit flight plan" alt onPress={() => go("plan")} />
           </>
         )}
@@ -230,7 +233,7 @@ export function ScanPanel() {
           All {job.mission.waypoints.length} photos are on the drone's memory card and the drone is home. To turn them into a measured survey: copy the
           photos to the PC, send the scan details to the PC too, and run the survey tool (docs/survey-processing.md). Then open the survey file on the Survey tab.
         </Lead>
-        {s.lastScan && s.mode === "real" && <Btn label="Send scan details to the PC" onPress={() => shareScanDetails(s.lastScan!).catch(() => {})} />}
+        {s.lastScan && s.mode === "real" && <Btn label="Send scan details to the PC" onPress={() => shareScanDetails(scanDetailsToSend()!).catch(() => {})} />}
         <Btn
           label="View survey"
           onPress={() => {

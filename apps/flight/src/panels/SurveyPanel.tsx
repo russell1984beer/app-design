@@ -8,7 +8,7 @@ import { S, commit, go, useApp } from "../store";
 import { useDrone } from "../drone";
 import { anchorFor, offsetWords, OFFSET_WARN_M, planToGps } from "../flight";
 import { currentLidar, fetchLidar, setLidarHome, takeoffOffset, useLidar } from "../lidar";
-import { currentSurvey, droneSurvey, openSurveyFile, removeSurvey, shareScanDetails } from "../survey";
+import { currentSurvey, droneSurvey, openSurveyFile, removeSurvey, scanDetailsToSend, shareScanDetails } from "../survey";
 import { Big, Btn, H2, Lead, Legend, Note, P, Readout, Row, Seg, Status } from "../ui";
 
 /** Where the levels come from: the real processed survey, or the draft from the title plan. */
@@ -17,6 +17,8 @@ export function SurveySource() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const survey = droneSurvey();
   const lidar = currentLidar();
+  // A part-flown survey filled from the LIDAR has its own explanation.
+  const shown = currentSurvey();
   const open = async () => {
     setMsg(null);
     try {
@@ -28,7 +30,9 @@ export function SurveySource() {
   return (
     <View style={{ marginTop: 14 }}>
       <H2 small>{survey ? "Drone survey" : lidar ? "LIDAR levels" : "Draft survey"}</H2>
-      {survey?.label ? (
+      {survey && shown !== survey && shown?.label ? (
+        <Note>{shown.label}</Note>
+      ) : survey?.label ? (
         <Note>{survey.label}</Note>
       ) : !survey && lidar ? (
         <Note>{currentSurvey()?.label ?? "LIDAR levels could not be placed on this plot."}</Note>
@@ -44,12 +48,12 @@ export function SurveySource() {
       )}
       <Row>
         <Btn label={survey ? "Open a newer survey" : "Open survey file"} alt style={{ flex: 1 }} onPress={open} />
-        {s.lastScan && (
+        {scanDetailsToSend() && s.mode === "real" && (
           <Btn
             label="Send scan details to PC"
             alt
             style={{ flex: 1 }}
-            onPress={() => shareScanDetails(s.lastScan!).catch((e) => setMsg({ ok: false, text: (e as Error).message }))}
+            onPress={() => shareScanDetails(scanDetailsToSend()!).catch((e) => setMsg({ ok: false, text: (e as Error).message }))}
           />
         )}
       </Row>
