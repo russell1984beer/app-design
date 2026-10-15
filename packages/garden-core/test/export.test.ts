@@ -40,8 +40,8 @@ test("DXF: boundary, house, features and labels, in metres with the garden end a
   assert.equal(count("CIRCLE"), 2);
   assert.equal(count("TEXT"), 5);
   assert.ok(lines.includes("EXISTING") && lines.includes("NEW") && lines.includes("BOUNDARY"));
-  // The far end of the garden (plan y = 0) is at the top: DXF y = 43.
+  // The far end of the garden (plan y = 0) is at the top: DXF y = the plot's length.
   const ys = lines.flatMap((l, i) => (i % 2 === 0 && l === "20" ? [Number(lines[i + 1])] : []));
-  assert.equal(Math.max(...ys), 43);
+  assert.equal(Math.max(...ys), P.lengthM);
   assert.equal(Math.min(...ys), 0);
 });

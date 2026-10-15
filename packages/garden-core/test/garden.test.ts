@@ -45,8 +45,8 @@ const ids = () => {
   return () => n++;
 };
 
-test("plot: 7 × 43 m, levels relative to the back door", () => {
-  assert.equal(P.widthM * P.lengthM, 301);
+test("plot: 7 × 46.5 m, levels relative to the back door", () => {
+  assert.equal(P.widthM * P.lengthM, 325.5);
   assert.ok(Math.abs(lvl(3, P.rearGardenM)) < 1e-12);
   // As in the prototype's draft, the garden rises towards the far end.
   assert.ok(lvl(3, 1) > lvl(3, 25));
@@ -57,7 +57,7 @@ test("levels: contours every 25 cm, slope bands, distance and fall", () => {
   assert.ok(c.filter((k) => k.segments.length > 0).length >= 4);
   assert.ok(c.some((k) => k.level === 0 && k.major));
   assert.ok(c.some((k) => k.level === 0.25 && !k.major));
-  assert.equal(slopeCells(P, z).length, 7 * 43);
+  assert.equal(slopeCells(P, z).length, P.widthM * Math.ceil(P.lengthM));
   const m = measureLine(lvl, [3, 2], [3, 22]);
   assert.equal(m.distanceM, 20);
   assert.ok(m.riseM < 0, "falls towards the house");
@@ -106,7 +106,7 @@ test("design: features cannot be placed in the house and are kept inside the plo
 
 test("design: a style replaces new features and removes existing ones it builds over", () => {
   const start = [...existingFeatures(P, ids()), { id: 50, kind: "pond" as const, x: 2, y: 2, w: 1, h: 1, a: 0 }];
-  const r = applyStyle(start, "family", ids());
+  const r = applyStyle(P, start, "family", ids());
   assert.ok(!r.items.some((i) => i.id === 50), "the old new pond goes");
   assert.equal(r.added.length, STYLES.family.items.length);
   // The family patio covers the existing patio and hot tub.
@@ -145,7 +145,7 @@ test("sun: shade from trees and sheds; open lawn gets more sun", () => {
   assert.ok(planted.every((h, i) => h <= bare[i]), "trees and the greenhouse only ever take sun away");
   assert.ok(planted.some((h, i) => h < bare[i] - 1));
   const grid = sunHoursGrid(P, items, 172);
-  assert.equal(grid.length, 14 * 59);
+  assert.equal(grid.length, 14 * P.rearGardenM * 2);
 });
 
 test("plants: suggestions suit the bed's sun; raised beds get vegetables", () => {

@@ -18,17 +18,19 @@ export type Plot = {
   latitudeDeg: number;
 };
 
-/** Same shape as the owner's garden, from the title plan. */
+/**
+ * Same shape as the owner's garden. The title plan gave a 29.5 m rear garden running at 128°; the first
+ * drone survey (14 Oct 2026), lined up by the owner on the aerial photo, showed 33 m at 119°.
+ */
 export const TEST_PLOT: Plot = {
   widthM: 7,
-  rearGardenM: 29.5,
+  rearGardenM: 33,
   houseDepthM: 8,
-  lengthM: 43,
+  lengthM: 46.5,
   houseWidthM: 5.8,
   ridgeHeightM: 8.5,
   roofPitchDeg: 35,
-  // The title plan's north arrow gave 128; the first drone survey (14 Oct 2026) showed 118.
-  gardenBearingDeg: 118,
+  gardenBearingDeg: 119,
   latitudeDeg: 50.86,
 };
 

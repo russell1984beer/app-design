@@ -222,8 +222,10 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 ## Test property
 The owner's own semi-detached house. The address and title number are in `CLAUDE.local.md`
 on the owner's PC (git-ignored, because this repo is public). Never commit them.
-Plot about 7 × 43 m: rear garden about 29.5 m, house about 8 m deep, front about 5.5 m.
-Rear garden faces south-east. Existing patio, hot tub, greenhouse and trees.
+Plot about 7 × 46.5 m: rear garden about 33 m, house about 8 m deep, front about 5.5 m.
+Rear garden faces south-east, 119°. (The title plan gave 29.5 m at 128°; the first drone survey on
+14 Oct 2026, lined up by the owner on the aerial photo, corrected both. `TEST_PLOT` has the new values
+and `loadSaved` moves the old defaults on.) Existing patio, hot tub, greenhouse and trees.
 Tests use a made-up location with the same shape (`packages/flight-core/test/helpers.ts`).
 
 ## Working with the owner

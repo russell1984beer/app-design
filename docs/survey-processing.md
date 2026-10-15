@@ -99,8 +99,13 @@ guessed, and the photo is grey where the drone has not flown. When the scan is f
     towards the street).
   - `--side 1`: move it towards the right-hand fence, looking down the garden from the house
     (negative: the left).
+  - `--rear 33`: the rear garden's true length in metres, if the far end of the outline misses the
+    rear boundary. The house end stays where it is.
 
-  The first real scan (14 October 2026) needed `--bearing 118 --back 4.5`.
+  Write a negative number with an equals sign, for example `--side=-0.3`.
+
+  The first real scan (14 October 2026), lined up by the owner on the aerial photo, needed
+  `--bearing 119 --rear 33 --back 8 --side=-0.31`. The app now uses 119° and 33 m.
 
 ## How accurate is it?
 

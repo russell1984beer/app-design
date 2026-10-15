@@ -142,9 +142,11 @@ export async function makeSurvey(opts: { scan: ScanDetails; dtm: string; dsm?: s
  * Corrects how the survey lines up with the plan, when the garden direction on the phone or the
  * take-off GPS was out. backM moves the plot outline towards the far end of the garden, sideM towards
  * the right-hand fence (looking down the garden from the house); both in metres, negative for the other way.
+ * rearGardenM changes the rear garden's length (the whole plot grows or shrinks with it).
  */
-export function adjustScan(scan: ScanDetails, a: { bearingDeg?: number; backM?: number; sideM?: number }): ScanDetails {
-  const plot = a.bearingDeg === undefined ? scan.plot : { ...scan.plot, gardenBearingDeg: a.bearingDeg };
+export function adjustScan(scan: ScanDetails, a: { bearingDeg?: number; backM?: number; sideM?: number; rearGardenM?: number }): ScanDetails {
+  let plot = a.bearingDeg === undefined ? scan.plot : { ...scan.plot, gardenBearingDeg: a.bearingDeg };
+  if (a.rearGardenM !== undefined) plot = { ...plot, rearGardenM: a.rearGardenM, lengthM: plot.lengthM + a.rearGardenM - plot.rearGardenM };
   const b = (plot.gardenBearingDeg * Math.PI) / 180;
   const back = a.backM ?? 0;
   const side = a.sideM ?? 0;

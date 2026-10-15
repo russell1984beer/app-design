@@ -40,7 +40,7 @@ test("UTM: the right zone, the central meridian at 500 km, and true distances", 
 
 /** A GeoTIFF in UTM zone 30 around the plot, like OpenDroneMap writes. */
 function geotiff(dir: string, name: string, bands: number, value: (e: number, n: number, band: number) => number | null, res = 0.05, nodata?: number) {
-  const corners = [[0, 0], [7, 0], [7, 43], [0, 43]].map(([x, y]) => planToUtm(x, y));
+  const corners = [[0, 0], [7, 0], [7, TEST_PLOT.lengthM], [0, TEST_PLOT.lengthM]].map(([x, y]) => planToUtm(x, y));
   const e0 = Math.min(...corners.map((c) => c[0])) - 3;
   const n1 = Math.max(...corners.map((c) => c[1])) + 3;
   const width = Math.ceil((Math.max(...corners.map((c) => c[0])) + 3 - e0) / res);
@@ -79,7 +79,7 @@ test("conversion: the ground model is lined up with the plan, metre for metre", 
   const dtm = geotiff(dir, "dtm.tif", 1, height);
   const s = await makeSurvey({ scan, dtm, photoCount: 52, now: new Date("2026-10-08T12:00:00Z") });
   assert.equal(s.ground.cols, 28);
-  assert.equal(s.ground.rows, 172);
+  assert.equal(s.ground.rows, Math.ceil(TEST_PLOT.lengthM / 0.25));
   assert.equal(s.coverage, 1);
   for (const [x, y] of [[1, 1], [3.5, 20], [6, 40], [2.2, 31.7]]) {
     const [e, n] = planToUtm(x, y);
@@ -105,18 +105,18 @@ test("conversion: gaps in the model are filled and the coverage is reported", as
 test("conversion: the aerial photo is cut to the plot with the far end at the top", async () => {
   const dir = mkdtempSync(join(tmpdir(), "plotwise-"));
   const dtm = geotiff(dir, "dtm.tif", 1, () => 10, 0.2);
-  // Red in the far half of the garden (plan y < 21.5), blue in the street half.
+  // Red in the far half of the garden (plan y < half the length), blue in the street half.
   const [eA, nA] = planToUtm(3.5, 0);
-  const [eB, nB] = planToUtm(3.5, 43);
+  const [eB, nB] = planToUtm(3.5, TEST_PLOT.lengthM);
   const far = (e: number, n: number) => (e - eA) ** 2 + (n - nA) ** 2 < (e - eB) ** 2 + (n - nB) ** 2;
   const ortho = geotiff(dir, "ortho.tif", 4, (e, n, b) => (b === 3 ? 255 : far(e, n) ? [220, 20, 20][b] : [20, 20, 220][b]), 0.1);
   const s = await makeSurvey({ scan, dtm, ortho, photoCount: 52 });
   assert.equal(s.photo!.widthPx, 280);
-  assert.equal(s.photo!.heightPx, 1720);
+  assert.equal(s.photo!.heightPx, TEST_PLOT.lengthM * 40);
   const img = jpeg.decode(Buffer.from(s.photo!.base64, "base64"));
   const px = (x: number, y: number) => Array.from(img.data.subarray((y * img.width + x) * 4, (y * img.width + x) * 4 + 3));
   assert.ok(px(140, 100)[0] > 150 && px(140, 100)[2] < 80, "top is the far end (red)");
-  assert.ok(px(140, 1600)[2] > 150 && px(140, 1600)[0] < 80, "bottom is the street end (blue)");
+  assert.ok(px(140, s.photo!.heightPx - 120)[2] > 150 && px(140, s.photo!.heightPx - 120)[0] < 80, "bottom is the street end (blue)");
 });
 
 test("line-up correction: new garden direction, outline moved back and sideways", () => {
@@ -130,6 +130,10 @@ test("line-up correction: new garden direction, outline moved back and sideways"
   assert.ok(Math.abs(distanceM(anchor, side) - 2) < 0.01);
   assert.ok(Math.abs(bearingDeg(anchor, side) - 208) < 0.5, "towards the right-hand fence");
   assert.equal(scan.plot.gardenBearingDeg, TEST_PLOT.gardenBearingDeg, "the original is left alone");
+  const longer = adjustScan(scan, { rearGardenM: TEST_PLOT.rearGardenM + 3.5 }).plot;
+  assert.equal(longer.rearGardenM, TEST_PLOT.rearGardenM + 3.5);
+  assert.equal(longer.lengthM, TEST_PLOT.lengthM + 3.5, "the whole plot grows with the rear garden");
+  assert.equal(longer.houseDepthM, TEST_PLOT.houseDepthM);
 });
 
 test("scan details file: checked before use", () => {

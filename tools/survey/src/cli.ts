@@ -3,6 +3,7 @@
 //           --odm <folder> skip processing and use an OpenDroneMap project that is already done
 //           --bearing <deg>  the garden's true compass direction, if the phone's setting was out
 //           --back <m>, --side <m>  move the plot outline towards the far end / right-hand fence (GPS was out)
+//           --rear <m>  the rear garden's true length, if the phone's setting was out
 
 import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
@@ -21,6 +22,7 @@ const { values } = parseArgs({
     bearing: { type: "string" },
     back: { type: "string" },
     side: { type: "string" },
+    rear: { type: "string" },
   },
 });
 
@@ -40,10 +42,10 @@ async function main() {
   if (!values.scan) fail("Say where the scan details file is: --scan \"C:\\...\\plotwise-scan-....json\"");
   if (!values.photos && !values.odm) fail("Say where the drone photos are: --photos \"C:\\...\\photos folder\"");
   const scanPath = resolve(values.scan);
-  const adjust = { bearingDeg: number("bearing", values.bearing), backM: number("back", values.back), sideM: number("side", values.side) };
+  const adjust = { bearingDeg: number("bearing", values.bearing), backM: number("back", values.back), sideM: number("side", values.side), rearGardenM: number("rear", values.rear) };
   const scan = adjustScan(readScan(await readFile(scanPath, "utf8")), adjust);
   if (Object.values(adjust).some((v) => v !== undefined)) {
-    console.log(`Lining up with the garden at ${scan.plot.gardenBearingDeg}°, outline moved ${adjust.backM ?? 0} m back and ${adjust.sideM ?? 0} m sideways.`);
+    console.log(`Lining up with the garden at ${scan.plot.gardenBearingDeg}°, rear garden ${scan.plot.rearGardenM} m, outline moved ${adjust.backM ?? 0} m back and ${adjust.sideM ?? 0} m sideways.`);
   }
 
   let project: string;

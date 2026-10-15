@@ -154,8 +154,10 @@ export async function loadSaved(): Promise<void> {
       // New safety settings added later keep their defaults.
       S.safety = { ...DEFAULT_SAFETY, ...S.safety };
       S.prices = { ...DEFAULT_PRICES, ...S.prices };
-      // The title plan's 128° was about 10° out (first drone survey, 14 Oct 2026): move the old default on.
-      if (S.plot.gardenBearingDeg === 128) S.plot = { ...S.plot, gardenBearingDeg: TEST_PLOT.gardenBearingDeg };
+      // The first drone survey (14 Oct 2026) corrected the title plan: 119°, not 128° (118° for a day),
+      // and a 33 m rear garden, not 29.5 m. Move the old defaults on; anything else the owner set stays.
+      if (S.plot.gardenBearingDeg === 128 || S.plot.gardenBearingDeg === 118) S.plot = { ...S.plot, gardenBearingDeg: TEST_PLOT.gardenBearingDeg };
+      if (S.plot.rearGardenM === 29.5 && S.plot.lengthM === 43) S.plot = { ...S.plot, rearGardenM: TEST_PLOT.rearGardenM, lengthM: TEST_PLOT.lengthM };
     }
   } catch {
     // A damaged save starts afresh rather than stopping the app.

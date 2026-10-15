@@ -222,7 +222,7 @@ function LayoutPanel() {
             pressed={s.style === k}
             onPress={() =>
               change(() => {
-                const r = applyStyle(s.items, k, nextId);
+                const r = applyStyle(s.plot, s.items, k, nextId);
                 for (const a of r.added) if (a.kind === "bed" || a.kind === "raised") a.plants = suggestPlants(s.plot, r.items, a);
                 s.items = r.items;
                 s.style = k;

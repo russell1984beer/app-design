@@ -238,6 +238,9 @@ export const EXISTING_TREES: [number, number, number][] = [
 
 export type Style = { label: string; desc: string; items: [Kind, number, number, number, number][] };
 
+/** The rear garden length the styles below were laid out for (y from the far end). */
+const STYLE_GARDEN_M = 29.5;
+
 export const STYLES: Record<string, Style> = {
   family: {
     label: "Family garden",
@@ -265,9 +268,11 @@ export const STYLES: Record<string, Style> = {
  * Replace the new features with a style's layout. Existing features stay, unless a hard
  * feature of the style (patio, deck, shed, pond) is built on top of them.
  */
-export function applyStyle(items: Item[], key: string, nextId: () => number): { items: Item[]; note: string; added: Item[] } {
+export function applyStyle(plot: Plot, items: Item[], key: string, nextId: () => number): { items: Item[]; note: string; added: Item[] } {
   const kept = items.filter((i) => i.exist);
-  const added: Item[] = STYLES[key].items.map(([kind, x, y, w, h]) => ({ id: nextId(), kind, x, y, w, h, a: 0 }));
+  // Styles are laid out for a 29.5 m rear garden; keep them at the same distance from the house.
+  const dy = plot.rearGardenM - STYLE_GARDEN_M;
+  const added: Item[] = STYLES[key].items.map(([kind, x, y, w, h]) => ({ id: nextId(), kind, x, y: y + dy, w, h, a: 0 }));
   const hard = added.filter((i) => ["patio", "deck", "shed", "pond"].includes(i.kind));
   const remaining = kept.filter((t) => {
     const c = centre(t);
