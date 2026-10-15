@@ -16,6 +16,7 @@ import {
   contours,
   corners,
   draftTerrain,
+  existingFeatures,
   terrainFromSurvey,
   fillOf,
   fmtLevel,
@@ -562,6 +563,12 @@ function streetAboveSea(s: AppState): number | null {
   return aboveSeaLevelM(l, (p) => planToGps({ ...s, home: l.home }, l.anchor, p), [s.plot.widthM / 2, s.plot.lengthM + 1.5]);
 }
 
+/** Ids for features drawn only as a picture (never saved). */
+function counter(): () => number {
+  let n = 0;
+  return () => ++n;
+}
+
 function photoLayer(s: AppState, px: (n: number) => number) {
   const { widthM: W, lengthM: H, rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
   const photo = currentSurvey()?.photo;
@@ -572,19 +579,10 @@ function photoLayer(s: AppState, px: (n: number) => number) {
     <G clipPath="url(#gclip)">
       <Rect width={W} height={H} fill="#7E9C60" />
       <Rect width={W} height={H} fill="url(#grassP)" />
-      <Rect x={0} y={0} width={W} height={8} fill="#56743F" opacity={0.5} />
-      <Rect x={0} y={GH - 6} width={W} height={6} fill="#C8C0B0" />
-      <Path d={`M0 ${GH - 4}h${W}M0 ${GH - 2}h${W}`} stroke="#ADA595" strokeWidth={px(1)} />
-      <Circle cx={W - 1.3} cy={GH - 1.3} r={1.05} fill="#3B4A4C" stroke="#8A9496" strokeWidth={px(2)} />
-      <Rect x={W - 2.8} y={GH - 10} width={2.2} height={3} fill="#E6EBEB" stroke="#9AA4A6" strokeWidth={px(1)} />
-      <Path d={`M${W - 2.8} ${GH - 8.5}h2.2`} stroke="#9AA4A6" strokeWidth={px(1)} />
-      <Rect x={W - 3.6} y={GH - 12.6} width={1.8} height={1.6} fill="#F0F0EA" />
-      <Rect x={W - 1.4} y={8} width={1.2} height={GH - 14} fill="#CFC8B6" />
-      <Circle cx={3} cy={4} r={1.6} fill="url(#canopy)" />
-      <Circle cx={4.8} cy={9.5} r={1.1} fill="url(#canopy)" />
-      <Circle cx={2.4} cy={13} r={1.4} fill="url(#canopy)" />
-      <Circle cx={1.6} cy={18.5} r={0.9} fill="url(#canopy)" />
-      <Circle cx={5.2} cy={16} r={0.7} fill="#C9C27A" />
+      {/* What is already in the garden, where the first drone survey showed it. */}
+      {existingFeatures(s.plot, counter()).map((it) =>
+        itemShape(it, it.kind === "tree" ? "url(#canopy)" : fillOf(it), { stroke: KINDS[it.kind].stroke, strokeWidth: px(1) }, undefined, `e${it.id}`),
+      )}
       <Rect x={0} y={GH + HD} width={W} height={H - GH - HD} fill="#B9B5AC" />
       <Rect x={0} y={GH + HD + 1} width={2.2} height={H - GH - HD - 1} fill="#7E9C60" />
       <Rect x={HW} y={GH} width={W - HW} height={HD} fill="#C2BCAE" />

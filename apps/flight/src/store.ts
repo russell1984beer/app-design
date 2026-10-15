@@ -7,7 +7,7 @@ import { useEffect, useReducer } from "react";
 import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { ScanProgress } from "../../../packages/flight-core/src/mission.ts";
 import { DEFAULT_SAFETY, type SafetySettings } from "../../../packages/flight-core/src/safety.ts";
-import { DEFAULT_PRICES, History, TEST_PLOT, existingFeatures, type Prices, type ScanDetails, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
+import { DEFAULT_PRICES, EXISTING_VERSION, History, TEST_PLOT, existingFeatures, type Prices, type ScanDetails, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 export type Tab = "plan" | "scan" | "survey" | "design" | "roof" | "quote";
 export type FlightMode = "sim" | "real";
@@ -47,6 +47,8 @@ export type AppState = {
   styleNote: string;
   snap: boolean;
   existInit: boolean;
+  /** Which version of the existing features (EXISTING_VERSION) the saved items hold. */
+  existVersion: number;
   roof: { photosTaken: number; showExample: boolean; sel: number | null };
   /** A scan that stopped part-way, with where the home point was, so it can resume. */
   resume: Partial<Record<"survey" | "roof", { anchor: LatLng; progress: ScanProgress }>>;
@@ -95,6 +97,7 @@ export const S: AppState = {
   styleNote: "",
   snap: true,
   existInit: false,
+  existVersion: EXISTING_VERSION,
   roof: { photosTaken: 0, showExample: false, sel: null },
   resume: {},
   prices: DEFAULT_PRICES,
@@ -120,7 +123,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "safety", "scanned", "items", "nextId", "existInit", "existVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();
@@ -158,6 +161,13 @@ export async function loadSaved(): Promise<void> {
       // and a 33 m rear garden, not 29.5 m. Move the old defaults on; anything else the owner set stays.
       if (S.plot.gardenBearingDeg === 128 || S.plot.gardenBearingDeg === 118) S.plot = { ...S.plot, gardenBearingDeg: TEST_PLOT.gardenBearingDeg };
       if (S.plot.rearGardenM === 29.5 && S.plot.lengthM === 43) S.plot = { ...S.plot, rearGardenM: TEST_PLOT.rearGardenM, lengthM: TEST_PLOT.lengthM };
+      // The existing features were re-measured: swap the saved copy for the new one (the owner's own
+      // new features stay). They are added again by ensureExisting.
+      if ((saved.existVersion ?? 1) < EXISTING_VERSION) {
+        S.items = S.items.filter((i) => !i.exist);
+        S.existInit = false;
+        S.existVersion = EXISTING_VERSION;
+      }
     }
   } catch {
     // A damaged save starts afresh rather than stopping the app.

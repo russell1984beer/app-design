@@ -14,7 +14,8 @@ export type Kind =
   | "shed"
   | "tree"
   | "greenhouse"
-  | "hottub";
+  | "hottub"
+  | "trampoline";
 
 export type KindInfo = { label: string; w: number; h: number; fill: string; stroke: string };
 
@@ -31,6 +32,7 @@ export const KINDS: Record<Kind, KindInfo> = {
   tree: { label: "Tree", w: 3.2, h: 3.2, fill: "#5C8A50", stroke: "#2F4D2A" },
   greenhouse: { label: "Greenhouse", w: 2.2, h: 3, fill: "#DCE6E4", stroke: "#7E9296" },
   hottub: { label: "Hot tub", w: 2.1, h: 2.1, fill: "#4B6670", stroke: "#2E3F45" },
+  trampoline: { label: "Trampoline", w: 3, h: 3, fill: "#2E3A3C", stroke: "#5FB8A0" },
 };
 
 export const KIND_ORDER = Object.keys(KINDS) as Kind[];
@@ -97,7 +99,7 @@ export type Item = {
   plants?: string[];
 };
 
-export const isRound = (k: Kind) => k === "tree" || k === "hottub";
+export const isRound = (k: Kind) => k === "tree" || k === "hottub" || k === "trampoline";
 export const isOval = (k: Kind) => isRound(k) || k === "pond";
 
 export function materialOf(it: Item): Material | null {
@@ -215,26 +217,52 @@ export function samplePoints(it: Item): Pt[] {
   return out;
 }
 
-/** What was already in the test garden: the patio, hot tub, greenhouse and trees. */
-export function existingFeatures(plot: Plot, nextId: () => number): Item[] {
-  const W = plot.widthM;
-  const GH = plot.rearGardenM;
-  const base = { a: 0, exist: true };
-  const items: Item[] = [
-    { ...base, id: nextId(), kind: "patio", x: W / 2, y: GH - 3, w: W, h: 6, mat: "sandstone" },
-    { ...base, id: nextId(), kind: "hottub", x: W - 1.3, y: GH - 1.3, w: 2.1, h: 2.1 },
-    { ...base, id: nextId(), kind: "greenhouse", x: W - 1.7, y: GH - 8.5, w: 2.2, h: 3 },
-  ];
-  for (const [x, y, w] of EXISTING_TREES) items.push({ ...base, id: nextId(), kind: "tree", x, y, w, h: w });
-  return items;
+/** Bump when EXISTING changes, so the phone swaps its saved copy for the new one. */
+export const EXISTING_VERSION = 2;
+
+type Existing = { kind: Kind; label: string; x?: number; y?: number; w?: number; h?: number; pts?: Pt[]; mat?: string; nearHouse?: boolean };
+
+/** The middle of a stepping-stone path, widened to a strip. */
+function strip(line: Pt[], half: number): Pt[] {
+  return [...line.map(([x, y]): Pt => [x - half, y]), ...line.slice().reverse().map(([x, y]): Pt => [x + half, y])];
 }
 
-export const EXISTING_TREES: [number, number, number][] = [
-  [3, 4, 3.2],
-  [4.8, 9.5, 2.2],
-  [2.4, 13, 2.8],
-  [1.6, 18.5, 1.8],
+/**
+ * What is already in the owner's garden, measured on the first drone survey's aerial photo
+ * (14 Oct 2026; 7 m wide, 33 m rear garden). y is from the far end; the ones marked nearHouse
+ * keep their distance from the house if the rear garden's length is changed.
+ */
+const EXISTING: Existing[] = [
+  { kind: "greenhouse", label: "Greenhouse", x: 3.65, y: 3.15, w: 5.9, h: 6.3 },
+  { kind: "patio", label: "Concrete base", x: 3.9, y: 8.8, w: 6, h: 5, mat: "porcelain" },
+  { kind: "shed", label: "Shed", x: 1.5, y: 9.2, w: 2.6, h: 3.2 },
+  { kind: "lawn", label: "Lawn", pts: [[2.5, 11.3], [6.9, 11.3], [6.9, 18.9], [5, 18.9], [4.3, 18], [3.3, 16.8], [2.5, 15.6]] },
+  { kind: "path", label: "Stepping-stone path", mat: "stepping", pts: strip([[2.05, 11.3], [2.05, 14.4], [2.6, 15.8], [3.4, 17], [4.2, 18.2], [4.7, 19.4], [4.8, 21], [4.6, 22.5], [4.2, 24]], 0.45) },
+  { kind: "trampoline", label: "Trampoline", x: 2, y: 20.9, w: 3, h: 3 },
+  { kind: "bed", label: "Planting", x: 5.95, y: 21.45, w: 1.9, h: 5.1 },
+  { kind: "tree", label: "Hedge", x: 1, y: 13.5, w: 2, h: 2 },
+  { kind: "tree", label: "Hedge", x: 1, y: 17, w: 2, h: 2 },
+  { kind: "patio", label: "Brick patio", x: 4, y: 26.5, w: 5.8, h: 5, mat: "block", nearHouse: true },
+  { kind: "patio", label: "Patio by the house", x: 4, y: 31, w: 5.8, h: 4, mat: "porcelain", nearHouse: true },
+  { kind: "hottub", label: "Hot tub", x: 3.35, y: 32.1, w: 1.7, h: 1.7, nearHouse: true },
+  { kind: "tree", label: "Hedge", x: 0.7, y: 26, w: 1.4, h: 1.4, nearHouse: true },
+  { kind: "tree", label: "Hedge", x: 0.7, y: 30, w: 1.4, h: 1.4, nearHouse: true },
 ];
+
+/** What was already in the test garden, where the drone survey showed it. */
+export function existingFeatures(plot: Plot, nextId: () => number): Item[] {
+  const dy = plot.rearGardenM - 33;
+  return EXISTING.map((e): Item => {
+    const shift = e.nearHouse ? dy : 0;
+    const base = { id: nextId(), kind: e.kind, a: 0, exist: true, label: e.label, ...(e.mat ? { mat: e.mat } : {}) };
+    if (!e.pts) return { ...base, x: e.x!, y: e.y! + shift, w: e.w!, h: e.h! };
+    const pts = e.pts.map(([x, y]): Pt => [x, y + shift]);
+    const xs = pts.map((p) => p[0]);
+    const ys = pts.map((p) => p[1]);
+    const [cx, cy] = centre({ ...base, x: 0, y: 0, w: 0, h: 0, pts });
+    return { ...base, pts, x: cx, y: cy, w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  });
+}
 
 export type Style = { label: string; desc: string; items: [Kind, number, number, number, number][] };
 

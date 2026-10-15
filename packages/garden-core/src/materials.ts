@@ -65,6 +65,7 @@ export const PRICE_LIST: PriceItem[] = [
   { id: "wildflowerFixed", label: "Wildflower meadow extras (fixed)", unit: "meadow", price: 25 },
   { id: "greenhouse", label: "Greenhouse", unit: "each", price: 600 },
   { id: "hottub", label: "Hot tub", unit: "each", price: 3500 },
+  { id: "trampoline", label: "Trampoline", unit: "each", price: 250 },
   { id: "pad", label: "Concrete pad", unit: "m²", price: 12 },
 ];
 
@@ -190,6 +191,8 @@ export function quantities(it: Item, z: Terrain, prices: Prices = DEFAULT_PRICES
       return { title, lines: [["Greenhouse", "1"], ["Paving slab base", `${A.toFixed(1)} m²`]], cost: P("greenhouse") + A * P("slabBase") };
     case "hottub":
       return { title, lines: [["Hot tub", "1"], ["Concrete pad, 100 mm", `${(A * 0.1).toFixed(2)} m³`]], cost: P("hottub") + A * P("pad") };
+    case "trampoline":
+      return { title, lines: [["Trampoline with safety net", "1"], ["Ground anchor kit", "1"]], cost: P("trampoline") };
   }
 }
 

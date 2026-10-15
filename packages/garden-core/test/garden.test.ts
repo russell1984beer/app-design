@@ -9,6 +9,7 @@ import {
   TEST_PLOT as P,
   applyStyle,
   area,
+  bbox,
   bedSun,
   clampToPlot,
   contours,
@@ -77,12 +78,22 @@ test("plan directions: up the plan is the garden's bearing; right is 90° clockw
 
 test("design: existing features, shapes and areas", () => {
   const items = existingFeatures(P, ids());
-  assert.equal(items.length, 7);
-  assert.ok(items.every((i) => i.exist));
+  assert.equal(items.length, 14);
+  assert.ok(items.every((i) => i.exist && i.label));
+  // Everything measured on the survey photo lies in the rear garden, clear of the house.
+  for (const it of items) {
+    const [x0, y0, x1, y1] = bbox(it);
+    assert.ok(x0 >= -0.01 && x1 <= P.widthM + 0.01 && y0 >= -0.01 && y1 <= P.rearGardenM + 0.01, `${it.label} inside the rear garden`);
+  }
+  assert.equal(items.find((i) => i.kind === "greenhouse")!.y < 5, true, "the greenhouse is at the far end");
   const tub = items.find((i) => i.kind === "hottub")!;
-  assert.ok(Math.abs(itemArea(tub) - (Math.PI * 2.1 * 2.1) / 4) < 1e-9);
+  assert.ok(Math.abs(itemArea(tub) - (Math.PI * 1.7 * 1.7) / 4) < 1e-9);
   assert.ok(inItem(tub, tub.x, tub.y));
-  assert.ok(!inItem(tub, tub.x + 1.1, tub.y + 1.1), "round, not square");
+  assert.ok(!inItem(tub, tub.x + 0.8, tub.y + 0.8), "round, not square");
+  const tramp = items.find((i) => i.kind === "trampoline")!;
+  assert.ok(!inItem(tramp, tramp.x + 1.4, tramp.y + 1.4), "the trampoline is round too");
+  const lawn = items.find((i) => i.kind === "lawn")!;
+  assert.ok(inItem(lawn, lawn.x, lawn.y) && itemArea(lawn) > 25, "the drawn lawn has its centre and area");
   const drawn: Item = { id: 99, kind: "lawn", x: 0, y: 0, w: 0, h: 0, a: 0, pts: [[0, 0], [4, 0], [4, 3], [0, 3]] };
   assert.equal(itemArea(drawn), 12);
   assert.ok(inItem(drawn, 2, 1) && !inItem(drawn, 5, 1));
@@ -109,8 +120,9 @@ test("design: a style replaces new features and removes existing ones it builds 
   const r = applyStyle(P, start, "family", ids());
   assert.ok(!r.items.some((i) => i.id === 50), "the old new pond goes");
   assert.equal(r.added.length, STYLES.family.items.length);
-  // The family patio covers the existing patio and hot tub.
-  assert.ok(!r.items.some((i) => i.exist && i.kind === "patio"));
+  // The family patio, by the house, covers the existing patio there and the hot tub.
+  assert.ok(!r.items.some((i) => i.exist && (i.label === "Patio by the house" || i.kind === "hottub")));
+  assert.ok(r.items.some((i) => i.exist && i.kind === "greenhouse"), "the greenhouse at the far end stays");
   assert.match(r.note, /removed to make room/);
 });
 
