@@ -72,10 +72,20 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   Cloud upload/sync of photos and surveys is not built yet.
 - `packages/flight-core/` (TypeScript, no runtime dependencies, needs Node 22.18+):
   - `planner.ts`: grid mission over a drawn boundary, angled orbit for walls/roof. `planSurvey` is
-    the garden scan, fixed to the owner's chosen plan (the prototype's): passes straight across the
-    plot, front to back, first and last along the end boundaries, about 0.75 x height x (1 - overlap)
-    apart (3.6 m at the default 20 m and 75%), flown back and forth. It never crosses the property
-    boundary. Take-off and landing are at the home point (default: middle of the rear garden,
+    the garden scan, the owner's choice after the first real scan (14 Oct 2026: it stopped for every
+    photo, shot at 1/15 s at sunset, and the photos taken while still braking were half as sharp):
+    smooth runs ALONG the plot, first and last along the side boundaries, at most
+    0.75 x height x (1 - overlap) apart (3 runs at the default 20 m and 75%), flown back and forth.
+    Photos along a run are taken on the fly (`Waypoint.onTheFly`: FlightSession heads for the run's
+    end and fires each photo as the drone passes its spot) at `runSpeedMs` = photo spacing /
+    `PHOTO_INTERVAL_S` (2.5 s, the 48 MP save time): 1 m/s by default. Only the run ends are stops, and
+    stopped photos wait until the drone reports it is still and level (`Telemetry.speedMs`/`tiltDeg`,
+    at most 3 s). A photo that fails or is missed on the fly is retaken at a stop. Real flights are
+    blocked when the sun is below 8° and warned below 20° (`sunElevationAt`). Optional fly-over film
+    (`withFilm`, Plan tab switch, on by default): after the photos, a 2 m/s run down the middle of the
+    garden towards the house and back, camera -35°, recorded with `startVideo`/`stopVideo` (Kotlin:
+    camera to VIDEO_NORMAL, KeyStartRecord; stopped on any return or landing). It never crosses the
+    property boundary. Take-off and landing are at the home point (default: middle of the rear garden,
     movable on the Plan map); the drone's own Return to Home brings it back there at the end.
     Optional (Plan tab switch, off by default): a lap round the plot's edge after the passes, camera
     tilted -60° looking in, also inside the boundary.

@@ -38,6 +38,10 @@ export type Telemetry = {
   obstacleM?: number;
   /** How many more photos fit on the drone's storage (none: not reported). */
   photosLeft?: number;
+  /** Ground speed, m/s (none: not reported). */
+  speedMs?: number;
+  /** How far the drone leans (the larger of pitch and roll), degrees (none: not reported). */
+  tiltDeg?: number;
 };
 
 export type DroneEvent =
@@ -62,6 +66,10 @@ export interface DroneBridge {
   goTo(position: LatLng, altitudeM: number, speedMs: number, headingDeg?: number): void;
   setGimbalPitch(deg: number): void;
   takePhoto(waypointIndex: number): void;
+  /** Switch the camera to video and start recording (the fly-over film). */
+  startVideo(): void;
+  /** Stop recording and switch the camera back to photos. */
+  stopVideo(): void;
   hover(): void;
   /** Use the drone's own Return to Home: climb to return height, fly home, land. */
   returnHome(): void;

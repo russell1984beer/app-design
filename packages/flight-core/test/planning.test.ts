@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { MINI_4_PRO, footprintM, gsdCm } from "../src/camera.ts";
 import { areaM2, distanceM, distanceToPolygonM } from "../src/geo.ts";
-import { DEFAULT_GRID, planGrid, planOrbit, planSurvey } from "../src/planner.ts";
+import { DEFAULT_GRID, planGrid, planOrbit, planSurvey, withFilm } from "../src/planner.ts";
 import {
   DEFAULT_SAFETY,
   batteryNeededToReturn,
@@ -11,7 +11,7 @@ import {
   preflightCheck,
   type PreflightInput,
 } from "../src/safety.ts";
-import { FIELD, FIELD_HOME, ORIGIN, PLOT, PLOT_HOME, alongAxis } from "./helpers.ts";
+import { FIELD, FIELD_HOME, ORIGIN, PLOT, PLOT_BEARING, PLOT_HOME, alongAxis } from "./helpers.ts";
 
 test("test plot is 7 m x 43 m", () => {
   assert.ok(Math.abs(areaM2(PLOT) - 301) < 1);
@@ -85,24 +85,49 @@ test("default flying height is 20 m with 75% overlap, as in the prototype", () =
   assert.equal(DEFAULT_GRID.frontOverlap, 0.75);
 });
 
-test("survey follows the prototype's plan: passes across, edge to edge, inside the plot", () => {
+test("survey: smooth runs along the garden, edge to edge, photos on the fly, inside the plot", () => {
   const m = planSurvey(PLOT);
-  // 20 m and 75% overlap: passes at most 3.75 m apart over 43 m, so 13 passes about 3.6 m apart.
-  assert.equal(m.estimate.passCount, 13);
-  assert.ok(Math.abs(m.estimate.lineSpacingM! - 42.9 / 12) < 0.01);
+  // 20 m and 75% overlap: runs at most 3.75 m apart over the 7 m width, so 3 runs about 3.45 m apart.
+  assert.equal(m.estimate.passCount, 3);
+  assert.ok(Math.abs(m.estimate.lineSpacingM! - 6.9 / 2) < 0.01);
   for (const w of m.waypoints) {
     assert.ok(distanceToPolygonM(w.position, PLOT) < 1e-6, `waypoint ${w.index} is outside the plot`);
     assert.equal(w.altitudeM, 20);
     assert.equal(w.gimbalPitchDeg, -90);
   }
-  // Each pass spans the 7 m width with a photo every 2.5 m or less: 4 photos.
-  assert.equal(m.waypoints.length, 13 * 4);
-  // First and last passes run along the two ends of the plot.
-  const ends = [m.waypoints[0], m.waypoints[m.waypoints.length - 1]].map((w) => distanceM(w.position, PLOT[0]) < distanceM(w.position, PLOT[1]));
-  assert.notEqual(ends[0], ends[1], "starts at one end, finishes at the other");
-  // Back and forth.
+  // Each run spans the 43 m length with a photo every 2.5 m or less: 19 photos.
+  assert.equal(m.waypoints.length, 3 * 19);
+  // Only the two ends of each run are stops; the photos between are taken on the fly, slowly
+  // enough for the camera (2.5 m apart, one every 2.5 s: 1 m/s).
+  const runs = [0, 1, 2].map((r) => m.waypoints.slice(r * 19, (r + 1) * 19));
+  for (const run of runs) {
+    assert.ok(!run[0].onTheFly && !run[18].onTheFly, "stops at both ends");
+    assert.ok(run.slice(1, 18).every((w) => w.onTheFly), "no stops in between");
+    assert.ok(run.slice(1).every((w) => Math.abs(w.speedMs! - 1) < 1e-9));
+    assert.equal(run[0].speedMs, undefined, "gets to the start of a run at the normal speed");
+  }
+  // Back and forth along the plot's length (it runs at 135°).
   const headings = m.waypoints.map((w) => Math.round(w.headingDeg!));
-  assert.deepEqual([...new Set(headings)].sort((a, b) => a - b), [45, 225]);
+  assert.deepEqual([...new Set(headings)].sort((a, b) => a - b), [135, 315]);
+  m.waypoints.forEach((w, i) => assert.equal(w.index, i));
+  // 3 runs of 43 m at 1 m/s plus 6 stops: about 2.5 minutes, not counting take-off and return.
+  assert.ok(m.estimate.durationS > 130 && m.estimate.durationS < 170, `${m.estimate.durationS}`);
+});
+
+test("fly-over film: there and back between two points inside the plot, filming only on the way", () => {
+  const scan = planSurvey(PLOT);
+  const from = alongAxis(ORIGIN, PLOT_BEARING, 41);
+  const to = alongAxis(ORIGIN, PLOT_BEARING, 9);
+  const m = withFilm(scan, from, to);
+  assert.equal(m.waypoints.length, scan.waypoints.length + 4);
+  assert.deepEqual(m.waypoints.slice(0, scan.waypoints.length), scan.waypoints);
+  const film = m.waypoints.slice(scan.waypoints.length);
+  assert.deepEqual(film.map((w) => w.video), ["start", undefined, undefined, "stop"]);
+  assert.ok(film.every((w) => !w.photo && w.gimbalPitchDeg === -35));
+  assert.ok(film.every((w) => distanceToPolygonM(w.position, PLOT) < 1e-6));
+  // Looks towards the house on the way, back down the garden on the return.
+  assert.ok(Math.abs(film[1].headingDeg! - 315) < 1 && Math.abs(film[3].headingDeg! - 135) < 1);
+  assert.equal(m.estimate.photoCount, scan.estimate.photoCount, "the film adds no photos");
   m.waypoints.forEach((w, i) => assert.equal(w.index, i));
 });
 
@@ -124,9 +149,9 @@ test("survey with the edge lap: the passes, then 24 tilted photos round the edge
   assert.notEqual(m.id, plain.id);
 });
 
-test("survey: higher or with less overlap means fewer passes", () => {
-  assert.ok(planSurvey(PLOT, { altitudeM: 30 }).estimate.passCount! < planSurvey(PLOT).estimate.passCount!);
-  assert.ok(planSurvey(PLOT, { overlap: 0.65 }).estimate.passCount! < planSurvey(PLOT).estimate.passCount!);
+test("survey: higher or with less overlap means fewer photos", () => {
+  assert.ok(planSurvey(PLOT, { altitudeM: 30 }).estimate.photoCount < planSurvey(PLOT).estimate.photoCount);
+  assert.ok(planSurvey(PLOT, { overlap: 0.65 }).estimate.photoCount < planSurvey(PLOT).estimate.photoCount);
 });
 
 test("same plan always gets the same id, different plans different ids", () => {

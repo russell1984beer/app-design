@@ -3,8 +3,8 @@
 // rule says so. It never fights the pilot: once the pilot takes over, it stops sending commands.
 
 import type { DroneBridge, Telemetry } from "./bridge.ts";
-import { distanceM, type LatLng } from "./geo.ts";
-import { emptyProgress, remainingWaypoints, type Mission, type ScanProgress } from "./mission.ts";
+import { distanceM, toLocal, type LatLng } from "./geo.ts";
+import { emptyProgress, remainingWaypoints, type Mission, type ScanProgress, type Waypoint } from "./mission.ts";
 import { batteryNeededToReturn, insideGeofence, type SafetySettings } from "./safety.ts";
 
 export type SessionState =
@@ -56,6 +56,18 @@ const OBSTACLE_RESUME_GRACE_S = 15;
 const ARRIVED_M = 0.5;
 const ARRIVED_ALT_M = 0.3;
 const MAX_PHOTO_ATTEMPTS = 3;
+
+// A stopped photo waits until the drone has stopped braking: the first real scan fired while it still
+// leaned 15-21° and moved at up to 0.8 m/s, and those photos were half as sharp as the level ones.
+const SETTLED_SPEED_MS = 0.2;
+const SETTLED_TILT_DEG = 4;
+/** Shoot anyway after this long (gusty air never quite settles). */
+const SETTLE_MAX_S = 3;
+
+/** A photo on the fly is taken this far before the spot, for the camera's own delay. */
+const FLY_PAST_LEAD_M = 0.3;
+/** Pushed further than this off the run's line (wind), the photo is taken later at a stop instead. */
+const FLY_PAST_MAX_OFF_M = 1.5;
 /** Fly this long before trusting the measured battery drain. */
 const DRAIN_SAMPLE_S = 30;
 
@@ -77,6 +89,13 @@ export class FlightSession {
   /** Arrival time at the waypoint being held over (waypoint holdS). */
   private holdStart?: { index: number; timeS: number };
   private holdEnded = new Set<number>();
+  /** Photos asked for on the fly, not yet confirmed by the drone. */
+  private flyPending = new Set<number>();
+  /** On-the-fly photos that failed or were missed: taken at a stop instead. */
+  private stopAt = new Set<number>();
+  /** When the drone arrived at the current stop photo, for the settling wait. */
+  private settleStart?: number;
+  private filming = false;
 
   constructor(options: FlightSessionOptions) {
     this.o = options;
@@ -114,6 +133,7 @@ export class FlightSession {
     this.heldFrom = this.state === "climbing" ? "takingOff" : this.state;
     this.commandedIndex = undefined;
     this.photoRequested = false;
+    this.settleStart = undefined;
     this.holdReason = "pilot";
     this.setState("holding");
   }
@@ -154,6 +174,7 @@ export class FlightSession {
   /** Land straight down where it is (the pilot has checked the ground below is clear). */
   pilotLand(): void {
     if (this.state === "ready" || this.state === "landed") return;
+    if (this.filming) this.stopFilming();
     this.o.bridge.land();
     this.returnReason = "pilotLanded";
     this.setState("landing");
@@ -162,6 +183,7 @@ export class FlightSession {
   /** The Return button in the app. */
   pilotReturnHome(): void {
     if (this.state === "ready" || this.state === "landed") return;
+    if (this.filming) this.stopFilming();
     this.o.bridge.returnHome();
     this.returnReason = "pilotButton";
     this.setState("returning");
@@ -242,7 +264,12 @@ export class FlightSession {
 
   private flyMission(t: Telemetry): void {
     const { bridge, mission } = this.o;
-    const next = remainingWaypoints(mission, this.progress)[0];
+    const remaining = remainingWaypoints(mission, this.progress);
+    // Photos already asked for on the fly are passed; the drone confirms them a moment later.
+    const next = remaining.find((w) => !this.flyPending.has(w.index));
+
+    // Everything flown; wait for the last photos to be confirmed.
+    if (!next && remaining.length > 0 && this.state === "scanning") return;
 
     if (this.state === "takingOff") {
       if (!next) return this.finish();
@@ -260,11 +287,14 @@ export class FlightSession {
 
     if (!next) return this.finish();
 
+    if (next.onTheFly && !this.stopAt.has(next.index)) return this.flyPast(t, next);
+
     if (this.commandedIndex !== next.index) {
       bridge.setGimbalPitch(next.gimbalPitchDeg);
-      bridge.goTo(next.position, next.altitudeM, mission.speedMs, next.headingDeg);
+      bridge.goTo(next.position, next.altitudeM, next.speedMs ?? mission.speedMs, next.headingDeg);
       this.commandedIndex = next.index;
       this.photoRequested = false;
+      this.settleStart = undefined;
       return;
     }
 
@@ -280,12 +310,66 @@ export class FlightSession {
     }
     if (arrived && !this.photoRequested) {
       if (next.photo) {
+        // The camera is still saving a photo from the run: wait for it rather than be told it is busy.
+        if (!this.settled(t) || this.flyPending.size > 0) return;
         bridge.takePhoto(next.index);
         this.photoRequested = true;
       } else {
+        if (next.video === "start" && !this.filming) {
+          bridge.startVideo();
+          this.filming = true;
+          this.log.push("filming");
+        } else if (next.video === "stop" && this.filming) {
+          this.stopFilming();
+        }
         this.recordPhoto(next.index);
       }
     }
+  }
+
+  /**
+   * An on-the-fly photo: keep flying towards the end of the run at its steady speed and take the
+   * photo as the drone passes the spot. Missed (blown off the line), it is taken at a stop instead.
+   */
+  private flyPast(t: Telemetry, w: Waypoint): void {
+    const { bridge, mission } = this.o;
+    const end = mission.waypoints.find((x) => x.index > w.index && !x.onTheFly) ?? w;
+    if (this.commandedIndex !== end.index) {
+      bridge.setGimbalPitch(w.gimbalPitchDeg);
+      bridge.goTo(end.position, end.altitudeM, end.speedMs ?? mission.speedMs, end.headingDeg);
+      this.commandedIndex = end.index;
+      this.photoRequested = false;
+      this.settleStart = undefined;
+    }
+    const run = toLocal(w.position, end.position);
+    const len = Math.hypot(run.x, run.y);
+    const at = toLocal(w.position, t.position);
+    const along = len > 0 ? (at.x * run.x + at.y * run.y) / len : 0;
+    const off = len > 0 ? Math.abs(at.x * run.y - at.y * run.x) / len : Math.hypot(at.x, at.y);
+    if (along < -FLY_PAST_LEAD_M) return;
+    if (off > FLY_PAST_MAX_OFF_M) {
+      if (along > 0) {
+        this.log.push(`photo ${w.index} missed on the fly (${off.toFixed(1)} m off the line): taking it at a stop`);
+        this.stopAt.add(w.index);
+      }
+      return;
+    }
+    bridge.takePhoto(w.index);
+    this.flyPending.add(w.index);
+  }
+
+  /** Stopped photos wait until the drone is still and level (when it reports that), or SETTLE_MAX_S. */
+  private settled(t: Telemetry): boolean {
+    if (t.speedMs === undefined && t.tiltDeg === undefined) return true;
+    this.settleStart ??= this.now();
+    const still = (t.speedMs ?? 0) <= SETTLED_SPEED_MS && (t.tiltDeg ?? 0) <= SETTLED_TILT_DEG;
+    return still || this.now() - this.settleStart >= SETTLE_MAX_S;
+  }
+
+  private stopFilming(): void {
+    this.o.bridge.stopVideo();
+    this.filming = false;
+    this.log.push("filming stopped");
   }
 
   private safetyReason(t: Telemetry): ReturnReason | undefined {
@@ -327,6 +411,7 @@ export class FlightSession {
 
   /** Every waypoint done: the drone's own Return to Home, or land straight down if the mission says so. */
   private finish(): void {
+    if (this.filming) this.stopFilming();
     if (this.o.mission.endWith !== "land") return this.goHome("complete");
     this.o.bridge.land();
     this.returnReason = "complete";
@@ -334,12 +419,14 @@ export class FlightSession {
   }
 
   private goHome(reason: ReturnReason): void {
+    if (this.filming) this.stopFilming();
     this.o.bridge.returnHome();
     this.returnReason = reason;
     this.setState("returning");
   }
 
   private recordPhoto(index: number): void {
+    this.flyPending.delete(index);
     if (!this.progress.completedWaypoints.includes(index)) {
       this.progress.completedWaypoints.push(index);
       this.o.onProgress?.({ ...this.progress, completedWaypoints: [...this.progress.completedWaypoints] });
@@ -351,6 +438,8 @@ export class FlightSession {
     const attempts = (this.photoAttempts.get(index) ?? 0) + 1;
     this.photoAttempts.set(index, attempts);
     this.log.push(`photo ${index} failed (${reason}), attempt ${attempts}`);
+    // One taken on the fly is tried again at a stop (the drone has flown on past the spot).
+    if (this.flyPending.delete(index)) this.stopAt.add(index);
     if (attempts < MAX_PHOTO_ATTEMPTS) this.photoRequested = false; // try again on the next update
     else if (this.state === "scanning") this.goHome("cameraFault");
   }

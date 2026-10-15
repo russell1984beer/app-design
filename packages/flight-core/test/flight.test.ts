@@ -8,7 +8,7 @@ import type { DroneBridge } from "../src/bridge.ts";
 import { FlightSession, type FlightSessionOptions } from "../src/flight-session.ts";
 import { distanceM, distanceToPolygonM } from "../src/geo.ts";
 import type { Mission, ScanProgress } from "../src/mission.ts";
-import { planGrid, planSurvey } from "../src/planner.ts";
+import { planGrid, planSurvey, withFilm } from "../src/planner.ts";
 import { DEFAULT_SAFETY, insideGeofence, type SafetySettings } from "../src/safety.ts";
 import { SimDrone, type SimOptions } from "../src/sim-drone.ts";
 import { FIELD, FIELD_HOME, ORIGIN, PLOT, PLOT_BEARING, PLOT_HOME, alongAxis, landed, run } from "./helpers.ts";
@@ -344,6 +344,77 @@ for (const edgeLap of [false, true]) test(`garden survey${edgeLap ? " with the e
   assert.equal(sim.photos.length, mission.waypoints.length);
   assert.ok(furthestOut < 0.3, `went ${furthestOut.toFixed(2)} m outside the boundary`);
   assert.ok(distanceM(sim.telemetry().position, home) < 1, "lands at the take-off point");
+});
+
+/** The garden survey from the middle of the rear garden, optionally with the fly-over film. */
+function smoothSurvey(film = false) {
+  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
+  const scan = planSurvey(PLOT);
+  const mission = film ? withFilm(scan, alongAxis(ORIGIN, PLOT_BEARING, 41), alongAxis(ORIGIN, PLOT_BEARING, 9)) : scan;
+  const sim = new SimDrone({ home });
+  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  return { home, scan, mission, sim, session };
+}
+
+test("smooth survey: photos along each run are taken on the fly, the ends at a stop, each where planned", () => {
+  const { mission, sim, session, home } = smoothSurvey();
+  session.start();
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(sim.photos.length, mission.waypoints.length, "every photo once");
+  for (let i = 0; i < sim.photos.length; i++) {
+    const w = mission.waypoints[sim.photos[i].waypointIndex];
+    assert.ok(distanceM(sim.photos[i].position, w.position) < 0.6, `photo ${w.index} taken ${distanceM(sim.photos[i].position, w.position).toFixed(2)} m from its spot`);
+    // On the fly at the run's steady 1 m/s; at the ends only once still.
+    if (w.onTheFly) assert.ok(Math.abs(sim.photoSpeeds[i] - 1) < 0.05, `photo ${w.index} at ${sim.photoSpeeds[i]} m/s`);
+    else assert.ok(sim.photoSpeeds[i] < 0.05, `photo ${w.index} waited until the drone was still`);
+  }
+  assert.ok(distanceM(sim.telemetry().position, home) < 1);
+});
+
+test("smooth survey: a photo that fails on the fly is taken again at a stop, and the scan carries on", () => {
+  const { mission, sim, session } = smoothSurvey();
+  const missed = mission.waypoints.find((w) => w.onTheFly)!.index + 3;
+  sim.failOnce.add(missed);
+  session.start();
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.deepEqual([...session.progress.completedWaypoints].sort((a, b) => a - b), mission.waypoints.map((w) => w.index));
+  const retake = sim.photos.findIndex((p) => p.waypointIndex === missed);
+  assert.ok(sim.photoSpeeds[retake] < 0.05, "the retake was at a stop");
+  assert.ok(distanceM(sim.photos[retake].position, mission.waypoints[missed].position) < 0.6);
+});
+
+test("fly-over film: recorded after the photos, inside the plot, then home with nothing left recording", () => {
+  const { scan, sim, session } = smoothSurvey(true);
+  let furthestOut = 0;
+  let photosWhileFilming = 0;
+  let photosBefore = 0;
+  session.start();
+  run(sim, session, {
+    until: landed(sim, session),
+    each: () => {
+      furthestOut = Math.max(furthestOut, distanceToPolygonM(sim.telemetry().position, PLOT));
+      if (sim.filming && sim.photos.length !== photosBefore) photosWhileFilming++;
+      photosBefore = sim.photos.length;
+    },
+  });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(sim.photos.length, scan.waypoints.length, "the film takes no photos");
+  assert.equal(photosWhileFilming, 0);
+  // 32 m there and back at 2 m/s.
+  assert.ok(sim.filmS > 30 && sim.filmS < 45, `${sim.filmS.toFixed(0)} s of film`);
+  assert.equal(sim.filming, false);
+  assert.ok(furthestOut < 0.3);
+});
+
+test("the Return button during the film stops the recording", () => {
+  const { sim, session } = smoothSurvey(true);
+  session.start();
+  run(sim, session, { until: () => sim.filming && sim.filmS > 5 });
+  session.pilotReturnHome();
+  assert.equal(sim.filming, false);
+  run(sim, session, { until: landed(sim, session) });
 });
 
 /** Fly until a few photos are taken, then press the emergency stop. */

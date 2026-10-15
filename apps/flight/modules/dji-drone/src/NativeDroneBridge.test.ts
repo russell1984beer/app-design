@@ -62,6 +62,8 @@ class FakeNative implements DjiDroneNative {
       djiFlightMode: null,
       pilotTookOver: t.flightMode === "pilot",
       obstacleM: t.obstacleM ?? null,
+      speedMs: t.speedMs ?? null,
+      tiltDeg: t.tiltDeg ?? null,
     });
   }
 
@@ -86,6 +88,14 @@ class FakeNative implements DjiDroneNative {
   }
   takePhoto(i: number) {
     this.sim.takePhoto(i);
+  }
+  startVideo() {
+    this.calls.push("startVideo");
+    this.sim.startVideo();
+  }
+  stopVideo() {
+    this.calls.push("stopVideo");
+    this.sim.stopVideo();
   }
   hover() {
     this.sim.hover();

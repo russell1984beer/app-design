@@ -28,6 +28,13 @@ export function sunPosition(latitudeDeg: number, day: number, solarHour: number)
   return { el: el / RAD, az };
 }
 
+/** How high the sun is at a place and moment, degrees above the horizon (to within a degree or so). */
+export function sunElevationAt(latitudeDeg: number, longitudeDeg: number, when: Date): number {
+  const day = Math.floor((when.getTime() - Date.UTC(when.getUTCFullYear(), 0, 0)) / 86_400_000);
+  const solarHour = when.getUTCHours() + when.getUTCMinutes() / 60 + longitudeDeg / 15;
+  return sunPosition(latitudeDeg, day, solarHour).el;
+}
+
 /** UK clock time to solar time: British Summer Time from late March to late October. */
 export const solarHour = (day: number, clock: number) => clock - (day > 85 && day < 300 ? 1 : 0) + 0.04;
 

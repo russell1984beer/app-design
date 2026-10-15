@@ -53,6 +53,8 @@ class DjiDroneModule : Module() {
     }
     Function("setGimbalPitch") { deg: Double -> controller?.setGimbalPitch(deg) }
     Function("takePhoto") { waypointIndex: Int -> controller?.takePhoto(waypointIndex) }
+    Function("startVideo") { controller?.startVideo() }
+    Function("stopVideo") { controller?.stopVideo() }
     Function("hover") { controller?.hover() }
     Function("returnHome") { controller?.returnHome() }
     Function("land") { controller?.land() }

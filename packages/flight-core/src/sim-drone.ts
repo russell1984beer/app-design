@@ -39,6 +39,8 @@ export class SimDrone implements DroneBridge {
   maxDistanceFromHomeM = 0;
   /** Make every photo fail, to test camera faults. */
   failPhotos = false;
+  /** Waypoints whose first photo fails (then works). */
+  failOnce = new Set<number>();
   /** Log of things the drone did by itself. */
   log: string[] = [];
 
@@ -47,7 +49,8 @@ export class SimDrone implements DroneBridge {
   private failsafe?: FailsafeConfig;
   private target?: Target;
   private returnPhase: ReturnPhase = "climb";
-  private pendingPhoto?: { index: number; remainingS: number };
+  /** The shutter fires straight away (where and how fast is kept); the file is saved a moment later. */
+  private pendingPhoto?: { index: number; remainingS: number; position: LatLng; speedMs: number };
   private events: DroneEvent[] = [];
   private failsafeTriggered = false;
 
@@ -71,8 +74,19 @@ export class SimDrone implements DroneBridge {
       wind: { ...this.wind },
       windWarning: this.wind.speedMs >= 10.7 ? "strong" : this.wind.speedMs >= 8 ? "moderate" : "none",
       obstacleM: this.obstacleM,
+      speedMs: this.speedMs,
+      // A real drone leans into its speed changes; this one leans while it moves.
+      tiltDeg: this.speedMs > 0.05 ? 8 : 0,
     };
   }
+
+  /** Ground speed over the last step, m/s. */
+  speedMs = 0;
+  /** How fast the drone was going as each photo was taken, in order (for the blur tests). */
+  photoSpeeds: number[] = [];
+  /** Seconds of film recorded, and whether it is recording now. */
+  filmS = 0;
+  filming = false;
 
   drainEvents(): DroneEvent[] {
     if (!this.signalOk) return [];
@@ -102,7 +116,20 @@ export class SimDrone implements DroneBridge {
 
   takePhoto(waypointIndex: number): void {
     if (!this.appInControl()) return;
-    this.pendingPhoto = { index: waypointIndex, remainingS: PHOTO_DELAY_S };
+    // Like the real camera: one photo at a time.
+    if (this.pendingPhoto) {
+      this.events.push({ type: "photoFailed", waypointIndex, reason: "camera busy" });
+      return;
+    }
+    this.pendingPhoto = { index: waypointIndex, remainingS: PHOTO_DELAY_S, position: fromLocal(this.home, this.pos), speedMs: this.speedMs };
+  }
+
+  startVideo(): void {
+    if (this.appInControl()) this.filming = true;
+  }
+
+  stopVideo(): void {
+    this.filming = false;
   }
 
   hover(): void {
@@ -172,6 +199,13 @@ export class SimDrone implements DroneBridge {
 
   step(dt: number): void {
     this.timeS += dt;
+    if (this.filming) this.filmS += dt;
+    const before = { ...this.pos };
+    this.stepPhysics(dt);
+    this.speedMs = dt > 0 ? Math.hypot(this.pos.x - before.x, this.pos.y - before.y) / dt : 0;
+  }
+
+  private stepPhysics(dt: number): void {
     if (this.mode === "onGround") return;
 
     this.battery = Math.max(0, this.battery - (this.drainPerMin / 60) * (1 + this.wind.speedMs / 10) * dt);
@@ -280,13 +314,14 @@ export class SimDrone implements DroneBridge {
     this.pendingPhoto.remainingS -= dt;
     if (this.pendingPhoto.remainingS <= 0) {
       const index = this.pendingPhoto.index;
-      if (this.failPhotos) {
+      if (this.failPhotos || this.failOnce.delete(index)) {
         this.events.push({ type: "photoFailed", waypointIndex: index, reason: "simulated camera fault" });
         this.pendingPhoto = undefined;
         return;
       }
       const file = `DJI_${String(this.photos.length + 1).padStart(4, "0")}.JPG`;
-      this.photos.push({ waypointIndex: index, file, position: fromLocal(this.home, this.pos) });
+      this.photos.push({ waypointIndex: index, file, position: this.pendingPhoto.position });
+      this.photoSpeeds.push(this.pendingPhoto.speedMs);
       this.events.push({ type: "photoTaken", waypointIndex: index, file });
       this.pendingPhoto = undefined;
     }

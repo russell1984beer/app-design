@@ -69,6 +69,8 @@ export class NativeDroneBridge implements DroneBridge {
       windWarning: t?.windWarning ?? "none",
       obstacleM: this.testObstacleM ?? (fresh && t!.obstacleM != null ? t!.obstacleM : undefined),
       photosLeft: t?.photosLeft ?? undefined,
+      speedMs: fresh && t!.speedMs != null ? t!.speedMs : undefined,
+      tiltDeg: fresh && t!.tiltDeg != null ? t!.tiltDeg : undefined,
     };
   }
 
@@ -128,6 +130,14 @@ export class NativeDroneBridge implements DroneBridge {
 
   takePhoto(waypointIndex: number): void {
     this.native.takePhoto(waypointIndex);
+  }
+
+  startVideo(): void {
+    this.native.startVideo?.();
+  }
+
+  stopVideo(): void {
+    this.native.stopVideo?.();
   }
 
   hover(): void {

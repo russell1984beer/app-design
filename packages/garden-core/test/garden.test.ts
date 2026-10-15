@@ -35,6 +35,7 @@ import {
   suggestPlants,
   sunHoursAt,
   sunHoursGrid,
+  sunElevationAt,
   sunPosition,
   type Item,
 } from "../src/index.ts";
@@ -145,6 +146,14 @@ test("sun: June midday is high in the south, December low", () => {
   const dec = sunPosition(P.latitudeDeg, 355, 12);
   assert.ok(dec.el > 14 && dec.el < 17);
   assert.equal(shadows(P, [], sunPosition(P.latitudeDeg, 172, 1)), null, "night");
+});
+
+test("sun now: the first real scan (14 Oct, 18:13 BST) was flown at sunset; midday was well lit", () => {
+  // A made-up spot at the same latitude on the south coast.
+  const at = (iso: string) => sunElevationAt(50.87, 0.6, new Date(iso));
+  assert.ok(at("2026-10-14T17:13:00Z") < 3, `${at("2026-10-14T17:13:00Z")}`);
+  assert.ok(at("2026-10-14T12:00:00Z") > 25);
+  assert.ok(at("2026-12-21T12:00:00Z") > 14 && at("2026-12-21T12:00:00Z") < 17, "winter midday is low but not dark");
 });
 
 test("sun: shade from trees and sheds; open lawn gets more sun", () => {

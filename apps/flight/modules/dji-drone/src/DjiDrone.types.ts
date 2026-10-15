@@ -17,6 +17,9 @@ export type NativeTelemetry = {
   obstacleM?: number | null;
   /** Photos that still fit on the drone's storage; null when not reported (missing from older builds). */
   photosLeft?: number | null;
+  /** Ground speed, m/s, and how far the drone leans (larger of pitch and roll), degrees; null when not reported. */
+  speedMs?: number | null;
+  tiltDeg?: number | null;
   headingDeg: number;
   productType: string | null;
   djiFlightMode: string | null;
@@ -64,6 +67,9 @@ export interface DjiDroneNative {
   goTo(lat: number, lng: number, altitudeM: number, speedMs: number, headingDeg: number | null): void;
   setGimbalPitch(deg: number): void;
   takePhoto(waypointIndex: number): void;
+  /** Camera to video and start recording / stop and back to photos (missing from older builds). */
+  startVideo?(): void;
+  stopVideo?(): void;
   hover(): void;
   returnHome(): void;
   land(): void;

@@ -5,10 +5,10 @@ import type { Telemetry } from "../../../packages/flight-core/src/bridge.ts";
 import { gsdCm, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
 import { fromLocal, toLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
-import { planFirstFlight, planSurvey } from "../../../packages/flight-core/src/planner.ts";
+import { planFirstFlight, planSurvey, withFilm } from "../../../packages/flight-core/src/planner.ts";
 import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/roof.ts";
 import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
-import { eastNorthToPlan, planToEastNorth, type Pt } from "../../../packages/garden-core/src/index.ts";
+import { eastNorthToPlan, planToEastNorth, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone } from "./drone";
 import { S, commit, commitNow, type AppState } from "./store";
@@ -61,8 +61,20 @@ export function roofPlan(s: AppState): Pt[] {
 }
 
 export function surveyMission(s: AppState, anchor: LatLng): Mission {
-  return planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap });
+  const scan = planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap });
+  if (!s.film) return scan;
+  // The fly-over film: down the middle of the garden from the far end to just short of the house,
+  // looking ahead, then back. It stays over the owner's own garden.
+  const { widthM: W, rearGardenM: GH } = s.plot;
+  return withFilm(scan, planToGps(s, anchor, [W / 2, 2]), planToGps(s, anchor, [W / 2, Math.max(4, GH - 3)]));
 }
+
+/** Below this the sun is too low for sharp photos (the first real scan, at sunset, needed 1/15 s). */
+export const SUN_BLOCK_DEG = 8;
+/** Below this, warn: the camera may slow its shutter and blur. */
+export const SUN_WARN_DEG = 20;
+
+const sunElevationDeg = (at: LatLng) => sunElevationAt(at.lat, at.lng, new Date());
 
 /** The bottom of the garden (the far end of the plot) up to the take-off point, full width. */
 export function firstFlightArea(s: AppState): Pt[] {
@@ -166,6 +178,11 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
     }
     if (weather && "error" in weather) extra.push({ id: "forecast", status: "block", message: weather.error });
+    const sun = sunElevationDeg(anchor);
+    if (sun < SUN_BLOCK_DEG)
+      extra.push({ id: "light", status: "block", message: "Too dark for sharp photos: the sun is too low. Fly when it is higher (late morning to mid afternoon is best)." });
+    else if (sun < SUN_WARN_DEG)
+      extra.push({ id: "light", status: "warn", message: `The sun is low (${Math.round(sun)}° up), so some photos may blur. Late morning to mid afternoon gives sharper photos.` });
     if (!flyZones) extra.push({ id: "flySafe", status: "block", message: "Checking DJI's no-fly zones for this place…" });
     else if ("error" in flyZones)
       // The drone itself still refuses to take off in DJI's restricted zones.
@@ -226,7 +243,10 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
     progress,
     onProgress: (p) => {
       // Real garden photos can be made into a survey, even from a scan that stopped part-way.
-      if (S.mode === "real" && kind !== "roof") recordScan(plan.anchor, p.completedWaypoints.length, flownAt);
+      if (S.mode === "real" && kind !== "roof") {
+        const photos = new Set(plan.mission.waypoints.filter((w) => w.photo).map((w) => w.index));
+        recordScan(plan.anchor, p.completedWaypoints.filter((i) => photos.has(i)).length, flownAt);
+      }
       if (kind === "check") return commitNow(); // a first flight check is short: it is simply flown again
       S.resume[kind] = { anchor: plan.anchor, progress: p };
       if (plan.kind === "roof") S.roof.photosTaken = p.completedWaypoints.length;

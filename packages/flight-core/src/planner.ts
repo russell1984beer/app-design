@@ -17,6 +17,12 @@ import type { Mission, MissionEstimate, Waypoint } from "./mission.ts";
 /** Pause at each photo waypoint to stop, steady and shoot. */
 const PHOTO_PAUSE_S = 2;
 
+/**
+ * Shortest time between photos taken on the fly. The Mini 4 Pro's 48 MP photos take about 2 s to
+ * save; a little more keeps the camera free for the next one. Runs are flown slowly enough for it.
+ */
+export const PHOTO_INTERVAL_S = 2.5;
+
 export type GridSettings = {
   /** Height above take-off point, metres. */
   altitudeM: number;
@@ -35,6 +41,13 @@ export type GridSettings = {
   edgeToEdge?: boolean;
   /** Distance between photos along a pass. Defaults to what frontOverlap needs. */
   photoSpacingM?: number;
+  /**
+   * Fly each pass in one smooth run, taking the photos along it without stopping (only the first and
+   * last photo of a pass are taken at a stop), at runSpeedMs.
+   */
+  onTheFly?: boolean;
+  /** Speed along a pass when photos are taken on the fly, m/s. */
+  runSpeedMs?: number;
   camera: CameraSpec;
 };
 
@@ -111,7 +124,8 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
     for (let k = 0; k <= shots; k++) line.push({ x: x0 + ((x1 - x0) * k) / shots, y });
     if (i % 2 === 1) line.reverse();
     const heading = i % 2 === 1 ? normaliseDeg(bearing + 180) : bearing;
-    for (const v of line) {
+    line.forEach((v, k) => {
+      const run = s.onTheFly && k > 0 ? { speedMs: s.runSpeedMs ?? s.speedMs, ...(k < line.length - 1 ? { onTheFly: true } : {}) } : {};
       waypoints.push({
         index: waypoints.length,
         position: fromLocal(origin, rotate(v, alpha)),
@@ -119,8 +133,9 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
         photo: true,
         gimbalPitchDeg: -90,
         headingDeg: heading,
+        ...run,
       });
-    }
+    });
   }
 
   const estimate = estimateMission(waypoints, s.speedMs);
@@ -153,12 +168,19 @@ export function surveySpacing(altitudeM: number, overlap: number): { passM: numb
   };
 }
 
+/** Speed along a survey run: as fast as the camera can keep up with the photo spacing. */
+export function runSpeedMs(photoSpacingM: number, cruiseMs: number): number {
+  return Math.min(cruiseMs, photoSpacingM / PHOTO_INTERVAL_S);
+}
+
 /**
- * The garden survey, fixed to the prototype's flight plan: passes straight across the plot,
- * front to back, the first and last along the end boundaries and the rest evenly between,
- * flown back and forth. Optionally followed by a lap round the edge with the camera tilted, to
- * capture walls, steps and tree heights. Every point stays inside the boundary. The drone takes off
- * from the home point and, when the scan is done, its own Return to Home lands it back there.
+ * The garden survey: smooth runs along the length of the plot (the owner's choice after the first real
+ * scan, which stopped for every photo and blurred some), the first and last along the side boundaries
+ * and the rest evenly between, flown back and forth. Photos along a run are taken on the fly at a
+ * steady speed; the drone only stops at the ends of each run. Optionally followed by a lap round the
+ * edge with the camera tilted, to capture walls, steps and tree heights. Every point stays inside the
+ * boundary. The drone takes off from the home point and, when the scan is done, its own Return to
+ * Home lands it back there.
  */
 export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings> = {}): Mission {
   const s = { ...DEFAULT_SURVEY, ...overrides };
@@ -170,8 +192,10 @@ export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings
     lineSpacingM: gap.passM,
     photoSpacingM: gap.photoM,
     edgeToEdge: true,
-    direction: "across",
+    direction: "along",
     speedMs: s.speedMs,
+    onTheFly: true,
+    runSpeedMs: runSpeedMs(gap.photoM, s.speedMs),
   });
   if (!s.edgeLap) return grid;
 
@@ -280,7 +304,50 @@ export function planFirstFlight(home: LatLng, area: LatLng[], overrides: Partial
   const back: Waypoint = { index: passes.length + 1, position: home, altitudeM: s.altitudeM, photo: false, gimbalPitchDeg: -90 };
   const waypoints = [hover, ...passes.map((w, i) => ({ ...w, index: i + 1 })), back];
   const mission = buildMission("check", waypoints, s.speedMs);
-  return { ...mission, endWith: "land", estimate: { ...mission.estimate, durationS: mission.estimate.durationS + s.holdS } };
+  return { ...mission, endWith: "land" };
+}
+
+export type FilmSettings = {
+  altitudeM: number;
+  /** Camera tilt while filming: -90 straight down, 0 the horizon. */
+  gimbalPitchDeg: number;
+  speedMs: number;
+};
+
+export const DEFAULT_FILM: FilmSettings = { altitudeM: 20, gimbalPitchDeg: -35, speedMs: 2 };
+
+/**
+ * The fly-over film, added after a scan: from `from`, film a slow run to `to` looking ahead, turn
+ * round and film the run back. Both points must be inside the property; the film never leaves the
+ * straight line between them.
+ */
+export function filmWaypoints(from: LatLng, to: LatLng, firstIndex: number, overrides: Partial<FilmSettings> = {}): Waypoint[] {
+  const s = { ...DEFAULT_FILM, ...overrides };
+  const there = bearingDeg(from, to);
+  const back = normaliseDeg(there + 180);
+  const w = (position: LatLng, headingDeg: number, extra: Partial<Waypoint>): Waypoint => ({
+    index: 0,
+    position,
+    altitudeM: s.altitudeM,
+    photo: false,
+    gimbalPitchDeg: s.gimbalPitchDeg,
+    headingDeg,
+    ...extra,
+  });
+  return [
+    // Get into place facing along the run; a moment's hover lets the camera switch to video.
+    w(from, there, { holdS: 2, video: "start" }),
+    w(to, there, { speedMs: s.speedMs }),
+    w(to, back, { holdS: 1 }),
+    w(from, back, { speedMs: s.speedMs, video: "stop" }),
+  ].map((x, i) => ({ ...x, index: firstIndex + i }));
+}
+
+/** The same mission with the fly-over film added after its last waypoint. */
+export function withFilm(mission: Mission, from: LatLng, to: LatLng, overrides: Partial<FilmSettings> = {}): Mission {
+  const film = filmWaypoints(from, to, mission.waypoints.length, { altitudeM: mission.waypoints[mission.waypoints.length - 1]?.altitudeM, ...overrides });
+  const m = buildMission(mission.kind, [...mission.waypoints, ...film], mission.speedMs);
+  return { ...m, endWith: mission.endWith, estimate: { ...mission.estimate, ...m.estimate, photoCount: mission.estimate.photoCount } };
 }
 
 /** A mission from a list of waypoints, with its id and time estimate. */
@@ -290,13 +357,19 @@ export function buildMission(kind: Mission["kind"], waypoints: Waypoint[], speed
 
 function estimateMission(waypoints: Waypoint[], speedMs: number): MissionEstimate {
   let pathLengthM = 0;
+  let flyingS = 0;
   for (let i = 1; i < waypoints.length; i++) {
     const a = waypoints[i - 1];
     const b = waypoints[i];
-    pathLengthM += Math.hypot(distanceM(a.position, b.position), a.altitudeM - b.altitudeM);
+    const leg = Math.hypot(distanceM(a.position, b.position), a.altitudeM - b.altitudeM);
+    pathLengthM += leg;
+    flyingS += leg / (b.speedMs ?? speedMs);
   }
   const photoCount = waypoints.filter((w) => w.photo).length;
-  return { photoCount, pathLengthM, durationS: pathLengthM / speedMs + photoCount * PHOTO_PAUSE_S };
+  // Photos taken on the fly cost no extra time; the others need a stop.
+  const stops = waypoints.filter((w) => w.photo && !w.onTheFly).length;
+  const holds = waypoints.reduce((t, w) => t + (w.holdS ?? 0), 0);
+  return { photoCount, pathLengthM, durationS: flyingS + stops * PHOTO_PAUSE_S + holds };
 }
 
 function longestEdgeBearing(polygon: LatLng[]): number {

@@ -224,6 +224,23 @@ looked wrong.
 | 9. Emergency STOP button | The red STOP button: hovers in place until you choose Resume, Return home or Land here. |  PASS | |
 | 10. Obstacle close by | The app's obstacle stop (a 2 m obstacle fed into the app for 3 seconds): stops, says why, hovers until Resume. | PASS | DJI's simulator has nothing for the drone's sensors to see. |
 
+### Smooth runs and the fly-over film (October 2026)
+
+After the first real scan the garden scan changed: 3 smooth runs along the garden with photos taken
+without stopping, then a short fly-over film. The 10 tests above fly their own small pattern, so check
+the new garden scan itself in the simulator before the next real flight:
+
+1. Drone on the table, propellers off, simulator on (as for the tests).
+2. Scan tab: leave **Real flight** off, tap **Start scan**.
+3. Watch and fill in:
+
+| What to look for | Result | Notes |
+| --- | --- | --- |
+| Each run is flown at a steady walking pace; it only stops at the ends. | | |
+| The photo count goes up while it is moving. | | |
+| After the photos the log says "Filming the fly-over", then later "Fly-over film saved". | | |
+| It comes home and lands. The drone's card has the photos and one video file. | | |
+
 **Not tested in the simulator:**
 
 - **Low battery.** DJI's simulator battery drains too slowly to reach it. The automatic tests

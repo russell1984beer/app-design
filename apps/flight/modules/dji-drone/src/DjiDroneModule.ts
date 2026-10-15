@@ -21,6 +21,8 @@ const NO_DRONE: DjiDroneNative = {
   goTo() {},
   setGimbalPitch() {},
   takePhoto() {},
+  startVideo() {},
+  stopVideo() {},
   hover() {},
   returnHome() {},
   land() {},

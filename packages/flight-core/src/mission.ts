@@ -15,6 +15,15 @@ export type Waypoint = {
   headingDeg?: number;
   /** Hover here this many seconds on arrival (before any photo), e.g. for checks on a first flight. */
   holdS?: number;
+  /**
+   * Take the photo while flying past, without stopping: the drone keeps going towards the next
+   * waypoint that is not on the fly (the end of the run), at a steady speed.
+   */
+  onTheFly?: boolean;
+  /** Speed for the leg to this waypoint, m/s; the mission's speed when not set. */
+  speedMs?: number;
+  /** Start or stop filming on arrival (the fly-over video). */
+  video?: "start" | "stop";
 };
 
 export type Mission = {

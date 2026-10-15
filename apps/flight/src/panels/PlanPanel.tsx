@@ -36,9 +36,10 @@ export function PlanPanel() {
     <View>
       <H2>Flight plan</H2>
       <Lead>
-        The drone takes off from the yellow point, flies {st.passes} passes across the plot from one end to the other, about{" "}
-        {(st.mission.estimate.lineSpacingM ?? 0).toFixed(1)} m apart{s.edgeLap ? ", then a lap round the edge" : ""}, then comes back and lands where it started. It never crosses the property
-        boundary. Tap the map to move the take-off point.
+        The drone takes off from the yellow point and flies {st.passes} smooth runs along the plot, about{" "}
+        {(st.mission.estimate.lineSpacingM ?? 0).toFixed(1)} m apart, taking photos as it goes without stopping{s.edgeLap ? ", then a lap round the edge" : ""}
+        {s.film ? ", then films a fly-over down the garden" : ""}. It comes back and lands where it started, and never crosses the property boundary. Tap the
+        map to move the take-off point.
       </Lead>
       <Stepper label="Flying height" value={s.alt} min={12} max={40} step={1} format={(v) => `${v} m`} onChange={(v) => set(() => (s.alt = v))} />
       <Stepper label="Photo overlap" value={s.ov} min={65} max={85} step={5} format={(v) => `${v}%`} onChange={(v) => set(() => (s.ov = v))} />
@@ -47,6 +48,12 @@ export function PlanPanel() {
         title="Lap round the edge"
         detail="After the passes, fly once round the edge of the plot with the camera tilted, to capture walls, steps and tree heights. Stays inside the boundary"
         onChange={(v) => set(() => (s.edgeLap = v))}
+      />
+      <Check
+        checked={s.film}
+        title="Film a fly-over"
+        detail="After the photos, film a slow run down the middle of the garden towards the house and back (about a minute of video, saved on the drone's card). For watching; the survey uses the photos"
+        onChange={(v) => set(() => (s.film = v))}
       />
       <Check checked={false} disabled title="RTK positioning" detail="Centimetre-level GPS for contractor-grade levels. Needs the Matrice 4E; the Mini 4 Pro does not have it" />
       <Stats items={surveyStatItems()} />

@@ -12,7 +12,9 @@ import dji.sdk.keyvalue.key.ProductKey
 import dji.sdk.keyvalue.key.RemoteControllerKey
 import dji.sdk.keyvalue.value.camera.CameraMode
 import dji.sdk.keyvalue.value.camera.GeneratedMediaFileInfo
+import dji.sdk.keyvalue.value.common.Attitude
 import dji.sdk.keyvalue.value.common.EmptyMsg
+import dji.sdk.keyvalue.value.common.Velocity3D
 import dji.sdk.keyvalue.value.common.LocationCoordinate2D
 import dji.sdk.keyvalue.value.common.LocationCoordinate3D
 import dji.sdk.keyvalue.value.flightcontroller.FailsafeAction
@@ -93,6 +95,9 @@ class DroneController(
   private var obstacleRaw: String = "-"
   /** Photos that still fit on the drone's storage (the card, or its own memory without one). */
   private var photosLeft: Int? = null
+  /** Speed (north, east, down, m/s) and attitude, so photos at a stop wait until the drone is still and level. */
+  private var velocity: Velocity3D? = null
+  private var attitude: Attitude? = null
   private var virtualStickEnabled = false
   private var authority: FlightControlAuthority? = null
 
@@ -197,6 +202,8 @@ class DroneController(
     listen(FlightControllerKey.KeyIsFlying) { if (it != null) isFlying = it }
     listen(FlightControllerKey.KeyAreMotorsOn) { if (it != null) motorsOn = it }
     listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
+    listen(FlightControllerKey.KeyAircraftVelocity) { velocity = it }
+    listen(FlightControllerKey.KeyAircraftAttitude) { attitude = it }
     listen(FlightControllerKey.KeyWindSpeed) { windSpeed = it }
     listen(FlightControllerKey.KeyWindDirection) { windDirection = it }
     listen(FlightControllerKey.KeyWindWarning) { windWarning = it }
@@ -391,6 +398,39 @@ class DroneController(
         photoFailed(waypointIndex, e.text())
       } else {
         photo.shutterFired = true
+      }
+    }
+  }
+
+  /**
+   * The fly-over film: camera to video, then record. A failure is reported but never stops the flight
+   * (the film is extra; the survey photos are already taken).
+   */
+  fun startVideo() = scheduler.post {
+    if (!sdkReady()) return@post
+    set(CameraKey.KeyCameraMode, CameraMode.VIDEO_NORMAL) { e ->
+      if (e != null) {
+        status("warning", "Could not switch the camera to video, so no fly-over film: ${e.text()}")
+      } else {
+        // The camera takes a moment to change mode before it will record.
+        scheduler.postDelayed(VIDEO_MODE_SETTLE_MS) {
+          action(CameraKey.KeyStartRecord) { e2 ->
+            if (e2 != null) status("warning", "Could not start the fly-over film: ${e2.text()}")
+            else status("filming", "Filming the fly-over.")
+          }
+        }
+      }
+    }
+  }
+
+  /** Stop recording and switch the camera back to photos. */
+  fun stopVideo() = scheduler.post {
+    if (!sdkReady()) return@post
+    action(CameraKey.KeyStopRecord) { e ->
+      if (e != null) status("warning", "Could not stop the fly-over film: ${e.text()}")
+      else status("filmed", "Fly-over film saved on the drone's card.")
+      set(CameraKey.KeyCameraMode, CameraMode.PHOTO_NORMAL) { e2 ->
+        if (e2 != null) status("warning", "Could not switch the camera back to photos: ${e2.text()}")
       }
     }
   }
@@ -721,6 +761,8 @@ class DroneController(
         // Only a fresh reading counts: old distances say nothing about what is there now.
         "obstacleM" to (if (now - obstacleAtMs <= OBSTACLE_FRESH_MS) obstacleM else null),
         "photosLeft" to photosLeft,
+        "speedMs" to velocity?.let { kotlin.math.hypot(it.x, it.y) },
+        "tiltDeg" to attitude?.let { maxOf(kotlin.math.abs(it.pitch), kotlin.math.abs(it.roll)) },
         "headingDeg" to compassHeading,
         "productType" to productType,
         "djiFlightMode" to djiFlightMode?.name,
@@ -807,6 +849,7 @@ class DroneController(
     const val TAG = "DjiDrone"
     const val TICK_MS = 100L
     const val PHOTO_TIMEOUT_MS = 5000L
+    const val VIDEO_MODE_SETTLE_MS = 1000L
     const val TAKEOFF_WAIT_MS = 30_000L
     const val HANDOVER_WAIT_MS = 5_000L
     const val HOME_POINT_TRIES = 20
