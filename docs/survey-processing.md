@@ -90,6 +90,18 @@ guessed, and the photo is grey where the drone has not flown. When the scan is f
   npm run survey -- --odm "C:\Surveys\2026-10-09\plotwise-processing\project" --scan "C:\Surveys\2026-10-09\plotwise-scan-2026-10-09.json"
   ```
 
+- **The photo looks twisted** (fences slanting) **or shifted** (the house line on the roof): the
+  garden direction on the phone, or the drone's take-off GPS, was out. Run the lining-up again with
+  corrections, without reprocessing:
+  - `--bearing 118`: the garden's true direction in degrees (Plan tab > Rear garden faces). Change
+    it on the phone too, so the flight lines match the garden.
+  - `--back 4.5`: move the outline that many metres towards the far end of the garden (negative:
+    towards the street).
+  - `--side 1`: move it towards the right-hand fence, looking down the garden from the house
+    (negative: the left).
+
+  The first real scan (14 October 2026) needed `--bearing 118 --back 4.5`.
+
 ## How accurate is it?
 
 - **Levels** (rises and falls across the garden) come out to within a few centimetres.

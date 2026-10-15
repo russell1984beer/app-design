@@ -27,7 +27,8 @@ export const TEST_PLOT: Plot = {
   houseWidthM: 5.8,
   ridgeHeightM: 8.5,
   roofPitchDeg: 35,
-  gardenBearingDeg: 128,
+  // The title plan's north arrow gave 128; the first drone survey (14 Oct 2026) showed 118.
+  gardenBearingDeg: 118,
   latitudeDeg: 50.86,
 };
 

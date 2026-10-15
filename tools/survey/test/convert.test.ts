@@ -6,9 +6,9 @@ import { join } from "node:path";
 import { writeArrayBuffer } from "geotiff";
 import jpeg from "jpeg-js";
 
-import { fromLocal } from "../../../packages/flight-core/src/geo.ts";
+import { bearingDeg, distanceM, fromLocal } from "../../../packages/flight-core/src/geo.ts";
 import { TEST_PLOT, gridHeight, planToEastNorth, readSurvey, type ScanDetails } from "../../../packages/garden-core/src/index.ts";
-import { makeSurvey, readScan } from "../src/convert.ts";
+import { adjustScan, makeSurvey, readScan } from "../src/convert.ts";
 import { latLngToUtm, projectionFor, utmZone } from "../src/utm.ts";
 
 const anchor = { lat: 52.0, lng: -1.0 };
@@ -117,6 +117,19 @@ test("conversion: the aerial photo is cut to the plot with the far end at the to
   const px = (x: number, y: number) => Array.from(img.data.subarray((y * img.width + x) * 4, (y * img.width + x) * 4 + 3));
   assert.ok(px(140, 100)[0] > 150 && px(140, 100)[2] < 80, "top is the far end (red)");
   assert.ok(px(140, 1600)[2] > 150 && px(140, 1600)[0] < 80, "bottom is the street end (blue)");
+});
+
+test("line-up correction: new garden direction, outline moved back and sideways", () => {
+  const turned = adjustScan(scan, { bearingDeg: 118 });
+  assert.equal(turned.plot.gardenBearingDeg, 118);
+  assert.deepEqual(turned.anchor, anchor);
+  const back = adjustScan(scan, { bearingDeg: 118, backM: 4.5 }).anchor;
+  assert.ok(Math.abs(distanceM(anchor, back) - 4.5) < 0.01);
+  assert.ok(Math.abs(bearingDeg(anchor, back) - 118) < 0.5, "towards the far end of the garden");
+  const side = adjustScan(scan, { bearingDeg: 118, sideM: 2 }).anchor;
+  assert.ok(Math.abs(distanceM(anchor, side) - 2) < 0.01);
+  assert.ok(Math.abs(bearingDeg(anchor, side) - 208) < 0.5, "towards the right-hand fence");
+  assert.equal(scan.plot.gardenBearingDeg, TEST_PLOT.gardenBearingDeg, "the original is left alone");
 });
 
 test("scan details file: checked before use", () => {

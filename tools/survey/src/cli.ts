@@ -1,18 +1,35 @@
 // npm run survey -- --photos <folder of drone photos> --scan <plotwise-scan-….json>
 // Optional: --out <file>   where to save the survey (default: next to the scan details file)
 //           --odm <folder> skip processing and use an OpenDroneMap project that is already done
+//           --bearing <deg>  the garden's true compass direction, if the phone's setting was out
+//           --back <m>, --side <m>  move the plot outline towards the far end / right-hand fence (GPS was out)
 
 import { createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { makeSurvey, readScan } from "./convert.ts";
+import { adjustScan, makeSurvey, readScan } from "./convert.ts";
 import { checkDocker, listPhotos, odmOutputs, runOdm } from "./odm.ts";
 
 const { values } = parseArgs({
-  options: { photos: { type: "string" }, scan: { type: "string" }, out: { type: "string" }, odm: { type: "string" } },
+  options: {
+    photos: { type: "string" },
+    scan: { type: "string" },
+    out: { type: "string" },
+    odm: { type: "string" },
+    bearing: { type: "string" },
+    back: { type: "string" },
+    side: { type: "string" },
+  },
 });
+
+function number(name: string, text: string | undefined): number | undefined {
+  if (text === undefined) return undefined;
+  const v = Number(text);
+  if (!Number.isFinite(v)) fail(`--${name} needs a number, for example --${name} 4.5`);
+  return v;
+}
 
 function fail(message: string): never {
   console.error(`\nSTOPPED: ${message}\n`);
@@ -23,7 +40,11 @@ async function main() {
   if (!values.scan) fail("Say where the scan details file is: --scan \"C:\\...\\plotwise-scan-....json\"");
   if (!values.photos && !values.odm) fail("Say where the drone photos are: --photos \"C:\\...\\photos folder\"");
   const scanPath = resolve(values.scan);
-  const scan = readScan(await readFile(scanPath, "utf8"));
+  const adjust = { bearingDeg: number("bearing", values.bearing), backM: number("back", values.back), sideM: number("side", values.side) };
+  const scan = adjustScan(readScan(await readFile(scanPath, "utf8")), adjust);
+  if (Object.values(adjust).some((v) => v !== undefined)) {
+    console.log(`Lining up with the garden at ${scan.plot.gardenBearingDeg}°, outline moved ${adjust.backM ?? 0} m back and ${adjust.sideM ?? 0} m sideways.`);
+  }
 
   let project: string;
   let photoCount = scan.photoCount;
