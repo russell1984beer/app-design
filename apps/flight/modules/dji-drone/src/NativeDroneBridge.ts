@@ -103,7 +103,9 @@ export class NativeDroneBridge implements DroneBridge {
     if (t.aircraftConnected === false) return "Controller connected, but not the drone. Switch the drone on and wait for the controller to link to it.";
     if (t.lat == null)
       return "Drone connected, but it has no GPS position yet. Outdoors: put it on open ground away from the house and wait a minute or two. Indoors: use the simulator.";
-    if (!t.signalOk) return "Drone connected, waiting for a steady signal.";
+    // Connected, but the position has stopped updating: indoors (no satellites) after being outside.
+    if (!t.signalOk)
+      return "Drone connected, but its GPS position has stopped updating (no satellites indoors). Indoors: tap Start simulator. Outdoors: wait in the open, away from the house.";
     return "Drone and controller connected.";
   }
 
