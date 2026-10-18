@@ -113,7 +113,8 @@ function Shell() {
           </View>
         </View>
         <View style={[styles.panel, wide ? { width: panelWidth, maxHeight: undefined, borderTopRightRadius: 0 } : { maxHeight: height * 0.46 }]}>
-          <ScrollView contentContainerStyle={{ padding: 18, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
+          {/* A fresh scroll view per tab, so each tab opens at the top rather than where the last one was left. */}
+          <ScrollView key={s.tab} contentContainerStyle={{ padding: 18, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
             <Panel />
           </ScrollView>
         </View>
