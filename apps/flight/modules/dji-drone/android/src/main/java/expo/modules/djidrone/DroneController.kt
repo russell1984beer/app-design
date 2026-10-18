@@ -861,7 +861,11 @@ class DroneController(
       mapOf("type" to "photoFailed", "waypointIndex" to index, "reason" to if (photosLeft == 0) "the drone's storage is full ($reason)" else reason),
     )
 
-  private fun status(kind: String, message: String) = emit("onStatus", mapOf("kind" to kind, "message" to message))
+  // Also in the phone's log: on 18 Oct the drone went home by itself and the reason was only on screen.
+  private fun status(kind: String, message: String) {
+    Log.i(TAG, "Status [$kind]: $message")
+    emit("onStatus", mapOf("kind" to kind, "message" to message))
+  }
 
   // ---- DJI key helpers ---------------------------------------------------------------------------
 
