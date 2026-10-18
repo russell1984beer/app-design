@@ -16,6 +16,7 @@ import { parseArcGrid, parseTiff, type Raster } from "../../../packages/garden-c
 import type { Pt } from "../../../packages/garden-core/src/index.ts";
 
 import type { LidarSite } from "./lidarMath";
+import { HOME_PROJECT_ID, currentProject } from "./store";
 
 export { aboveSeaLevelM, fillGapsFromLidar, lidarSurvey, obstacleHeights, takeoffOffset, type LidarSite, type TakeoffOffset } from "./lidarMath";
 
@@ -177,8 +178,20 @@ export function lidarFor(anchor: LatLng | null): LidarSite | null {
   return site;
 }
 
+/** A postcode's middle can be this far from the property itself. */
+const POSTCODE_REACH_M = 300;
+
+/**
+ * The LIDAR for the open project: only if it was fetched there. The phone keeps one site, fetched on
+ * the owner's own flights; another property must not show its levels. (The first project, the owner's
+ * own, always used it before projects had locations.)
+ */
 export function currentLidar(): LidarSite | null {
-  return site;
+  if (!site) return null;
+  const p = currentProject();
+  if (p.id === HOME_PROJECT_ID) return site;
+  const at = p.corners?.[0] ?? p.postcodeAt;
+  return at && distanceM(at, site.anchor) <= POSTCODE_REACH_M ? site : null;
 }
 
 /** Why there is no LIDAR for this take-off point yet: still fetching, or the error. */

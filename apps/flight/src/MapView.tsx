@@ -48,7 +48,7 @@ import {
 
 import { SIM_HOME, drone, useDrone } from "./drone";
 import { firstFlightMission, gpsToPlan, missionOnPlan, planToGps, roofScan, surveyMission } from "./flight";
-import { S, commit, history, nextId, sn, useApp, type AppState } from "./store";
+import { HOME_PROJECT_ID, S, commit, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
 import { aboveSeaLevelM, currentLidar } from "./lidar";
 import { MAX_ZOOM, NO_ZOOM, fit, toPlan, zoomAt, zoomedView, type Zoom } from "./mapZoom";
@@ -573,9 +573,9 @@ function photoLayer(s: AppState, px: (n: number) => number) {
     <G clipPath="url(#gclip)">
       <Rect width={W} height={H} fill="#7E9C60" />
       <Rect width={W} height={H} fill="url(#grassP)" />
-      {/* What is already in the garden, where the first drone survey showed it. */}
+      {/* What is already in the owner's garden, where the first drone survey showed it (other properties: none yet). */}
       {/* Only drawn, never saved, so no real ids: the list's fixed order gives the keys. */}
-      {existingFeatures(s.plot, () => 0).map((it, i) =>
+      {(s.projectId === HOME_PROJECT_ID ? existingFeatures(s.plot, () => 0) : []).map((it, i) =>
         itemShape(it, it.kind === "tree" ? "url(#canopy)" : fillOf(it), { stroke: KINDS[it.kind].stroke, strokeWidth: px(1) }, undefined, `e${i}`),
       )}
       <Rect x={0} y={GH + HD} width={W} height={H - GH - HD} fill="#B9B5AC" />

@@ -11,7 +11,6 @@ export function ProjectsPanel() {
   const p = currentProject();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [newName, setNewName] = useState("");
 
   async function run(task: () => Promise<unknown>, ok?: string) {
     setBusy(true);
@@ -40,8 +39,15 @@ export function ProjectsPanel() {
           onPress={() => run(() => openProject(x.id))}
         />
       ))}
-      <Field label="New project name" value={newName} placeholder="e.g. 12 High Street" onCommit={setNewName} />
-      <Btn label="Add a project" alt disabled={busy} onPress={() => run(() => addProject(newName).then(() => setNewName("")), "Project added and opened.")} />
+      {/* Added straight from the name box: a separate button could act before the typed name arrived. */}
+      <Field
+        label="Add a project: type its name and press the tick"
+        value=""
+        placeholder="e.g. 12 High Street"
+        onCommit={(v) => {
+          if (v.trim() && !busy) run(() => addProject(v), "Project added and opened.");
+        }}
+      />
 
       <H2 small>{p.name}</H2>
       <Field label="Name" value={p.name} onCommit={renameProject} />
