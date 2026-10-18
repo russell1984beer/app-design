@@ -24,6 +24,8 @@ export type AppState = {
   edgeLap: boolean;
   /** Film a fly-over after the photos (garden scan only). */
   film: boolean;
+  /** Photos along each run of the garden scan; null: the recommended number. */
+  photosPerRun: number | null;
   safety: SafetySettings;
   /** Operator ID, airspace, neighbours. Ticked again before every flight. */
   checks: boolean[];
@@ -78,6 +80,7 @@ export const S: AppState = {
   ov: 75,
   edgeLap: false,
   film: true,
+  photosPerRun: null,
   safety: DEFAULT_SAFETY,
   checks: [false, false, false],
   mode: "sim",
@@ -126,7 +129,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "safety", "scanned", "items", "nextId", "existInit", "existVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "safety", "scanned", "items", "nextId", "existInit", "existVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();

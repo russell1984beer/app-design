@@ -46,8 +46,10 @@ export type GridSettings = {
    * last photo of a pass are taken at a stop), at runSpeedMs.
    */
   onTheFly?: boolean;
-  /** Speed along a pass when photos are taken on the fly, m/s. */
+  /** Speed along a pass when photos are taken on the fly, m/s. Default: as fast as the camera keeps up. */
   runSpeedMs?: number;
+  /** Exactly this many photos along each pass (first and last at its ends); overrides photoSpacingM. */
+  photosPerPass?: number;
   camera: CameraSpec;
 };
 
@@ -119,13 +121,14 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
     if (xs.length < 2) continue;
     const x0 = Math.min(...xs);
     const x1 = Math.max(...xs);
-    const shots = Math.max(1, Math.ceil((x1 - x0) / photoSpacing));
+    const shots = s.photosPerPass ? Math.max(1, Math.round(s.photosPerPass) - 1) : Math.max(1, Math.ceil((x1 - x0) / photoSpacing));
     const line: Vec2[] = [];
     for (let k = 0; k <= shots; k++) line.push({ x: x0 + ((x1 - x0) * k) / shots, y });
     if (i % 2 === 1) line.reverse();
     const heading = i % 2 === 1 ? normaliseDeg(bearing + 180) : bearing;
+    const runSpeed = s.runSpeedMs ?? runSpeedMs((x1 - x0) / shots, s.speedMs);
     line.forEach((v, k) => {
-      const run = s.onTheFly && k > 0 ? { speedMs: s.runSpeedMs ?? s.speedMs, ...(k < line.length - 1 ? { onTheFly: true } : {}) } : {};
+      const run = s.onTheFly && k > 0 ? { speedMs: runSpeed, ...(k < line.length - 1 ? { onTheFly: true } : {}) } : {};
       waypoints.push({
         index: waypoints.length,
         position: fromLocal(origin, rotate(v, alpha)),
@@ -156,7 +159,31 @@ export type SurveySettings = {
   edgeLap: boolean;
   edgePhotoCount: number;
   edgeGimbalPitchDeg: number;
+  /** Photos along each run, chosen by the owner; undefined: the recommended number for the overlap. */
+  photosPerRun?: number;
 };
+
+/** Fewer photos than this front overlap leaves gaps the survey cannot join. */
+export const MIN_FRONT_OVERLAP = 0.6;
+/** Photos closer than this would mean crawling along the runs (under 0.4 m/s). */
+export const MIN_PHOTO_SPACING_M = 1;
+
+/**
+ * The choice of photos per run for the garden survey: the recommended number (from the overlap), and
+ * the fewest (MIN_FRONT_OVERLAP) and most (MIN_PHOTO_SPACING_M) that make sense. Per run; multiply by
+ * `runs` for the whole flight.
+ */
+export function surveyPhotoChoice(boundary: LatLng[], overrides: Partial<SurveySettings> = {}): { recommended: number; min: number; max: number; runs: number } {
+  const s = { ...DEFAULT_SURVEY, ...overrides };
+  const plan = planSurvey(boundary, { ...overrides, photosPerRun: undefined, edgeLap: false });
+  const runs = plan.estimate.passCount ?? 1;
+  const recommended = Math.round(plan.estimate.photoCount / runs);
+  const runLengthM = distanceM(plan.waypoints[0].position, plan.waypoints[recommended - 1].position);
+  const along = footprintM(MINI_4_PRO, s.altitudeM).height;
+  const min = Math.min(recommended, Math.max(2, Math.ceil(runLengthM / (along * (1 - MIN_FRONT_OVERLAP))) + 1));
+  const max = Math.max(recommended, Math.floor(runLengthM / MIN_PHOTO_SPACING_M) + 1);
+  return { recommended, min, max, runs };
+}
 
 export const DEFAULT_SURVEY: SurveySettings = { altitudeM: 20, overlap: 0.75, speedMs: 4, edgeLap: false, edgePhotoCount: 24, edgeGimbalPitchDeg: -60 };
 
@@ -195,7 +222,7 @@ export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings
     direction: "along",
     speedMs: s.speedMs,
     onTheFly: true,
-    runSpeedMs: runSpeedMs(gap.photoM, s.speedMs),
+    photosPerPass: s.photosPerRun,
   });
   if (!s.edgeLap) return grid;
 

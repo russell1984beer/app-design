@@ -4,7 +4,7 @@ import { MINI_4_PRO_MAX_WIND_MS, UK_MAX_ALTITUDE_M, validateSettings, type Signa
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
 import { canFly } from "../../modules/dji-drone";
-import { surveyStats } from "../flight";
+import { photoChoice, surveyStats } from "../flight";
 import { S, commit, go, useApp } from "../store";
 import { Btn, Check, H2, Lead, Note, Seg, Stats, Status, Stepper } from "../ui";
 
@@ -27,6 +27,8 @@ export function surveyStatItems(): [string, string][] {
 export function PlanPanel() {
   const s = useApp();
   const st = surveyStats(s);
+  const pc = photoChoice(s);
+  const perRun = Math.min(pc.max, Math.max(pc.min, s.photosPerRun ?? pc.recommended));
   const settingIssues = validateSettings(s.safety).filter((i) => i.status !== "pass");
   const set = (fn: () => void) => {
     fn();
@@ -43,6 +45,26 @@ export function PlanPanel() {
       </Lead>
       <Stepper label="Flying height" value={s.alt} min={12} max={40} step={1} format={(v) => `${v} m`} onChange={(v) => set(() => (s.alt = v))} />
       <Stepper label="Photo overlap" value={s.ov} min={65} max={85} step={5} format={(v) => `${v}%`} onChange={(v) => set(() => (s.ov = v))} />
+      <Stepper
+        label={`Photos per flight${perRun === pc.recommended ? " (recommended)" : ""}`}
+        value={perRun * pc.runs}
+        min={pc.min * pc.runs}
+        max={pc.max * pc.runs}
+        step={pc.runs}
+        format={(v) => `${v}`}
+        onChange={(v) =>
+          set(() => {
+            const n = Math.round(v / pc.runs);
+            s.photosPerRun = n === pc.recommended ? null : n;
+          })
+        }
+      />
+      <Note>
+        Recommended: {pc.recommended * pc.runs} photos ({pc.recommended} on each of the {pc.runs} runs). Fewer is a quicker flight but the survey has less to work
+        with; more gives more detail but the drone flies the runs more slowly. Between {pc.min * pc.runs} and {pc.max * pc.runs}.
+        {s.edgeLap ? " The lap round the edge adds its own photos." : ""}
+      </Note>
+      {s.photosPerRun !== null && <Btn label="Use the recommended number" alt onPress={() => set(() => (s.photosPerRun = null))} />}
       <Check
         checked={s.edgeLap}
         title="Lap round the edge"
@@ -51,8 +73,8 @@ export function PlanPanel() {
       />
       <Check
         checked={s.film}
-        title="Film a fly-over"
-        detail="After the photos, film a slow run down the middle of the garden towards the house and back (about a minute of video, saved on the drone's card). For watching; the survey uses the photos"
+        title="Record a video of the flight (recommended)"
+        detail="After the photos, the drone films a slow run down the middle of the garden towards the house and back: about a minute of video, saved on the drone's card. The Mini 4 Pro cannot film and take the survey photos at the same time, so the video comes at the end. Untick for photos only"
         onChange={(v) => set(() => (s.film = v))}
       />
       <Check checked={false} disabled title="RTK positioning" detail="Centimetre-level GPS for contractor-grade levels. Needs the Matrice 4E; the Mini 4 Pro does not have it" />

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { MINI_4_PRO, footprintM, gsdCm } from "../src/camera.ts";
 import { areaM2, distanceM, distanceToPolygonM } from "../src/geo.ts";
-import { DEFAULT_GRID, planGrid, planOrbit, planSurvey, withFilm } from "../src/planner.ts";
+import { DEFAULT_GRID, PHOTO_INTERVAL_S, planGrid, planOrbit, planSurvey, surveyPhotoChoice, withFilm } from "../src/planner.ts";
 import {
   DEFAULT_SAFETY,
   batteryNeededToReturn,
@@ -98,12 +98,14 @@ test("survey: smooth runs along the garden, edge to edge, photos on the fly, ins
   // Each run spans the 43 m length with a photo every 2.5 m or less: 19 photos.
   assert.equal(m.waypoints.length, 3 * 19);
   // Only the two ends of each run are stops; the photos between are taken on the fly, slowly
-  // enough for the camera (2.5 m apart, one every 2.5 s: 1 m/s).
+  // enough for the camera (about 2.4 m apart, one every 2.5 s: just under 1 m/s).
   const runs = [0, 1, 2].map((r) => m.waypoints.slice(r * 19, (r + 1) * 19));
   for (const run of runs) {
     assert.ok(!run[0].onTheFly && !run[18].onTheFly, "stops at both ends");
     assert.ok(run.slice(1, 18).every((w) => w.onTheFly), "no stops in between");
-    assert.ok(run.slice(1).every((w) => Math.abs(w.speedMs! - 1) < 1e-9));
+    const gap = distanceM(run[0].position, run[1].position);
+    assert.ok(run.slice(1).every((w) => Math.abs(w.speedMs! - gap / PHOTO_INTERVAL_S) < 1e-3), `${run[1].speedMs}`);
+    assert.ok(run[1].speedMs! > 0.9 && run[1].speedMs! <= 1);
     assert.equal(run[0].speedMs, undefined, "gets to the start of a run at the normal speed");
   }
   // Back and forth along the plot's length (it runs at 135°).
@@ -112,6 +114,22 @@ test("survey: smooth runs along the garden, edge to edge, photos on the fly, ins
   m.waypoints.forEach((w, i) => assert.equal(w.index, i));
   // 3 runs of 43 m at 1 m/s plus 6 stops: about 2.5 minutes, not counting take-off and return.
   assert.ok(m.estimate.durationS > 130 && m.estimate.durationS < 170, `${m.estimate.durationS}`);
+});
+
+test("photos per flight: the owner's number, with the recommended one and sensible limits", () => {
+  const c = surveyPhotoChoice(PLOT);
+  assert.deepEqual([c.runs, c.recommended], [3, 19]);
+  // At least 60% overlap along a run (21 m long footprint at 20 m), at most one photo a metre.
+  assert.ok(c.min >= 4 && c.min < c.recommended, `min ${c.min}`);
+  assert.equal(c.max, 44);
+  const fewer = planSurvey(PLOT, { photosPerRun: 10 });
+  assert.equal(fewer.estimate.photoCount, 30);
+  // Fewer photos further apart: the camera keeps up at a faster pace, so a shorter flight.
+  assert.ok(fewer.waypoints[1].speedMs! > planSurvey(PLOT).waypoints[1].speedMs!);
+  assert.ok(fewer.estimate.durationS < planSurvey(PLOT).estimate.durationS);
+  const more = planSurvey(PLOT, { photosPerRun: 30 });
+  assert.equal(more.estimate.photoCount, 90);
+  assert.ok(more.waypoints.every((w) => distanceToPolygonM(w.position, PLOT) < 1e-6));
 });
 
 test("fly-over film: there and back between two points inside the plot, filming only on the way", () => {

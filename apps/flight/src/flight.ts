@@ -5,7 +5,7 @@ import type { Telemetry } from "../../../packages/flight-core/src/bridge.ts";
 import { gsdCm, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
 import { fromLocal, toLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
-import { planFirstFlight, planSurvey, withFilm } from "../../../packages/flight-core/src/planner.ts";
+import { planFirstFlight, planSurvey, surveyPhotoChoice, withFilm } from "../../../packages/flight-core/src/planner.ts";
 import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/roof.ts";
 import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
 import { eastNorthToPlan, planToEastNorth, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
@@ -60,8 +60,16 @@ export function roofPlan(s: AppState): Pt[] {
   return [[0, GH], [HW, GH], [HW, GH + HD], [0, GH + HD]];
 }
 
+/** How many photos per run the owner can choose, and the recommended number, at the current settings. */
+export function photoChoice(s: AppState) {
+  return surveyPhotoChoice(plotGps(s, SIM_HOME), { altitudeM: s.alt, overlap: s.ov / 100 });
+}
+
 export function surveyMission(s: AppState, anchor: LatLng): Mission {
-  const scan = planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap });
+  const c = s.photosPerRun === null ? null : photoChoice(s);
+  // A chosen number stays within what makes sense at the current height (it changes the limits).
+  const photosPerRun = c ? Math.min(c.max, Math.max(c.min, s.photosPerRun!)) : undefined;
+  const scan = planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap, photosPerRun });
   if (!s.film) return scan;
   // The fly-over film: down the middle of the garden from the far end to just short of the house,
   // looking ahead, then back. It stays over the owner's own garden.

@@ -365,8 +365,8 @@ test("smooth survey: photos along each run are taken on the fly, the ends at a s
   for (let i = 0; i < sim.photos.length; i++) {
     const w = mission.waypoints[sim.photos[i].waypointIndex];
     assert.ok(distanceM(sim.photos[i].position, w.position) < 0.6, `photo ${w.index} taken ${distanceM(sim.photos[i].position, w.position).toFixed(2)} m from its spot`);
-    // On the fly at the run's steady 1 m/s; at the ends only once still.
-    if (w.onTheFly) assert.ok(Math.abs(sim.photoSpeeds[i] - 1) < 0.05, `photo ${w.index} at ${sim.photoSpeeds[i]} m/s`);
+    // On the fly at the run's steady pace (just under 1 m/s); at the ends only once still.
+    if (w.onTheFly) assert.ok(Math.abs(sim.photoSpeeds[i] - w.speedMs!) < 0.05, `photo ${w.index} at ${sim.photoSpeeds[i]} m/s`);
     else assert.ok(sim.photoSpeeds[i] < 0.05, `photo ${w.index} waited until the drone was still`);
   }
   assert.ok(distanceM(sim.telemetry().position, home) < 1);
