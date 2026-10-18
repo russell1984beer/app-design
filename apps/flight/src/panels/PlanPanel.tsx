@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
 import { MINI_4_PRO_MAX_WIND_MS, UK_MAX_ALTITUDE_M, validateSettings, type SignalLossAction } from "../../../../packages/flight-core/src/safety.ts";
+import { PHOTO_INTERVAL_S } from "../../../../packages/flight-core/src/planner.ts";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
 import { canFly } from "../../modules/dji-drone";
@@ -65,6 +66,19 @@ export function PlanPanel() {
         {s.edgeLap ? " The lap round the edge adds its own photos." : ""}
       </Note>
       {s.photosPerRun !== null && <Btn label="Use the recommended number" alt onPress={() => set(() => (s.photosPerRun = null))} />}
+      <Stepper
+        label={`Time between photos${s.photoIntervalS === PHOTO_INTERVAL_S ? " (recommended)" : ""}`}
+        value={s.photoIntervalS}
+        min={2}
+        max={8}
+        step={0.5}
+        format={(v) => `${v} s`}
+        onChange={(v) => set(() => (s.photoIntervalS = v))}
+      />
+      <Note>
+        The drone flies each run slowly enough to give the camera this long to save each photo, so it never has to stop. {PHOTO_INTERVAL_S} s suits a fast (U3 / V30)
+        memory card. A slow card needs more: a card that takes about 4 s per photo needs 5 s here. Longer means a longer flight.
+      </Note>
       <Check
         checked={s.edgeLap}
         title="Lap round the edge"

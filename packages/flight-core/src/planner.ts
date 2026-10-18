@@ -50,6 +50,8 @@ export type GridSettings = {
   runSpeedMs?: number;
   /** Exactly this many photos along each pass (first and last at its ends); overrides photoSpacingM. */
   photosPerPass?: number;
+  /** Seconds between photos on the fly (the memory card's save time, with a margin). Default PHOTO_INTERVAL_S. */
+  photoIntervalS?: number;
   camera: CameraSpec;
 };
 
@@ -126,7 +128,7 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
     for (let k = 0; k <= shots; k++) line.push({ x: x0 + ((x1 - x0) * k) / shots, y });
     if (i % 2 === 1) line.reverse();
     const heading = i % 2 === 1 ? normaliseDeg(bearing + 180) : bearing;
-    const runSpeed = s.runSpeedMs ?? runSpeedMs((x1 - x0) / shots, s.speedMs);
+    const runSpeed = s.runSpeedMs ?? runSpeedMs((x1 - x0) / shots, s.speedMs, s.photoIntervalS);
     line.forEach((v, k) => {
       const run = s.onTheFly && k > 0 ? { speedMs: runSpeed, ...(k < line.length - 1 ? { onTheFly: true } : {}) } : {};
       waypoints.push({
@@ -161,6 +163,8 @@ export type SurveySettings = {
   edgeGimbalPitchDeg: number;
   /** Photos along each run, chosen by the owner; undefined: the recommended number for the overlap. */
   photosPerRun?: number;
+  /** Seconds between photos along a run: longer for a slow memory card (the drone flies slower). */
+  photoIntervalS?: number;
 };
 
 /** Fewer photos than this front overlap leaves gaps the survey cannot join. */
@@ -196,8 +200,8 @@ export function surveySpacing(altitudeM: number, overlap: number): { passM: numb
 }
 
 /** Speed along a survey run: as fast as the camera can keep up with the photo spacing. */
-export function runSpeedMs(photoSpacingM: number, cruiseMs: number): number {
-  return Math.min(cruiseMs, photoSpacingM / PHOTO_INTERVAL_S);
+export function runSpeedMs(photoSpacingM: number, cruiseMs: number, photoIntervalS = PHOTO_INTERVAL_S): number {
+  return Math.min(cruiseMs, photoSpacingM / photoIntervalS);
 }
 
 /**
@@ -223,6 +227,7 @@ export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings
     speedMs: s.speedMs,
     onTheFly: true,
     photosPerPass: s.photosPerRun,
+    photoIntervalS: s.photoIntervalS,
   });
   if (!s.edgeLap) return grid;
 

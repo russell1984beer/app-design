@@ -69,7 +69,7 @@ export function surveyMission(s: AppState, anchor: LatLng): Mission {
   const c = s.photosPerRun === null ? null : photoChoice(s);
   // A chosen number stays within what makes sense at the current height (it changes the limits).
   const photosPerRun = c ? Math.min(c.max, Math.max(c.min, s.photosPerRun!)) : undefined;
-  const scan = planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap, photosPerRun });
+  const scan = planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap, photosPerRun, photoIntervalS: s.photoIntervalS });
   if (!s.film) return scan;
   // The fly-over film: down the middle of the garden from the far end to just short of the house,
   // looking ahead, then back. It stays over the owner's own garden.

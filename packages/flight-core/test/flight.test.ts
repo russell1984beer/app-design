@@ -399,6 +399,20 @@ test("slow memory card: photos the camera is too busy for are taken at a stop, a
   assert.ok(!session.log.some((l) => /camera busy\)/.test(l)), "never refused by a busy camera");
 });
 
+test("slow memory card with a longer time between photos: the drone flies slower and never stops for them", () => {
+  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
+  const mission = planSurvey(PLOT, { photoIntervalS: 5 });
+  const sim = new SimDrone({ home, photoSaveS: 4 });
+  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  session.start();
+  run(sim, session, { until: landed(sim, session), maxS: 3600 });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(sim.photos.length, mission.waypoints.length);
+  assert.ok(!session.log.some((l) => /camera still busy/.test(l)), "no photo had to wait for a stop");
+  // Half the speed of the 2.5 s plan.
+  assert.ok(Math.abs(mission.waypoints[1].speedMs! - planSurvey(PLOT).waypoints[1].speedMs! / 2) < 1e-9);
+});
+
 test("first photo fails (the 18 Oct slow card): it waits before trying again instead of giving up", () => {
   const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
   const mission = planSurvey(PLOT);

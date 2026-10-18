@@ -7,6 +7,7 @@ import { useEffect, useReducer } from "react";
 import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { ScanProgress } from "../../../packages/flight-core/src/mission.ts";
 import { DEFAULT_SAFETY, type SafetySettings } from "../../../packages/flight-core/src/safety.ts";
+import { PHOTO_INTERVAL_S } from "../../../packages/flight-core/src/planner.ts";
 import { DEFAULT_PRICES, EXISTING_VERSION, History, TEST_PLOT, existingFeatures, type Prices, type ScanDetails, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 export type Tab = "plan" | "scan" | "survey" | "design" | "roof" | "quote";
@@ -26,6 +27,8 @@ export type AppState = {
   film: boolean;
   /** Photos along each run of the garden scan; null: the recommended number. */
   photosPerRun: number | null;
+  /** Seconds between photos along a run: longer for a slow memory card, so the drone never has to stop. */
+  photoIntervalS: number;
   safety: SafetySettings;
   /** Operator ID, airspace, neighbours. Ticked again before every flight. */
   checks: boolean[];
@@ -81,6 +84,7 @@ export const S: AppState = {
   edgeLap: false,
   film: true,
   photosPerRun: null,
+  photoIntervalS: PHOTO_INTERVAL_S,
   safety: DEFAULT_SAFETY,
   checks: [false, false, false],
   mode: "sim",
@@ -129,7 +133,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "safety", "scanned", "items", "nextId", "existInit", "existVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "photoIntervalS", "safety", "scanned", "items", "nextId", "existInit", "existVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();
