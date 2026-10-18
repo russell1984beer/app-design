@@ -789,9 +789,28 @@ class DroneController(
 
   private var storageInUse: dji.sdk.keyvalue.value.camera.CameraStorageLocation? = null
 
+  private var storageSummary = ""
+
+  /**
+   * The drone picks its storage itself: the memory card when it has found one, otherwise its own
+   * small memory (about 70 photos). The app cannot choose, so it says which is in use when that changes.
+   */
   private fun onStorage(info: dji.sdk.keyvalue.value.camera.CameraStorageInfos) {
     photosLeft = info.currentCameraStorageInfo?.availablePhotoCount
     storageInUse = info.currentStorageType
+    val card = info.cameraStorageInfoList?.firstOrNull { it.storageType == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD }
+    val summary = "using ${storageInUse?.name}, card ${card?.storageState?.name ?: "not reported"}"
+    if (summary == storageSummary) return
+    storageSummary = summary
+    Log.i(TAG, "Storage: $summary, photos left $photosLeft")
+    when {
+      storageInUse == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD ->
+        status("storage", "Saving photos to the memory card ($photosLeft more fit).")
+      card?.storageState?.name == "INSERTED" ->
+        status("storage", "A memory card is in, but the drone is still saving to its own memory. Switch the drone off and on again; if that does not help, format the card in DJI Fly.")
+      else ->
+        status("storage", "No memory card found: saving to the drone's own memory ($photosLeft photos fit). Switch the drone off, push the card fully in, then switch it on.")
+    }
   }
 
   /**
