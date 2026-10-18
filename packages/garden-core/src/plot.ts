@@ -16,6 +16,12 @@ export type Plot = {
   /** Compass direction the rear garden runs towards, from the house. Up on the plan. */
   gardenBearingDeg: number;
   latitudeDeg: number;
+  /**
+   * The real boundary on the plan when it is not a plain rectangle (e.g. a park traced on its site
+   * plan). The rectangle above then just hugs it, for the design screens; flights and the geofence
+   * follow this outline.
+   */
+  boundary?: Pt[];
 };
 
 /**
@@ -42,6 +48,56 @@ export function inHouse(p: Plot, x: number, y: number): boolean {
 
 export function inPlot(p: Plot, x: number, y: number): boolean {
   return x >= 0 && x <= p.widthM && y >= 0 && y <= p.lengthM;
+}
+
+/** The plot's outline on the plan: its traced boundary, or the rectangle. */
+export function plotOutline(p: Plot): Pt[] {
+  return p.boundary ?? [[0, 0], [p.widthM, 0], [p.widthM, p.lengthM], [0, p.lengthM]];
+}
+
+/** Is a point inside a polygon (any shape, either winding)? */
+export function inRing(P: Pt[], x: number, y: number): boolean {
+  let c = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [a, b] = P[i];
+    const [d, e] = P[j];
+    if (b > y !== e > y && x < ((d - a) * (y - b)) / (e - b) + a) c = !c;
+  }
+  return c;
+}
+
+/** Where the vertical line at x is inside a polygon: the first stretch from the far end (smallest y), or null. */
+export function spanAtX(P: Pt[], x: number): [number, number] | null {
+  const ys: number[] = [];
+  for (let i = 0; i < P.length; i++) {
+    const [a, b] = P[i];
+    const [c, d] = P[(i + 1) % P.length];
+    if (a > x !== c > x) ys.push(b + ((x - a) / (c - a)) * (d - b));
+  }
+  ys.sort((m, n) => m - n);
+  return ys.length >= 2 ? [ys[0], ys[1]] : null;
+}
+
+/** The part of a polygon on the far-end side of the line y = yMax (smaller y). Empty if none. */
+export function clipToY(P: Pt[], yMax: number): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i];
+    const b = P[(i + 1) % P.length];
+    const ina = a[1] <= yMax;
+    const inb = b[1] <= yMax;
+    if (ina) out.push(a);
+    if (ina !== inb) out.push([a[0] + ((yMax - a[1]) / (b[1] - a[1])) * (b[0] - a[0]), yMax]);
+  }
+  return out.length >= 3 ? out : [];
+}
+
+/** A point well inside a polygon: the middle of its widest-looking vertical stretch through the middle. */
+export function pointInside(P: Pt[]): Pt {
+  const xs = P.map((p) => p[0]);
+  const x = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const span = spanAtX(P, x);
+  return span ? [x, (span[0] + span[1]) / 2] : P[0];
 }
 
 /** Ground height in metres above an arbitrary datum. */

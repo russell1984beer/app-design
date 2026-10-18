@@ -1,15 +1,16 @@
 // Full screen: the plot drawing (title plan) laid over a satellite photo. The owner drags it into
-// place, turns and sizes it to match, then taps the plot's four corners; the app works the plot out.
+// place, turns and sizes it to match, then taps the plot's four corners (or, for any other shape,
+// traces its boundary point by point); the app works the plot out.
 
 import { useRef, useState } from "react";
 import { Image, PanResponder, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Polygon, Polyline, Text as SText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
-import { latLngToWorldPx, metresPerPx, plotFromCorners, tilesAround, worldPxToLatLng } from "../../../packages/flight-core/src/georef.ts";
+import { areaM2, type LatLng } from "../../../packages/flight-core/src/geo.ts";
+import { latLngToWorldPx, metresPerPx, plotFromCorners, rectAroundPolygon, tilesAround, worldPxToLatLng } from "../../../packages/flight-core/src/georef.ts";
 
-import { applyCorners, drawingUri } from "./projects";
+import { applyBoundary, applyCorners, drawingUri } from "./projects";
 import { S, commit, currentProject, type Project } from "./store";
 import { C } from "./theme";
 import { Btn, Card, Chip, Chips, H2, Line, Note, Seg } from "./ui";
@@ -19,6 +20,9 @@ const tileUrl = (z: number, x: number, y: number) => `https://server.arcgisonlin
 const CREDIT = "Imagery © Esri, Maxar, Earthstar Geographics";
 
 const CORNER_NAMES = ["far end, left", "far end, right", "street end, right", "street end, left"];
+
+/** Enough for a boundary with many turns; more would be fiddly to tap anyway. */
+const MAX_TRACE = 60;
 
 /** A tap moves less than this; more is a drag. */
 const TAP_PX = 10;
@@ -37,8 +41,9 @@ export function LineUp() {
   const [ov, setOv] = useState<NonNullable<Project["overlay"]>>(
     p.overlay ?? { centre: start, rotationDeg: 0, metresPerPx: drawing.paperWidthMm ? atScale(1250) : 60 / drawing.widthPx },
   );
-  const [mode, setMode] = useState<"move" | "corners">("move");
-  const [corners, setCorners] = useState<LatLng[]>(p.corners ?? []);
+  const [mode, setMode] = useState<"move" | "corners" | "trace">(p.boundary ? "trace" : "move");
+  const [corners, setCorners] = useState<LatLng[]>(p.boundary ? [] : (p.corners ?? []));
+  const [trace, setTrace] = useState<LatLng[]>(p.boundary ?? []);
   const [opacity, setOpacity] = useState(0.55);
 
   const c = latLngToWorldPx(mapCentre, z);
@@ -50,8 +55,8 @@ export function LineUp() {
   const mpp = metresPerPx(mapCentre.lat, z);
 
   // The touch handler is made once, so it reads the latest values through a ref.
-  const now = useRef({ mode, ov, corners, toScreen, toLatLng });
-  now.current = { mode, ov, corners, toScreen, toLatLng };
+  const now = useRef({ mode, ov, corners, trace, toScreen, toLatLng });
+  now.current = { mode, ov, corners, trace, toScreen, toLatLng };
   const dragFrom = useRef<{ x: number; y: number } | null>(null);
   const touch = useRef(
     PanResponder.create({
@@ -67,8 +72,10 @@ export function LineUp() {
       },
       onPanResponderRelease: (e, g) => {
         const n = now.current;
-        if (n.mode !== "corners" || Math.abs(g.dx) + Math.abs(g.dy) > TAP_PX || n.corners.length >= 4) return;
-        setCorners([...n.corners, n.toLatLng(e.nativeEvent.locationX, e.nativeEvent.locationY)]);
+        if (n.mode === "move" || Math.abs(g.dx) + Math.abs(g.dy) > TAP_PX) return;
+        const at = n.toLatLng(e.nativeEvent.locationX, e.nativeEvent.locationY);
+        if (n.mode === "corners" && n.corners.length < 4) setCorners([...n.corners, at]);
+        if (n.mode === "trace" && n.trace.length < MAX_TRACE) setTrace([...n.trace, at]);
       },
     }),
   ).current;
@@ -85,8 +92,11 @@ export function LineUp() {
   const d = toScreen(ov.centre);
   const dw = (drawing.widthPx * ov.metresPerPx) / mpp;
   const dh = (drawing.heightPx * ov.metresPerPx) / mpp;
-  const pts = corners.map(toScreen);
+  const shown = mode === "trace" ? trace : corners;
+  const pts = shown.map(toScreen);
+  const closedShape = mode === "trace" ? trace.length >= 3 : corners.length === 4;
   const result = corners.length === 4 ? plotFromCorners(corners) : null;
+  const traced = trace.length >= 3 ? { rect: plotFromCorners(rectAroundPolygon(trace)), areaM2: areaM2(trace) } : null;
   const turn = (deg: number) => setOv({ ...ov, rotationDeg: (ov.rotationDeg + deg + 360) % 360 });
   const scale = (f: number) => setOv({ ...ov, metresPerPx: ov.metresPerPx * f });
 
@@ -107,7 +117,7 @@ export function LineUp() {
         )}
         </View>
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-          {pts.length === 4 ? (
+          {closedShape ? (
             <Polygon points={pts.map((q) => `${q.x},${q.y}`).join(" ")} fill="none" stroke={C.hivis} strokeWidth={3} />
           ) : (
             pts.length > 1 && <Polyline points={pts.map((q) => `${q.x},${q.y}`).join(" ")} fill="none" stroke={C.hivis} strokeWidth={3} />
@@ -130,6 +140,7 @@ export function LineUp() {
           options={[
             ["move", "Move the plan"],
             ["corners", "Mark the corners"],
+            ["trace", "Trace any shape"],
           ]}
           value={mode}
           onChange={setMode}
@@ -168,6 +179,39 @@ export function LineUp() {
               <Chip label="Zoom in" onPress={() => setZ(Math.min(19, z + 1))} />
               <Chip label="Centre the photo on the plan" onPress={() => setMapCentre(ov.centre)} />
             </Chips>
+          </>
+        ) : mode === "trace" ? (
+          <>
+            <Note>
+              For a plot that is not a simple rectangle. Start at a corner of the far end (the end away from the road or the entrance), then tap every turn
+              of the boundary line in order, all the way round. The shape closes itself; there is no need to tap the first point again.
+            </Note>
+            <Text style={styles.next}>
+              {trace.length === 0 ? "Next: point 1, a corner of the far end" : `${trace.length} point${trace.length === 1 ? "" : "s"} so far${trace.length < 3 ? " (at least 3 needed)" : ""}`}
+            </Text>
+            <Chips>
+              <Chip label="Undo last point" onPress={() => setTrace(trace.slice(0, -1))} />
+              <Chip label="Start again" onPress={() => setTrace([])} />
+            </Chips>
+            {traced && (
+              <>
+                <Card>
+                  <Line first k="Area inside the boundary" v={`${Math.round(traced.areaM2)} m²`} />
+                  <Line k="Length (far end to the road)" v={`${traced.rect.lengthM.toFixed(1)} m`} />
+                  <Line k="Widest" v={`${traced.rect.widthM.toFixed(1)} m`} />
+                  <Line k="Runs" v={`${Math.round(traced.rect.gardenBearingDeg)}°`} />
+                </Card>
+                <Note>Scans and the flying limit follow this outline. The design screens use the rectangle round it. A survey made for the old shape will need making again.</Note>
+                <Btn
+                  label={`Use this boundary (${trace.length} points)`}
+                  onPress={() => {
+                    applyBoundary(trace, ov);
+                    S.lineUp = false;
+                    commit();
+                  }}
+                />
+              </>
+            )}
           </>
         ) : (
           <>

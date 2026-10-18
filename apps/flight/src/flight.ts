@@ -8,7 +8,7 @@ import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import { planFirstFlight, planSurvey, surveyPhotoChoice, withFilm } from "../../../packages/flight-core/src/planner.ts";
 import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/roof.ts";
 import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
-import { eastNorthToPlan, planToEastNorth, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
+import { clipToY, eastNorthToPlan, planToEastNorth, plotOutline, pointInside, spanAtX, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone } from "./drone";
 import { planPointFromCorner, takeoffSpotCheck } from "./placement";
@@ -50,9 +50,9 @@ export function gpsToPlan(s: AppState, anchor: LatLng, p: LatLng): Pt {
   return eastNorthToPlan(s.plot, s.home, { east: v.x, north: v.y });
 }
 
+/** The plot's boundary in GPS: the traced outline when there is one, otherwise the rectangle. Flights and the geofence use it. */
 export function plotGps(s: AppState, anchor: LatLng): LatLng[] {
-  const { widthM: W, lengthM: H } = s.plot;
-  return ([[0, 0], [W, 0], [W, H], [0, H]] as Pt[]).map((p) => planToGps(s, anchor, p));
+  return plotOutline(s.plot).map((p) => planToGps(s, anchor, p));
 }
 
 /** The owner's half of the roof, seen from above. */
@@ -97,12 +97,22 @@ export function surveyMission(s: AppState, anchor: LatLng): Mission {
       photosPerRun: s.photosPerRun === null ? undefined : photosPerRun(s),
       photoIntervalS: s.photoIntervalS,
     });
-    if (!s.film) return scan;
-    // The fly-over film: down the middle of the garden from the far end to just short of the house,
-    // looking ahead, then back. It stays over the owner's own garden.
-    const { widthM: W, rearGardenM: GH } = s.plot;
-    return withFilm(scan, planToGps(s, anchor, [W / 2, 2]), planToGps(s, anchor, [W / 2, Math.max(4, GH - 3)]));
+    const film = s.film ? filmLine(s.plot) : null;
+    return film ? withFilm(scan, planToGps(s, anchor, film[0]), planToGps(s, anchor, film[1])) : scan;
   });
+}
+
+/**
+ * The fly-over film's line on the plan, inside the plot: down the middle of the garden from the far end
+ * to just short of the house; on a traced boundary, the length of it through its middle. Null when
+ * there is no room for one.
+ */
+function filmLine(p: AppState["plot"]): [Pt, Pt] | null {
+  if (!p.boundary) return [[p.widthM / 2, 2], [p.widthM / 2, Math.max(4, p.rearGardenM - 3)]];
+  const x = pointInside(p.boundary)[0];
+  const span = spanAtX(p.boundary, x);
+  if (!span || span[1] - span[0] < 10) return null;
+  return [[x, span[0] + 2], [x, span[1] - 3]];
 }
 
 /** Below this the sun is too low for sharp photos (the first real scan, at sunset, needed 1/15 s). */
@@ -110,11 +120,12 @@ const SUN_BLOCK_DEG = 8;
 /** Below this, warn: the camera may slow its shutter and blur. */
 const SUN_WARN_DEG = 20;
 
-/** The bottom of the garden (the far end of the plot) up to the take-off point, full width. */
+/** The bottom of the garden (the far end of the plot) up to the take-off point, full width (inside a traced boundary). */
 export function firstFlightArea(s: AppState): Pt[] {
   const W = s.plot.widthM;
   const y = s.home[1];
-  return [[0, 0], [W, 0], [W, y], [0, y]];
+  const clipped = s.plot.boundary ? clipToY(s.plot.boundary, y) : [];
+  return clipped.length ? clipped : [[0, 0], [W, 0], [W, y], [0, y]];
 }
 
 export function firstFlightMission(s: AppState, anchor: LatLng): Mission {

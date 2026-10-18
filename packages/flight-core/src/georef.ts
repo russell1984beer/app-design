@@ -1,7 +1,7 @@
 // Placing a property on the map: satellite map tiles (Web Mercator, the scheme every online map uses)
 // and the plot worked out from its four boundary corners, marked by the owner over a satellite photo.
 
-import { bearingDeg, distanceM, type LatLng } from "./geo.ts";
+import { bearingDeg, convexHull, distanceM, fromLocal, toLocal, type LatLng } from "./geo.ts";
 
 const TILE_PX = 256;
 
@@ -64,4 +64,46 @@ export function plotFromCorners(c: LatLng[]): PlotFromCorners {
     gardenBearingDeg: bearingDeg(mid(c[3], c[2]), mid(c[0], c[1])),
     farLeft: c[0],
   };
+}
+
+/**
+ * The smallest rectangle round a traced boundary (any shape), as four corners in plotFromCorners'
+ * order. Its long side runs along the plot; the far end is the end the tracing started at (the owner
+ * is asked to start at a far corner). Used for the design screens' rectangle; flights use the outline.
+ */
+export function rectAroundPolygon(points: LatLng[]): LatLng[] {
+  if (points.length < 3) throw new Error("Tap at least three points round the boundary.");
+  const origin = points[0];
+  const hull = convexHull(points).map((p) => toLocal(origin, p));
+  let best: { area: number; angle: number; minX: number; maxX: number; minY: number; maxY: number } | null = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i];
+    const b = hull[(i + 1) % hull.length];
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    const c = Math.cos(-angle);
+    const s = Math.sin(-angle);
+    const xs = hull.map((p) => p.x * c - p.y * s);
+    const ys = hull.map((p) => p.x * s + p.y * c);
+    const box = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    const area = (box.maxX - box.minX) * (box.maxY - box.minY);
+    if (!best || area < best.area) best = { area, angle, ...box };
+  }
+  const r = best!;
+  // Back from the box's own frame to east/north.
+  const turn = (x: number, y: number) => ({ x: x * Math.cos(r.angle) - y * Math.sin(r.angle), y: x * Math.sin(r.angle) + y * Math.cos(r.angle) });
+  const centre = turn((r.minX + r.maxX) / 2, (r.minY + r.maxY) / 2);
+  const sizeX = r.maxX - r.minX;
+  const sizeY = r.maxY - r.minY;
+  // Along the plot: the box's long side.
+  const longX = sizeX >= sizeY;
+  const length = longX ? sizeX : sizeY;
+  const width = longX ? sizeY : sizeX;
+  let along = longX ? turn(1, 0) : turn(0, 1);
+  // Towards the far end: the side the first point is on (it is at the local origin).
+  if (-centre.x * along.x - centre.y * along.y < 0) along = { x: -along.x, y: -along.y };
+  // Left, looking towards the far end.
+  const left = { x: -along.y, y: along.x };
+  const corner = (f: number, l: number) =>
+    fromLocal(origin, { x: centre.x + along.x * f * (length / 2) + left.x * l * (width / 2), y: centre.y + along.y * f * (length / 2) + left.y * l * (width / 2) });
+  return [corner(1, 1), corner(1, -1), corner(-1, -1), corner(-1, 1)];
 }

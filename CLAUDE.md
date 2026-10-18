@@ -66,6 +66,13 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
   (where the drone stands) is still the take-off and Return to Home point, and `takeoffSpotCheck` warns over
   2.5 m and blocks over 5 m from the plan's take-off point. The simulator still flies SIM_HOME, so this is
   first checked on a real first flight check (docs/android-flight-module.md).
+- Any-shape boundaries: for a plot that is not a rectangle (e.g. a park), LineUp's "Trace any shape" mode
+  takes any number of points, starting at the far end. `rectAroundPolygon` (georef.ts, minimum-area
+  rectangle, far end = the side with the first point) sets `corners` and the rectangle `Plot` the design
+  screens use; `applyBoundary` stores the traced points as `Project.boundary` (lat/lng) and `Plot.boundary`
+  (on the plan). `plotOutline(plot)` is the outline everything flight-related uses: `plotGps` (geofence and
+  scan area), the film line, `firstFlightArea` (`clipToY`), the take-off point (must be inside, `inRing`)
+  and the Plan map's outline and clip. Marking four corners clears any traced boundary.
 - Survey processing (stage 1, free, on the owner's PC): after a real scan the app records the scan
   details (take-off GPS, plot, home point) and shares them as `plotwise-scan-<date>.json`.
   `tools/survey` (`npm run survey -- --photos <dir> --scan <file>`) runs OpenDroneMap 3.5.6 in Docker

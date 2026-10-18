@@ -37,6 +37,11 @@ import {
   sunHoursGrid,
   sunElevationAt,
   sunPosition,
+  clipToY,
+  inRing,
+  plotOutline,
+  pointInside,
+  spanAtX,
   type Item,
 } from "../src/index.ts";
 
@@ -52,6 +57,24 @@ test("plot: 7 × 46.5 m, levels relative to the back door", () => {
   assert.ok(Math.abs(lvl(3, P.rearGardenM)) < 1e-12);
   // As in the prototype's draft, the garden rises towards the far end.
   assert.ok(lvl(3, 1) > lvl(3, 25));
+});
+
+test("plot outline: the rectangle, or a traced boundary of any shape", () => {
+  assert.deepEqual(plotOutline(P), [[0, 0], [P.widthM, 0], [P.widthM, P.lengthM], [0, P.lengthM]]);
+  // An L shape: narrow at the far end, wide nearer the street.
+  const L: [number, number][] = [[0, 0], [10, 0], [10, 20], [30, 20], [30, 40], [0, 40]];
+  assert.deepEqual(plotOutline({ ...P, boundary: L }), L);
+  assert.ok(inRing(L, 5, 10) && !inRing(L, 20, 10) && inRing(L, 20, 30));
+  assert.deepEqual(spanAtX(L, 5), [0, 40]);
+  assert.deepEqual(spanAtX(L, 20), [20, 40]);
+  assert.equal(spanAtX(L, 40), null);
+  // The far-end part up to y = 25: the narrow bit and a 5 m strip of the wide bit.
+  const near = clipToY(L, 25);
+  assert.ok(near.every(([, y]) => y <= 25));
+  assert.ok(inRing(near, 5, 10) && inRing(near, 20, 22) && !inRing(near, 20, 30));
+  assert.deepEqual(clipToY(L, -1), []);
+  const inside = pointInside(L);
+  assert.ok(inRing(L, inside[0], inside[1]));
 });
 
 test("levels: contours every 25 cm, slope bands, distance and fall", () => {

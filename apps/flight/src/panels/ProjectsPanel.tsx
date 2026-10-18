@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Alert, Image, Text, View } from "react-native";
 
+import { areaM2 } from "../../../../packages/flight-core/src/geo.ts";
+
 import { addProject, deleteProject, drawingUri, findPostcode, openProject, pickDrawing, renameProject } from "../projects";
 import { HOME_PROJECT_ID, S, commit, currentProject, useApp } from "../store";
 import { C } from "../theme";
@@ -68,7 +70,7 @@ export function ProjectsPanel() {
       <H2 small>Plot drawing</H2>
       <Lead>
         The Land Registry title plan: its PDF file as downloaded (the first page is used), or a photo or screenshot of it. You line it up over a satellite
-        photo and mark the corners, and the app works out the plot's size, direction and exact position.
+        photo and mark the corners (or trace the boundary, for any other shape), and the app works out the plot's size, direction and exact position.
       </Lead>
       {uri && p.drawing && (
         <Image source={{ uri }} style={{ width: "100%", aspectRatio: p.drawing.widthPx / p.drawing.heightPx, borderRadius: 10, marginBottom: 8 }} resizeMode="contain" />
@@ -85,7 +87,8 @@ export function ProjectsPanel() {
       {(!p.drawing || !p.postcodeAt) && <Note>Find the postcode and upload the drawing first.</Note>}
       {p.corners && (
         <Card>
-          <Line first k="Plot from the drawing" v={`${s.plot.widthM} × ${s.plot.lengthM} m`} />
+          {p.boundary && <Line first k="Boundary traced" v={`${p.boundary.length} points, about ${Math.round(areaM2(p.boundary))} m²`} />}
+          <Line first={!p.boundary} k={p.boundary ? "Rectangle round it" : "Plot from the drawing"} v={`${s.plot.widthM} × ${s.plot.lengthM} m`} />
           <Line k="Rear garden" v={`${s.plot.rearGardenM} m`} />
           <Line k="Garden runs" v={`${s.plot.gardenBearingDeg}°`} />
           <Line k="Far corner (left)" v={`${p.corners[0].lat.toFixed(6)}, ${p.corners[0].lng.toFixed(6)}`} />

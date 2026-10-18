@@ -5,8 +5,9 @@ import * as DocumentPicker from "expo-document-picker";
 import { File, Paths } from "expo-file-system";
 import { Image } from "react-native";
 
-import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
-import { plotFromCorners } from "../../../packages/flight-core/src/georef.ts";
+import { toLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
+import { plotFromCorners, rectAroundPolygon } from "../../../packages/flight-core/src/georef.ts";
+import { eastNorthToPlan, inRing, pointInside, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 import { DjiDrone } from "../modules/dji-drone";
 
@@ -124,6 +125,7 @@ export async function pickDrawing(): Promise<"picked" | "cancelled"> {
   p.drawing = { file: name, widthPx: width, heightPx: height, ...(paperWidthMm ? { paperWidthMm } : {}) };
   p.overlay = null;
   p.corners = null;
+  p.boundary = null;
   commit();
   return "picked";
 }
@@ -145,11 +147,35 @@ export function applyCorners(corners: LatLng[], overlay: Project["overlay"]): vo
     rearGardenM: Math.max(3, Math.round((lengthM - S.plot.houseDepthM - front) * 10) / 10),
     gardenBearingDeg: Math.round(g.gardenBearingDeg),
     latitudeDeg: Math.round(g.farLeft.lat * 100) / 100,
+    // Four corners make a plain rectangle: any traced outline goes.
+    boundary: undefined,
   };
   // The take-off point stays inside the (possibly smaller) rear garden.
   S.home = [Math.min(S.home[0], S.plot.widthM), Math.min(S.home[1], S.plot.rearGardenM)];
   const p = currentProject();
   p.corners = corners;
+  p.boundary = null;
   p.overlay = overlay;
+  commit();
+}
+
+/**
+ * A boundary traced point by point (any shape, e.g. a park on its site plan). The rectangle round it
+ * becomes the plot for the design screens; the traced outline, on the plan, is what flights and the
+ * geofence follow.
+ */
+export function applyBoundary(points: LatLng[], overlay: Project["overlay"]): void {
+  applyCorners(rectAroundPolygon(points), overlay);
+  const farLeft = currentProject().corners![0];
+  // On the plan, placed from the rectangle just set (the same corner and direction the flights use).
+  const boundary = points.map((q): Pt => {
+    const v = toLocal(farLeft, q);
+    const [x, y] = eastNorthToPlan(S.plot, [0, 0], { east: v.x, north: v.y });
+    return [Math.round(x * 100) / 100, Math.round(y * 100) / 100];
+  });
+  S.plot = { ...S.plot, boundary };
+  // The take-off point must be inside the real boundary, not just the rectangle round it.
+  if (!inRing(boundary, S.home[0], S.home[1])) S.home = pointInside(boundary);
+  currentProject().boundary = points;
   commit();
 }

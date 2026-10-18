@@ -21,6 +21,7 @@ import {
   fillOf,
   fmtLevel,
   inHouse,
+  inRing,
   inItem,
   isOval,
   isRound,
@@ -39,6 +40,7 @@ import {
   MONTHS,
   clampToPlot,
   newItem,
+  plotOutline,
   suggestPlants,
   type Item,
   type Plot,
@@ -275,8 +277,8 @@ function pointerDown(p: Pt, px: (n: number) => number): Drag | null {
     return null;
   }
   if (s.tab === "plan") {
-    // Move the take-off point.
-    if (inG && !inHouse(s.plot, p[0], p[1]) && !drone.flying) {
+    // Move the take-off point (inside the traced boundary, when there is one).
+    if (inG && (!s.plot.boundary || inRing(s.plot.boundary, p[0], p[1])) && !inHouse(s.plot, p[0], p[1]) && !drone.flying) {
       s.home = [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
       commit();
     }
@@ -525,7 +527,7 @@ function defs(s: AppState, px: (n: number) => number) {
         <Stop offset="1" stopColor="#36552E" />
       </RadialGradient>
       <ClipPath id="gclip">
-        <Rect x={0} y={0} width={W} height={H} />
+        {s.plot.boundary ? <Polygon points={outlinePoints(s)} /> : <Rect x={0} y={0} width={W} height={H} />}
       </ClipPath>
       <ClipPath id="sclip">
         <Rect x={0} y={0} width={W} height={GH} />
@@ -718,8 +720,10 @@ function slopeLayer(s: AppState) {
   return terrainFor(s.plot).slope.map((c) => <Rect key={`${c.x},${c.y}`} x={c.x} y={c.y} width={c.w + 0.02} height={c.h + 0.02} fill={SLOPE_COLOUR[c.band]} />);
 }
 
+const outlinePoints = (s: AppState) => plotOutline(s.plot).map((p) => p.join(",")).join(" ");
+
 function boundary(s: AppState, px: (n: number) => number) {
-  return <Rect x={0} y={0} width={s.plot.widthM} height={s.plot.lengthM} fill="none" stroke={C.ink} strokeWidth={px(2)} />;
+  return <Polygon points={outlinePoints(s)} fill="none" stroke={C.ink} strokeWidth={px(2)} />;
 }
 
 function dims(s: AppState, px: (n: number) => number) {

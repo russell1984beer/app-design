@@ -29,6 +29,8 @@ export type Project = {
   overlay: { centre: LatLng; rotationDeg: number; metresPerPx: number } | null;
   /** The boundary corners as marked: far end left, far end right, street end right, street end left. */
   corners: LatLng[] | null;
+  /** The boundary traced point by point, when it is not a rectangle (corners then hold the rectangle round it). */
+  boundary?: LatLng[] | null;
   /** This project's own fields while another project is open; null for the open one (they are in S). */
   data: Partial<Pick<AppState, ProjectField>> | null;
 };

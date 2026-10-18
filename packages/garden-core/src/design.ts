@@ -1,6 +1,6 @@
 // Garden design: features on the plan, their shapes, materials, starting styles and editing helpers.
 
-import { area, inHouse, perimeter, type Plot, type Pt } from "./plot.ts";
+import { area, inHouse, inRing, perimeter, type Plot, type Pt } from "./plot.ts";
 
 export type Kind =
   | "patio"
@@ -146,16 +146,6 @@ export function corners(it: Item): Pt[] {
 
 /** A plan point in the feature's own unrotated frame, relative to its centre. */
 export const localOf = (it: Item, p: Pt): Pt => rotP(p[0] - it.x, p[1] - it.y, -it.a);
-
-export function inRing(P: Pt[], x: number, y: number): boolean {
-  let c = false;
-  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
-    const [a, b] = P[i];
-    const [d, e] = P[j];
-    if (b > y !== e > y && x < ((d - a) * (y - b)) / (e - b) + a) c = !c;
-  }
-  return c;
-}
 
 export function inItem(it: Item, x: number, y: number): boolean {
   if (it.pts) return inRing(it.pts, x, y);

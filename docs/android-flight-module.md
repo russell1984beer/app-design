@@ -316,6 +316,10 @@ drone still takes off from, and comes home to, the exact spot where it stands.
 - The LIDAR check of the house now checks the line-up: if the plot seems shifted against the house,
   it says so and points to the Projects tab.
 - Projects without marked corners fly exactly as before.
+- Plots that are not a rectangle (for example a park or an odd-shaped site): on the line-up screen choose **Trace any
+  shape** and tap every turn of the boundary line, starting at the far end. The scan runs, the
+  flying limit (geofence) and the first flight check then follow that outline, and the take-off point
+  must be inside it. The design screens still use the rectangle round it.
 
 **The simulator cannot test this part** (it flies over a made-up field, not your garden). Check it on
 a real **first flight check** (low and short), in daylight with little wind:
