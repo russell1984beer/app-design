@@ -218,7 +218,7 @@ export function TestBench() {
     firedRef.current = false;
     setScenario(sc);
     setTest(t);
-    drone.startJob("test", home, {
+    drone.startJob("test", home, home, {
       mission,
       boundary: area,
       settings: DEFAULT_SAFETY,

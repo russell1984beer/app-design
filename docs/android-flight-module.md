@@ -304,11 +304,40 @@ While it hovers, the screen shows:
 
 Try it in DJI's simulator first if you like (propellers off): the same button works there.
 
+## Flights placed from the title plan (October 2026)
+
+Once a project's title plan is lined up and its four corners marked (Projects tab), real flights put
+the plan on the map from that line-up instead of from where the drone happens to be sitting. The
+drone still takes off from, and comes home to, the exact spot where it stands.
+
+- The pre-flight list then says how far the drone is from the yellow take-off point (Plan map). Over
+  2.5 m it warns; over 5 m it will not take off. Carry the drone to the point, or wait a minute for
+  its GPS to settle.
+- The LIDAR check of the house now checks the line-up: if the plot seems shifted against the house,
+  it says so and points to the Projects tab.
+- Projects without marked corners fly exactly as before.
+
+**The simulator cannot test this part** (it flies over a made-up field, not your garden). Check it on
+a real **first flight check** (low and short), in daylight with little wind:
+
+| Before take-off | Result | Notes |
+| --- | --- | --- |
+| Projects tab: the title plan sits on your plot in the satellite photo, corners marked. | | |
+| Plan tab: the yellow take-off point is on clear open ground in your garden. | | |
+| Drone on that spot: the list says "The drone is on the take-off point (… m away)". | | |
+| Scan tab: the flight path drawn on the map stays over your garden. | | |
+
+| In the air | Result | Notes |
+| --- | --- | --- |
+| It hovers over the take-off point, then scans the bottom of the garden, not next door. | | |
+| It comes back and lands where it took off. | | |
+
+If anything looks shifted, press Return home (or the controller's RTH button) and check the line-up.
+
 ## Not built yet
 
 - **Uploading photos to the cloud and processing them into a survey.** The Survey tab uses a
   draft of the garden from the title plan with estimated levels.
 - **Roof damage detection.** The Roof tab shows a labelled example report.
-- **Placing the plot from a satellite map.** For a real flight the plot is lined up from the
-  take-off point (set on the Plan map, with the drone sitting on it) and the garden's compass
-  direction on the Plan tab. A wrong direction shifts the whole plan, so check it carefully.
+- **The simulator flying over the real garden.** It still uses a made-up field, so placement from the
+  title plan is first checked on a real first flight check (above).

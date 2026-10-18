@@ -11,7 +11,8 @@ import { preflightCheck, type CheckItem, type PreflightResult } from "../../../p
 import { eastNorthToPlan, planToEastNorth, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone } from "./drone";
-import { S, commit, commitNow, type AppState } from "./store";
+import { planPointFromCorner, takeoffSpotCheck } from "./placement";
+import { S, commit, commitNow, currentProject, type AppState } from "./store";
 import { recordScan } from "./survey";
 import { currentFlyZones } from "./flysafe";
 import { lidarFor, lidarStatus, takeoffOffset, type TakeoffOffset } from "./lidar";
@@ -150,21 +151,42 @@ export function surveyStats(s: AppState) {
   };
 }
 
-/** Where the home point is in GPS terms: the simulator's field, or the drone sitting on it. */
+/** The far-left corner of the plot as marked on the title plan (Projects tab), if it has been. */
+const markedCorner = (): LatLng | null => currentProject().corners?.[0] ?? null;
+
+/**
+ * Where the plan's take-off point is in GPS terms, which places the whole plan: the simulator's field;
+ * on a real flight, from the plot lined up on the title plan when there is one, otherwise the drone
+ * sitting on it. Needs the drone connected either way.
+ */
 export function anchorFor(s: AppState, t: Telemetry | null): LatLng | null {
   if (s.mode === "sim") return SIM_HOME;
-  return t?.signalOk ? t.position : null;
+  if (!t?.signalOk) return null;
+  const corner = markedCorner();
+  return corner ? planPointFromCorner(s.plot, corner, s.home) : t.position;
 }
 
 export type FlightKind = "survey" | "roof" | "check";
 
-export type FlightPlan = { kind: FlightKind; mission: Mission; boundary: LatLng[]; property?: LatLng[]; anchor: LatLng; check: PreflightResult };
+export type FlightPlan = {
+  kind: FlightKind;
+  mission: Mission;
+  boundary: LatLng[];
+  property?: LatLng[];
+  /** Places the plan (see anchorFor). */
+  anchor: LatLng;
+  /** Where the drone actually stands: it takes off here and its Return to Home lands it here. */
+  home: LatLng;
+  check: PreflightResult;
+};
 
 export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null, resume = false): FlightPlan | { error: string } {
   // Resuming uses the home point's position from the first flight, so the plan is exactly the same.
   const saved = kind === "check" ? undefined : s.resume[kind];
   const anchor = resume && saved ? saved.anchor : anchorFor(s, t);
   if (!anchor) return { error: "No GPS position from the drone yet. Put the drone on the take-off point, switch it on and wait for GPS." };
+  // With no title plan line-up the two are the same point.
+  const home = s.mode === "sim" || !t?.signalOk ? anchor : t.position;
   let mission: Mission;
   let boundary: LatLng[];
   let property: LatLng[] | undefined;
@@ -194,7 +216,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     settings: s.safety,
     boundary,
     property,
-    home: anchor,
+    home,
     mission,
     forecast,
     noFlyZones: flyZones && "zones" in flyZones ? flyZones.zones : [],
@@ -224,18 +246,26 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     else if ("error" in flyZones)
       // The drone itself still refuses to take off in DJI's restricted zones.
       extra.push({ id: "flySafe", status: "warn", message: `Could not check DJI's no-fly zones (${flyZones.error}). Check DJI Fly before you fly.` });
+    // Placed from the title plan: the drone must be standing on the take-off point it puts on the map.
+    if (markedCorner() && t?.signalOk) extra.push(takeoffSpotCheck(t.position, anchor));
+    // The house in the LIDAR against the plan: checks the drone's spot, or the title plan's line-up.
     const off = takeoffMismatch(s, anchor);
+    const lineUp = !!markedCorner();
     if (off && Math.abs(off.alongM) >= OFFSET_BLOCK_M)
       extra.push({
         id: "takeoffPoint",
         status: "block",
-        message: `The drone seems to be about ${offsetWords(off.alongM)} than the take-off point on the plan (the house shows up shifted in the LIDAR). The whole flight would be shifted too. Carry the drone to the take-off point, or move the take-off point (button above).`,
+        message: lineUp
+          ? `The plot as lined up on the title plan seems to be about ${Math.abs(off.alongM).toFixed(0)} m off the house in the LIDAR. The whole flight would be shifted. Check the line-up on the Projects tab.`
+          : `The drone seems to be about ${offsetWords(off.alongM)} than the take-off point on the plan (the house shows up shifted in the LIDAR). The whole flight would be shifted too. Carry the drone to the take-off point, or move the take-off point (button above).`,
       });
     else if (off && Math.abs(off.alongM) >= OFFSET_WARN_M)
       extra.push({
         id: "takeoffPoint",
         status: "warn",
-        message: `The drone may be about ${offsetWords(off.alongM)} than the take-off point on the plan. Check it is standing on the marked spot.`,
+        message: lineUp
+          ? `The plot as lined up on the title plan may be about ${Math.abs(off.alongM).toFixed(0)} m off the house in the LIDAR. Check the line-up on the Projects tab.`
+          : `The drone may be about ${offsetWords(off.alongM)} than the take-off point on the plan. Check it is standing on the marked spot.`,
       });
     if (obstacles?.source === "LIDAR" && s.goneSpots.length)
       extra.push({
@@ -252,7 +282,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
   }
   if (!s.checks.every(Boolean)) extra.push({ id: "checklist", status: "block", message: "Tick every item in Before you fly (Plan tab)." });
   const items = [...extra, ...check.items];
-  return { kind, mission, boundary, property, anchor, check: { canTakeOff: items.every((i) => i.status !== "block"), items } };
+  return { kind, mission, boundary, property, anchor, home, check: { canTakeOff: items.every((i) => i.status !== "block"), items } };
 }
 
 /** A scan of this kind that stopped part-way and still matches the current settings. */
@@ -280,7 +310,7 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
   if (!resume && kind !== "check") delete S.resume[kind];
   const flownAt = new Date().toISOString();
   const photoIndices = new Set(plan.mission.waypoints.filter((w) => w.photo).map((w) => w.index));
-  drone.startJob(plan.kind, plan.anchor, {
+  drone.startJob(plan.kind, plan.anchor, plan.home, {
     mission: plan.mission,
     boundary: plan.boundary,
     settings: S.safety,

@@ -86,7 +86,9 @@ export function ProjectsPanel() {
         </Card>
       )}
       <Note>
-        The flights still line up on the drone's take-off point for now. Using this exact position for the flights comes next, with its own safety checks.
+        {p.corners
+          ? "Real flights are placed from this line-up: put the drone on the yellow take-off point (Plan map) and the app checks it is there before take-off. It still takes off from, and comes home to, the spot where it stands."
+          : "Until the corners are marked, real flights line up on the drone: put it on the yellow take-off point before take-off."}
       </Note>
 
       {message && <Status status={message.ok ? "pass" : "block"} text={message.text} />}

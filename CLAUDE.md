@@ -55,6 +55,17 @@ Note: "TerraScan" clashes with existing Terrasolid software, so do not use that 
 - `packages/garden-core/` (TypeScript, no dependencies; for iOS and Android): the prototype's plot
   model and draft levels, contours, slope, design features and styles, sun and shade, plants,
   material quantities and the example roof report. `npm test` there.
+- Projects (Projects tab, `apps/flight/src/projects.ts`, `panels/ProjectsPanel.tsx`, `LineUp.tsx`): several
+  properties, each with its own `PROJECT_FIELDS` (plot, home, items, scans…) parked in `Project.data` while
+  another is open; the first (id `home`) is the owner's, whose name and postcode live only on the phone (this
+  repo is public). Postcode via postcodes.io; title plan as the Land Registry PDF (page 1 drawn to PNG by
+  `PdfPages.kt` in the drone module) or a picture; lined up over Esri World Imagery tiles and the four corners
+  marked (far left, far right, street right, street left) -> `plotFromCorners` (`flight-core/src/georef.ts`)
+  sets width, length and bearing. Real flights then place the plan from the far-left corner
+  (`placement.ts planPointFromCorner`, used by `anchorFor`) instead of the drone's GPS; `FlightPlan.home`
+  (where the drone stands) is still the take-off and Return to Home point, and `takeoffSpotCheck` warns over
+  2.5 m and blocks over 5 m from the plan's take-off point. The simulator still flies SIM_HOME, so this is
+  first checked on a real first flight check (docs/android-flight-module.md).
 - Survey processing (stage 1, free, on the owner's PC): after a real scan the app records the scan
   details (take-off GPS, plot, home point) and shares them as `plotwise-scan-<date>.json`.
   `tools/survey` (`npm run survey -- --photos <dir> --scan <file>`) runs OpenDroneMap 3.5.6 in Docker
