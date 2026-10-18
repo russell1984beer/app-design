@@ -790,6 +790,10 @@ class DroneController(
   private var storageInUse: dji.sdk.keyvalue.value.camera.CameraStorageLocation? = null
 
   private var storageSummary = ""
+  private var cardState: String? = null
+
+  private fun cardRemovedWhileOn() =
+    storageInUse == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD && cardState == "NOT_INSERTED"
 
   /**
    * The drone picks its storage itself: the memory card when it has found one, otherwise its own
@@ -799,11 +803,15 @@ class DroneController(
     photosLeft = info.currentCameraStorageInfo?.availablePhotoCount
     storageInUse = info.currentStorageType
     val card = info.cameraStorageInfoList?.firstOrNull { it.storageType == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD }
-    val summary = "using ${storageInUse?.name}, card ${card?.storageState?.name ?: "not reported"}"
+    cardState = card?.storageState?.name
+    val summary = "using ${storageInUse?.name}, card ${cardState ?: "not reported"}"
     if (summary == storageSummary) return
     storageSummary = summary
     Log.i(TAG, "Storage: $summary, photos left $photosLeft")
     when {
+      // Seen on 18 Oct: the card taken out with the drone on; it keeps "using" the card until restarted.
+      cardRemovedWhileOn() ->
+        status("storage", "The memory card was taken out while the drone was on. Switch the drone off and on again so it saves to its own memory.")
       storageInUse == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD ->
         status("storage", "Saving photos to the memory card ($photosLeft more fit).")
       card?.storageState?.name == "INSERTED" ->
@@ -822,6 +830,7 @@ class DroneController(
     if (isFlying || motorsOn) return@post done("Only with the drone landed and its motors off.")
     if (!aircraftConnected) return@post done("The drone is not connected.")
     val where = storageInUse ?: return@post done("The drone has not said which storage it is using yet. Wait a few seconds and try again.")
+    if (cardRemovedWhileOn()) return@post done("The memory card was taken out while the drone was on, so there is nothing to format. Switch the drone off and on again, then format its own memory.")
     Log.i(TAG, "Formatting the drone's storage (${where.name}).")
     action(CameraKey.KeyFormatStorage, where) { e ->
       if (e == null) keys.getValue(KeyTools.createKey(CameraKey.KeyCameraStorageInfos))?.let { onStorage(it) }
