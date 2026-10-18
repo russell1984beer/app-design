@@ -56,6 +56,8 @@ const OBSTACLE_RESUME_GRACE_S = 15;
 const ARRIVED_M = 0.5;
 const ARRIVED_ALT_M = 0.3;
 const MAX_PHOTO_ATTEMPTS = 3;
+/** After a failed photo, wait this long before the next one (the camera may still be saving). */
+const PHOTO_RETRY_DELAY_S = 4;
 
 // A stopped photo waits until the drone has stopped braking: the first real scan fired while it still
 // leaned 15-21° and moved at up to 0.8 m/s, and those photos were half as sharp as the level ones.
@@ -96,6 +98,8 @@ export class FlightSession {
   /** When the drone arrived at the current stop photo, for the settling wait. */
   private settleStart?: number;
   private filming = false;
+  /** No photo before this time (a pause after a failed one). */
+  private retryAfter = -Infinity;
 
   constructor(options: FlightSessionOptions) {
     this.o = options;
@@ -311,7 +315,7 @@ export class FlightSession {
     if (arrived && !this.photoRequested) {
       if (next.photo) {
         // The camera is still saving a photo from the run: wait for it rather than be told it is busy.
-        if (!this.settled(t) || this.flyPending.size > 0) return;
+        if (!this.settled(t) || this.flyPending.size > 0 || this.now() < this.retryAfter) return;
         bridge.takePhoto(next.index);
         this.photoRequested = true;
       } else {
@@ -352,6 +356,13 @@ export class FlightSession {
         this.log.push(`photo ${w.index} missed on the fly (${off.toFixed(1)} m off the line): taking it at a stop`);
         this.stopAt.add(w.index);
       }
+      return;
+    }
+    // The camera is still saving the last photo (a slow card), or pausing after a failed one: rather
+    // than be refused, take this one later at a stop.
+    if (this.flyPending.size > 0 || this.now() < this.retryAfter) {
+      this.log.push(`photo ${w.index}: camera still busy as the drone passed, taking it at a stop`);
+      this.stopAt.add(w.index);
       return;
     }
     bridge.takePhoto(w.index);
@@ -440,8 +451,12 @@ export class FlightSession {
     this.log.push(`photo ${index} failed (${reason}), attempt ${attempts}`);
     // One taken on the fly is tried again at a stop (the drone has flown on past the spot).
     if (this.flyPending.delete(index)) this.stopAt.add(index);
-    if (attempts < MAX_PHOTO_ATTEMPTS) this.photoRequested = false; // try again on the next update
-    else if (this.state === "scanning") this.goHome("cameraFault");
+    // Try again after a pause: on 18 Oct a slow card was still saving, and two instant retries were
+    // both refused, so the scan ended at the first photo.
+    if (attempts < MAX_PHOTO_ATTEMPTS) {
+      this.photoRequested = false;
+      this.retryAfter = this.now() + PHOTO_RETRY_DELAY_S;
+    } else if (this.state === "scanning") this.goHome("cameraFault");
   }
 
   private setState(s: SessionState): void {

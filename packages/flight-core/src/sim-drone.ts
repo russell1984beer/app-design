@@ -13,6 +13,8 @@ export type SimOptions = {
   /** Battery used per minute in calm air. Real Mini 4 Pro: roughly 3%/min. */
   drainPercentPerMin?: number;
   returnSpeedMs?: number;
+  /** Seconds the card takes to save a photo (a slow card: several). */
+  photoSaveS?: number;
 };
 
 type Target = { pos: Vec2; altitudeM: number; speedMs: number };
@@ -46,6 +48,7 @@ export class SimDrone implements DroneBridge {
 
   private readonly drainPerMin: number;
   private readonly returnSpeedMs: number;
+  private readonly photoSaveS: number;
   private failsafe?: FailsafeConfig;
   private target?: Target;
   private returnPhase: ReturnPhase = "climb";
@@ -60,6 +63,7 @@ export class SimDrone implements DroneBridge {
     this.wind = o.wind ?? { speedMs: 0, fromDeg: 0 };
     this.drainPerMin = o.drainPercentPerMin ?? 3;
     this.returnSpeedMs = o.returnSpeedMs ?? 8;
+    this.photoSaveS = o.photoSaveS ?? PHOTO_DELAY_S;
   }
 
   // ---- DroneBridge -------------------------------------------------------
@@ -121,7 +125,7 @@ export class SimDrone implements DroneBridge {
       this.events.push({ type: "photoFailed", waypointIndex, reason: "camera busy" });
       return;
     }
-    this.pendingPhoto = { index: waypointIndex, remainingS: PHOTO_DELAY_S, position: fromLocal(this.home, this.pos), speedMs: this.speedMs };
+    this.pendingPhoto = { index: waypointIndex, remainingS: this.photoSaveS, position: fromLocal(this.home, this.pos), speedMs: this.speedMs };
   }
 
   startVideo(): void {

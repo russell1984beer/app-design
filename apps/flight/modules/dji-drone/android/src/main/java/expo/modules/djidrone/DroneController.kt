@@ -393,6 +393,7 @@ class DroneController(
       return@post
     }
     val photo = PendingPhoto(waypointIndex, scheduler.nowMs() + PHOTO_TIMEOUT_MS, askedAtMs = scheduler.nowMs())
+    lastPhotoAskedAtMs = photo.askedAtMs
     pendingPhoto = photo
     action(CameraKey.KeyStartShootPhoto) { e ->
       if (pendingPhoto !== photo) return@action
@@ -783,8 +784,15 @@ class DroneController(
     )
   }
 
+  /** When the last photo was asked for, to time a save that arrives after the app gave up on it. */
+  private var lastPhotoAskedAtMs = 0L
+
   private fun onMediaFile(info: GeneratedMediaFileInfo?) {
-    val photo = pendingPhoto ?: return
+    val photo = pendingPhoto
+    if (photo == null) {
+      if (info != null) Log.i(TAG, "A file was saved ${"%.1f".format((scheduler.nowMs() - lastPhotoAskedAtMs) / 1000.0)} s after the last photo was asked for (late photo or video)")
+      return
+    }
     if (info == null || !photo.shutterFired) return
     pendingPhoto = null
     // How long the card takes to save a photo: on-the-fly photos come every PHOTO_INTERVAL_S (2.5 s).
@@ -887,7 +895,8 @@ class DroneController(
   companion object {
     const val TAG = "DjiDrone"
     const val TICK_MS = 100L
-    const val PHOTO_TIMEOUT_MS = 5000L
+    /** A slow memory card took over 5 s to save one 48 MP photo (18 Oct). */
+    const val PHOTO_TIMEOUT_MS = 10_000L
     const val VIDEO_MODE_SETTLE_MS = 1000L
     const val TAKEOFF_WAIT_MS = 30_000L
     const val HANDOVER_WAIT_MS = 5_000L

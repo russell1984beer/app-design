@@ -385,6 +385,32 @@ test("smooth survey: a photo that fails on the fly is taken again at a stop, and
   assert.ok(distanceM(sim.photos[retake].position, mission.waypoints[missed].position) < 0.6);
 });
 
+test("slow memory card: photos the camera is too busy for are taken at a stop, and the scan finishes", () => {
+  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
+  const mission = planSurvey(PLOT);
+  // Each photo takes 4 s to save, longer than the 2.5 s between photos on the fly.
+  const sim = new SimDrone({ home, photoSaveS: 4 });
+  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  session.start();
+  run(sim, session, { until: landed(sim, session), maxS: 3600 });
+  assert.equal(session.returnReason, "complete", session.log.slice(-5).join(" | "));
+  assert.equal(sim.photos.length, mission.waypoints.length, "every photo once");
+  assert.ok(session.log.some((l) => /camera still busy/.test(l)), "some were moved to a stop");
+  assert.ok(!session.log.some((l) => /camera busy\)/.test(l)), "never refused by a busy camera");
+});
+
+test("first photo fails (the 18 Oct slow card): it waits before trying again instead of giving up", () => {
+  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
+  const mission = planSurvey(PLOT);
+  const sim = new SimDrone({ home });
+  sim.failOnce.add(0);
+  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  session.start();
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.equal(sim.photos.length, mission.waypoints.length);
+});
+
 test("fly-over film: recorded after the photos, inside the plot, then home with nothing left recording", () => {
   const { scan, sim, session } = smoothSurvey(true);
   let furthestOut = 0;
