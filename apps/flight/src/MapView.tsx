@@ -563,12 +563,6 @@ function streetAboveSea(s: AppState): number | null {
   return aboveSeaLevelM(l, (p) => planToGps({ ...s, home: l.home }, l.anchor, p), [s.plot.widthM / 2, s.plot.lengthM + 1.5]);
 }
 
-/** Ids for features drawn only as a picture (never saved). */
-function counter(): () => number {
-  let n = 0;
-  return () => ++n;
-}
-
 function photoLayer(s: AppState, px: (n: number) => number) {
   const { widthM: W, lengthM: H, rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
   const photo = currentSurvey()?.photo;
@@ -580,8 +574,9 @@ function photoLayer(s: AppState, px: (n: number) => number) {
       <Rect width={W} height={H} fill="#7E9C60" />
       <Rect width={W} height={H} fill="url(#grassP)" />
       {/* What is already in the garden, where the first drone survey showed it. */}
-      {existingFeatures(s.plot, counter()).map((it) =>
-        itemShape(it, it.kind === "tree" ? "url(#canopy)" : fillOf(it), { stroke: KINDS[it.kind].stroke, strokeWidth: px(1) }, undefined, `e${it.id}`),
+      {/* Only drawn, never saved, so no real ids: the list's fixed order gives the keys. */}
+      {existingFeatures(s.plot, () => 0).map((it, i) =>
+        itemShape(it, it.kind === "tree" ? "url(#canopy)" : fillOf(it), { stroke: KINDS[it.kind].stroke, strokeWidth: px(1) }, undefined, `e${i}`),
       )}
       <Rect x={0} y={GH + HD} width={W} height={H - GH - HD} fill="#B9B5AC" />
       <Rect x={0} y={GH + HD + 1} width={2.2} height={H - GH - HD - 1} fill="#7E9C60" />

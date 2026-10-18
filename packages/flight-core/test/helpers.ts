@@ -31,6 +31,8 @@ export const PLOT_BEARING = 135;
 export const PLOT = rectangle(ORIGIN, PLOT_BEARING, 7, 43);
 /** Home point on the rear lawn, 20 m from the street. */
 export const PLOT_HOME = alongAxis(ORIGIN, PLOT_BEARING, 20);
+/** Home point in the middle of the rear garden, for the full garden survey. */
+export const GARDEN_HOME = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
 
 /** A bigger field, for flights long enough to run the battery down. */
 export const FIELD = rectangle(ORIGIN, 0, 40, 100);

@@ -147,12 +147,9 @@ export async function makeSurvey(opts: { scan: ScanDetails; dtm: string; dsm?: s
 export function adjustScan(scan: ScanDetails, a: { bearingDeg?: number; backM?: number; sideM?: number; rearGardenM?: number }): ScanDetails {
   let plot = a.bearingDeg === undefined ? scan.plot : { ...scan.plot, gardenBearingDeg: a.bearingDeg };
   if (a.rearGardenM !== undefined) plot = { ...plot, rearGardenM: a.rearGardenM, lengthM: plot.lengthM + a.rearGardenM - plot.rearGardenM };
-  const b = (plot.gardenBearingDeg * Math.PI) / 180;
-  const back = a.backM ?? 0;
-  const side = a.sideM ?? 0;
-  const east = back * Math.sin(b) + side * Math.cos(b);
-  const north = back * Math.cos(b) - side * Math.sin(b);
-  return { ...scan, plot, anchor: fromLocal(scan.anchor, { x: east, y: north }) };
+  // On the plan, the far end is towards smaller y and the right-hand fence towards larger x.
+  const shift = planToEastNorth(plot, [0, 0], [a.sideM ?? 0, -(a.backM ?? 0)]);
+  return { ...scan, plot, anchor: fromLocal(scan.anchor, { x: shift.east, y: shift.north }) };
 }
 
 export function readScan(text: string): ScanDetails {

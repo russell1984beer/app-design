@@ -60,29 +60,54 @@ export function roofPlan(s: AppState): Pt[] {
   return [[0, GH], [HW, GH], [HW, GH + HD], [0, GH + HD]];
 }
 
+/**
+ * Recent plans by their inputs. The Scan tab redraws on every telemetry update (10 a second) and asks
+ * for the survey several times per redraw; planning it afresh each time was wasted work.
+ */
+const plans = new Map<string, unknown>();
+function remembered<T>(key: string, make: () => T): T {
+  if (!plans.has(key)) {
+    if (plans.size >= 8) plans.clear();
+    plans.set(key, make());
+  }
+  return plans.get(key) as T;
+}
+
 /** How many photos per run the owner can choose, and the recommended number, at the current settings. */
 export function photoChoice(s: AppState) {
-  return surveyPhotoChoice(plotGps(s, SIM_HOME), { altitudeM: s.alt, overlap: s.ov / 100 });
+  return remembered(`choice ${JSON.stringify([s.plot, s.home, s.alt, s.ov])}`, () =>
+    surveyPhotoChoice(plotGps(s, SIM_HOME), { altitudeM: s.alt, overlap: s.ov / 100 }),
+  );
+}
+
+/** The owner's photos per run, kept within what makes sense at the current height (it changes the limits). */
+export function photosPerRun(s: AppState): number {
+  const c = photoChoice(s);
+  return s.photosPerRun === null ? c.recommended : Math.min(c.max, Math.max(c.min, s.photosPerRun));
 }
 
 export function surveyMission(s: AppState, anchor: LatLng): Mission {
-  const c = s.photosPerRun === null ? null : photoChoice(s);
-  // A chosen number stays within what makes sense at the current height (it changes the limits).
-  const photosPerRun = c ? Math.min(c.max, Math.max(c.min, s.photosPerRun!)) : undefined;
-  const scan = planSurvey(plotGps(s, anchor), { altitudeM: s.alt, overlap: s.ov / 100, edgeLap: s.edgeLap, photosPerRun, photoIntervalS: s.photoIntervalS });
-  if (!s.film) return scan;
-  // The fly-over film: down the middle of the garden from the far end to just short of the house,
-  // looking ahead, then back. It stays over the owner's own garden.
-  const { widthM: W, rearGardenM: GH } = s.plot;
-  return withFilm(scan, planToGps(s, anchor, [W / 2, 2]), planToGps(s, anchor, [W / 2, Math.max(4, GH - 3)]));
+  const key = JSON.stringify([s.plot, s.home, s.alt, s.ov, s.edgeLap, s.film, s.photosPerRun, s.photoIntervalS, anchor]);
+  return remembered(`survey ${key}`, () => {
+    const scan = planSurvey(plotGps(s, anchor), {
+      altitudeM: s.alt,
+      overlap: s.ov / 100,
+      edgeLap: s.edgeLap,
+      photosPerRun: s.photosPerRun === null ? undefined : photosPerRun(s),
+      photoIntervalS: s.photoIntervalS,
+    });
+    if (!s.film) return scan;
+    // The fly-over film: down the middle of the garden from the far end to just short of the house,
+    // looking ahead, then back. It stays over the owner's own garden.
+    const { widthM: W, rearGardenM: GH } = s.plot;
+    return withFilm(scan, planToGps(s, anchor, [W / 2, 2]), planToGps(s, anchor, [W / 2, Math.max(4, GH - 3)]));
+  });
 }
 
 /** Below this the sun is too low for sharp photos (the first real scan, at sunset, needed 1/15 s). */
-export const SUN_BLOCK_DEG = 8;
+const SUN_BLOCK_DEG = 8;
 /** Below this, warn: the camera may slow its shutter and blur. */
-export const SUN_WARN_DEG = 20;
-
-const sunElevationDeg = (at: LatLng) => sunElevationAt(at.lat, at.lng, new Date());
+const SUN_WARN_DEG = 20;
 
 /** The bottom of the garden (the far end of the plot) up to the take-off point, full width. */
 export function firstFlightArea(s: AppState): Pt[] {
@@ -190,7 +215,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
     }
     if (weather && "error" in weather) extra.push({ id: "forecast", status: "block", message: weather.error });
-    const sun = sunElevationDeg(anchor);
+    const sun = sunElevationAt(anchor.lat, anchor.lng, new Date());
     if (sun < SUN_BLOCK_DEG)
       extra.push({ id: "light", status: "block", message: "Too dark for sharp photos: the sun is too low. Fly when it is higher (late morning to mid afternoon is best)." });
     else if (sun < SUN_WARN_DEG)
@@ -247,15 +272,14 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
   if (S.mode === "sim") {
     if (!drone.simOn) await drone.setSimulator(true);
     // The simulator gives the drone its pretend GPS position a moment after it starts.
-    const until = Date.now() + SIM_POSITION_WAIT_MS;
-    while (!drone.telemetry?.signalOk && Date.now() < until) await new Promise((r) => setTimeout(r, 250));
-    if (!drone.telemetry?.signalOk) throw new Error("The simulator is on but the drone has no position yet. Wait a few seconds and tap Start again.");
+    if (!(await drone.positionReady(SIM_POSITION_WAIT_MS))) throw new Error("The simulator is on but the drone has no position yet. Wait a few seconds and tap Start again.");
   }
   const kind = plan.kind;
   const saved = resume && kind !== "check" ? S.resume[kind] : undefined;
   const progress = saved && saved.progress.missionId === plan.mission.id ? saved.progress : undefined;
   if (!resume && kind !== "check") delete S.resume[kind];
   const flownAt = new Date().toISOString();
+  const photoIndices = new Set(plan.mission.waypoints.filter((w) => w.photo).map((w) => w.index));
   drone.startJob(plan.kind, plan.anchor, {
     mission: plan.mission,
     boundary: plan.boundary,
@@ -263,10 +287,7 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
     progress,
     onProgress: (p) => {
       // Real garden photos can be made into a survey, even from a scan that stopped part-way.
-      if (S.mode === "real" && kind !== "roof") {
-        const photos = new Set(plan.mission.waypoints.filter((w) => w.photo).map((w) => w.index));
-        recordScan(plan.anchor, p.completedWaypoints.filter((i) => photos.has(i)).length, flownAt);
-      }
+      if (S.mode === "real" && kind !== "roof") recordScan(plan.anchor, p.completedWaypoints.filter((i) => photoIndices.has(i)).length, flownAt);
       if (kind === "check") return commitNow(); // a first flight check is short: it is simply flown again
       S.resume[kind] = { anchor: plan.anchor, progress: p };
       if (plan.kind === "roof") S.roof.photosTaken = p.completedWaypoints.length;

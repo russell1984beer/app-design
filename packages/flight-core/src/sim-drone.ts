@@ -78,9 +78,8 @@ export class SimDrone implements DroneBridge {
       wind: { ...this.wind },
       windWarning: this.wind.speedMs >= 10.7 ? "strong" : this.wind.speedMs >= 8 ? "moderate" : "none",
       obstacleM: this.obstacleM,
+      // No lean: this drone stops dead, so the settling wait is tested on speed alone.
       speedMs: this.speedMs,
-      // A real drone leans into its speed changes; this one leans while it moves.
-      tiltDeg: this.speedMs > 0.05 ? 8 : 0,
     };
   }
 

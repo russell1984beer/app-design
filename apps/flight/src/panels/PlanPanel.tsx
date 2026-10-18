@@ -5,7 +5,7 @@ import { PHOTO_INTERVAL_S } from "../../../../packages/flight-core/src/planner.t
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
 import { canFly } from "../../modules/dji-drone";
-import { photoChoice, surveyStats } from "../flight";
+import { photoChoice, photosPerRun, surveyStats } from "../flight";
 import { S, commit, go, useApp } from "../store";
 import { Btn, Check, H2, Lead, Note, Seg, Stats, Status, Stepper } from "../ui";
 
@@ -29,7 +29,7 @@ export function PlanPanel() {
   const s = useApp();
   const st = surveyStats(s);
   const pc = photoChoice(s);
-  const perRun = Math.min(pc.max, Math.max(pc.min, s.photosPerRun ?? pc.recommended));
+  const perRun = photosPerRun(s);
   const settingIssues = validateSettings(s.safety).filter((i) => i.status !== "pass");
   const set = (fn: () => void) => {
     fn();
@@ -52,7 +52,7 @@ export function PlanPanel() {
         min={pc.min * pc.runs}
         max={pc.max * pc.runs}
         step={pc.runs}
-        format={(v) => `${v}`}
+        format={String}
         onChange={(v) =>
           set(() => {
             const n = Math.round(v / pc.runs);

@@ -8,7 +8,7 @@ import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { ScanProgress } from "../../../packages/flight-core/src/mission.ts";
 import { DEFAULT_SAFETY, type SafetySettings } from "../../../packages/flight-core/src/safety.ts";
 import { PHOTO_INTERVAL_S } from "../../../packages/flight-core/src/planner.ts";
-import { DEFAULT_PRICES, EXISTING_VERSION, History, TEST_PLOT, existingFeatures, type Prices, type ScanDetails, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
+import { DEFAULT_PRICES, History, TEST_PLOT, existingFeatures, type Prices, type ScanDetails, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 export type Tab = "plan" | "scan" | "survey" | "design" | "roof" | "quote";
 export type FlightMode = "sim" | "real";
@@ -54,8 +54,8 @@ export type AppState = {
   styleNote: string;
   snap: boolean;
   existInit: boolean;
-  /** Which version of the existing features (EXISTING_VERSION) the saved items hold. */
-  existVersion: number;
+  /** Version of the saved data, so loadSaved's corrections each run once. */
+  saveVersion: number;
   roof: { photosTaken: number; showExample: boolean; sel: number | null };
   /** A scan that stopped part-way, with where the home point was, so it can resume. */
   resume: Partial<Record<"survey" | "roof", { anchor: LatLng; progress: ScanProgress }>>;
@@ -73,6 +73,9 @@ export type AppState = {
   /** Bumped on every change; the map redraws when it changes. */
   v: number;
 };
+
+/** Raise this, and add a step to loadSaved, when saved data needs correcting. */
+const SAVE_VERSION = 3;
 
 export const S: AppState = {
   tab: "plan",
@@ -107,7 +110,7 @@ export const S: AppState = {
   styleNote: "",
   snap: true,
   existInit: false,
-  existVersion: EXISTING_VERSION,
+  saveVersion: SAVE_VERSION,
   roof: { photosTaken: 0, showExample: false, sel: null },
   resume: {},
   prices: DEFAULT_PRICES,
@@ -133,7 +136,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "photoIntervalS", "safety", "scanned", "items", "nextId", "existInit", "existVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "photoIntervalS", "safety", "scanned", "items", "nextId", "existInit", "saveVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();
@@ -167,17 +170,22 @@ export async function loadSaved(): Promise<void> {
       // New safety settings added later keep their defaults.
       S.safety = { ...DEFAULT_SAFETY, ...S.safety };
       S.prices = { ...DEFAULT_PRICES, ...S.prices };
-      // The first drone survey (14 Oct 2026) corrected the title plan: 119°, not 128° (118° for a day),
-      // and a 33 m rear garden, not 29.5 m. Move the old defaults on; anything else the owner set stays.
-      if (S.plot.gardenBearingDeg === 128 || S.plot.gardenBearingDeg === 118) S.plot = { ...S.plot, gardenBearingDeg: TEST_PLOT.gardenBearingDeg };
-      if (S.plot.rearGardenM === 29.5 && S.plot.lengthM === 43) S.plot = { ...S.plot, rearGardenM: TEST_PLOT.rearGardenM, lengthM: TEST_PLOT.lengthM };
-      // The existing features were re-measured: swap the saved copy for the new one (the owner's own
-      // new features stay). They are added again by ensureExisting.
-      if ((saved.existVersion ?? 1) < EXISTING_VERSION) {
+      // Corrections to what older versions saved, each run once and in order. (Saves from before the
+      // version number: those that already had the re-measured features recorded existVersion 2.)
+      const from = saved.saveVersion ?? ((saved as { existVersion?: number }).existVersion === 2 ? 3 : 1);
+      if (from < 2) {
+        // The first drone survey (14 Oct 2026) corrected the title plan: 119°, not 128° (118° for a
+        // day), and a 33 m rear garden, not 29.5 m. Only the old defaults move; the owner's own stay.
+        if (S.plot.gardenBearingDeg === 128 || S.plot.gardenBearingDeg === 118) S.plot = { ...S.plot, gardenBearingDeg: TEST_PLOT.gardenBearingDeg };
+        if (S.plot.rearGardenM === 29.5 && S.plot.lengthM === 43) S.plot = { ...S.plot, rearGardenM: TEST_PLOT.rearGardenM, lengthM: TEST_PLOT.lengthM };
+      }
+      if (from < 3) {
+        // The existing features were re-measured: drop the saved copy (the owner's own new features
+        // stay); ensureExisting adds the new one.
         S.items = S.items.filter((i) => !i.exist);
         S.existInit = false;
-        S.existVersion = EXISTING_VERSION;
       }
+      S.saveVersion = SAVE_VERSION;
     }
   } catch {
     // A damaged save starts afresh rather than stopping the app.

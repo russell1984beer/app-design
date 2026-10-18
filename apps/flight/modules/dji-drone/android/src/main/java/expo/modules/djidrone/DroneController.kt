@@ -11,12 +11,14 @@ import dji.sdk.keyvalue.key.KeyTools
 import dji.sdk.keyvalue.key.ProductKey
 import dji.sdk.keyvalue.key.RemoteControllerKey
 import dji.sdk.keyvalue.value.camera.CameraMode
+import dji.sdk.keyvalue.value.camera.CameraStorageInfos
+import dji.sdk.keyvalue.value.camera.CameraStorageLocation
 import dji.sdk.keyvalue.value.camera.GeneratedMediaFileInfo
 import dji.sdk.keyvalue.value.common.Attitude
 import dji.sdk.keyvalue.value.common.EmptyMsg
-import dji.sdk.keyvalue.value.common.Velocity3D
 import dji.sdk.keyvalue.value.common.LocationCoordinate2D
 import dji.sdk.keyvalue.value.common.LocationCoordinate3D
+import dji.sdk.keyvalue.value.common.Velocity3D
 import dji.sdk.keyvalue.value.flightcontroller.FailsafeAction
 import dji.sdk.keyvalue.value.flightcontroller.FlightControlAuthority
 import dji.sdk.keyvalue.value.flightcontroller.FlightControlAuthorityChangeReason
@@ -49,6 +51,8 @@ import expo.modules.djidrone.control.Position
 import expo.modules.djidrone.control.StickCommand
 import expo.modules.djidrone.control.Target
 import expo.modules.djidrone.control.TelemetryRules
+import kotlin.math.abs
+import kotlin.math.hypot
 
 /** Runs work on one thread, so the controller's state is only ever touched from there. */
 interface Scheduler {
@@ -115,9 +119,11 @@ class DroneController(
   private var target: Target? = null
   private val goTo = GoToController()
   private var pendingPhoto: PendingPhoto? = null
+  /** When the last photo was asked for: how long the card takes to save it, even after the app gave up. */
+  private var lastPhotoAskedAtMs = 0L
   private var running = false
 
-  private class PendingPhoto(val waypointIndex: Int, var deadlineMs: Long, var shutterFired: Boolean = false, val askedAtMs: Long = 0)
+  private class PendingPhoto(val waypointIndex: Int, var deadlineMs: Long, var shutterFired: Boolean = false)
 
   // ---- Lifecycle -------------------------------------------------------------------------------
 
@@ -392,8 +398,8 @@ class DroneController(
       photoFailed(waypointIndex, "camera busy")
       return@post
     }
-    val photo = PendingPhoto(waypointIndex, scheduler.nowMs() + PHOTO_TIMEOUT_MS, askedAtMs = scheduler.nowMs())
-    lastPhotoAskedAtMs = photo.askedAtMs
+    lastPhotoAskedAtMs = scheduler.nowMs()
+    val photo = PendingPhoto(waypointIndex, lastPhotoAskedAtMs + PHOTO_TIMEOUT_MS)
     pendingPhoto = photo
     action(CameraKey.KeyStartShootPhoto) { e ->
       if (pendingPhoto !== photo) return@action
@@ -771,8 +777,8 @@ class DroneController(
         // Only a fresh reading counts: old distances say nothing about what is there now.
         "obstacleM" to (if (now - obstacleAtMs <= OBSTACLE_FRESH_MS) obstacleM else null),
         "photosLeft" to photosLeft,
-        "speedMs" to velocity?.let { kotlin.math.hypot(it.x, it.y) },
-        "tiltDeg" to attitude?.let { maxOf(kotlin.math.abs(it.pitch), kotlin.math.abs(it.roll)) },
+        "speedMs" to velocity?.let { hypot(it.x, it.y) },
+        "tiltDeg" to attitude?.let { maxOf(abs(it.pitch), abs(it.roll)) },
         "headingDeg" to compassHeading,
         "productType" to productType,
         "djiFlightMode" to djiFlightMode?.name,
@@ -784,9 +790,6 @@ class DroneController(
     )
   }
 
-  /** When the last photo was asked for, to time a save that arrives after the app gave up on it. */
-  private var lastPhotoAskedAtMs = 0L
-
   private fun onMediaFile(info: GeneratedMediaFileInfo?) {
     val photo = pendingPhoto
     if (photo == null) {
@@ -795,30 +798,30 @@ class DroneController(
     }
     if (info == null || !photo.shutterFired) return
     pendingPhoto = null
-    // How long the card takes to save a photo: on-the-fly photos come every PHOTO_INTERVAL_S (2.5 s).
-    Log.i(TAG, "Photo ${photo.waypointIndex} saved ${"%.1f".format((scheduler.nowMs() - photo.askedAtMs) / 1000.0)} s after asking (storage ${storageInUse?.name})")
+    // How long the card takes to save a photo, to set the Plan tab's time between photos.
+    Log.i(TAG, "Photo ${photo.waypointIndex} saved ${"%.1f".format((scheduler.nowMs() - lastPhotoAskedAtMs) / 1000.0)} s after asking (storage ${storageInUse?.name})")
     emit(
       "onDroneEvent",
       mapOf("type" to "photoTaken", "waypointIndex" to photo.waypointIndex, "file" to "${info.dir_no}/${info.file_no}"),
     )
   }
 
-  private var storageInUse: dji.sdk.keyvalue.value.camera.CameraStorageLocation? = null
+  private var storageInUse: CameraStorageLocation? = null
 
   private var storageSummary = ""
   private var cardState: String? = null
 
   private fun cardRemovedWhileOn() =
-    storageInUse == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD && cardState == "NOT_INSERTED"
+    storageInUse == CameraStorageLocation.SDCARD && cardState == "NOT_INSERTED"
 
   /**
    * The drone picks its storage itself: the memory card when it has found one, otherwise its own
    * small memory (about 70 photos). The app cannot choose, so it says which is in use when that changes.
    */
-  private fun onStorage(info: dji.sdk.keyvalue.value.camera.CameraStorageInfos) {
+  private fun onStorage(info: CameraStorageInfos) {
     photosLeft = info.currentCameraStorageInfo?.availablePhotoCount
     storageInUse = info.currentStorageType
-    val card = info.cameraStorageInfoList?.firstOrNull { it.storageType == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD }
+    val card = info.cameraStorageInfoList?.firstOrNull { it.storageType == CameraStorageLocation.SDCARD }
     cardState = card?.storageState?.name
     val summary = "using ${storageInUse?.name}, card ${cardState ?: "not reported"}"
     if (summary == storageSummary) return
@@ -828,9 +831,9 @@ class DroneController(
       // Seen on 18 Oct: the card taken out with the drone on; it keeps "using" the card until restarted.
       cardRemovedWhileOn() ->
         status("storage", "The memory card was taken out while the drone was on. Switch the drone off and on again so it saves to its own memory.")
-      storageInUse == dji.sdk.keyvalue.value.camera.CameraStorageLocation.SDCARD ->
+      storageInUse == CameraStorageLocation.SDCARD ->
         status("storage", "Saving photos to the memory card ($photosLeft more fit).")
-      card?.storageState?.name == "INSERTED" ->
+      cardState == "INSERTED" ->
         status("storage", "A memory card is in, but the drone is still saving to its own memory. Switch the drone off and on again; if that does not help, format the card in DJI Fly.")
       else ->
         status("storage", "No memory card found: saving to the drone's own memory ($photosLeft photos fit). Switch the drone off, push the card fully in, then switch it on.")

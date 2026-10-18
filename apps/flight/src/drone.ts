@@ -75,6 +75,22 @@ class DroneHub {
     return () => this.telemetryHooks.delete(fn);
   }
 
+  /** Resolves true once the drone reports a usable position (e.g. just after the simulator starts), false after timeoutMs. */
+  positionReady(timeoutMs: number): Promise<boolean> {
+    if (this.telemetry?.signalOk) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const done = (ok: boolean) => {
+        clearTimeout(timer);
+        off();
+        resolve(ok);
+      };
+      const off = this.onTelemetry((t) => {
+        if (t.signalOk) done(true);
+      });
+      const timer = setTimeout(() => done(false), timeoutMs);
+    });
+  }
+
   addLog(line: string): void {
     this.log.unshift(`${new Date().toLocaleTimeString()}  ${line}`);
     if (this.log.length > 80) this.log.pop();

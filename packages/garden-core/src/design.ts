@@ -217,9 +217,6 @@ export function samplePoints(it: Item): Pt[] {
   return out;
 }
 
-/** Bump when EXISTING changes, so the phone swaps its saved copy for the new one. */
-export const EXISTING_VERSION = 2;
-
 type Existing = { kind: Kind; label: string; x?: number; y?: number; w?: number; h?: number; pts?: Pt[]; mat?: string; nearHouse?: boolean };
 
 /** The middle of a stepping-stone path, widened to a strip. */
@@ -249,18 +246,20 @@ const EXISTING: Existing[] = [
   { kind: "tree", label: "Hedge", x: 0.7, y: 30, w: 1.4, h: 1.4, nearHouse: true },
 ];
 
+/** The rear garden length EXISTING was measured on. */
+const EXISTING_GARDEN_M = 33;
+
 /** What was already in the test garden, where the drone survey showed it. */
 export function existingFeatures(plot: Plot, nextId: () => number): Item[] {
-  const dy = plot.rearGardenM - 33;
+  const dy = plot.rearGardenM - EXISTING_GARDEN_M;
   return EXISTING.map((e): Item => {
     const shift = e.nearHouse ? dy : 0;
     const base = { id: nextId(), kind: e.kind, a: 0, exist: true, label: e.label, ...(e.mat ? { mat: e.mat } : {}) };
     if (!e.pts) return { ...base, x: e.x!, y: e.y! + shift, w: e.w!, h: e.h! };
-    const pts = e.pts.map(([x, y]): Pt => [x, y + shift]);
-    const xs = pts.map((p) => p[0]);
-    const ys = pts.map((p) => p[1]);
-    const [cx, cy] = centre({ ...base, x: 0, y: 0, w: 0, h: 0, pts });
-    return { ...base, pts, x: cx, y: cy, w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    const shape: Item = { ...base, x: 0, y: 0, w: 0, h: 0, pts: e.pts.map(([x, y]): Pt => [x, y + shift]) };
+    const [x0, y0, x1, y1] = bbox(shape);
+    const [x, y] = centre(shape);
+    return { ...shape, x, y, w: x1 - x0, h: y1 - y0 };
   });
 }
 

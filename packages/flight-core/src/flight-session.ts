@@ -135,9 +135,7 @@ export class FlightSession {
     this.o.bridge.hover();
     // Climbing restarts from the climb command; take-off and scanning carry on where they were.
     this.heldFrom = this.state === "climbing" ? "takingOff" : this.state;
-    this.commandedIndex = undefined;
-    this.photoRequested = false;
-    this.settleStart = undefined;
+    this.commanded(undefined);
     this.holdReason = "pilot";
     this.setState("holding");
   }
@@ -178,7 +176,6 @@ export class FlightSession {
   /** Land straight down where it is (the pilot has checked the ground below is clear). */
   pilotLand(): void {
     if (this.state === "ready" || this.state === "landed") return;
-    if (this.filming) this.stopFilming();
     this.o.bridge.land();
     this.returnReason = "pilotLanded";
     this.setState("landing");
@@ -187,7 +184,6 @@ export class FlightSession {
   /** The Return button in the app. */
   pilotReturnHome(): void {
     if (this.state === "ready" || this.state === "landed") return;
-    if (this.filming) this.stopFilming();
     this.o.bridge.returnHome();
     this.returnReason = "pilotButton";
     this.setState("returning");
@@ -296,9 +292,7 @@ export class FlightSession {
     if (this.commandedIndex !== next.index) {
       bridge.setGimbalPitch(next.gimbalPitchDeg);
       bridge.goTo(next.position, next.altitudeM, next.speedMs ?? mission.speedMs, next.headingDeg);
-      this.commandedIndex = next.index;
-      this.photoRequested = false;
-      this.settleStart = undefined;
+      this.commanded(next.index);
       return;
     }
 
@@ -315,7 +309,7 @@ export class FlightSession {
     if (arrived && !this.photoRequested) {
       if (next.photo) {
         // The camera is still saving a photo from the run: wait for it rather than be told it is busy.
-        if (!this.settled(t) || this.flyPending.size > 0 || this.now() < this.retryAfter) return;
+        if (!this.settled(t) || this.cameraBusy()) return;
         bridge.takePhoto(next.index);
         this.photoRequested = true;
       } else {
@@ -323,7 +317,7 @@ export class FlightSession {
           bridge.startVideo();
           this.filming = true;
           this.log.push("filming");
-        } else if (next.video === "stop" && this.filming) {
+        } else if (next.video === "stop") {
           this.stopFilming();
         }
         this.recordPhoto(next.index);
@@ -341,9 +335,7 @@ export class FlightSession {
     if (this.commandedIndex !== end.index) {
       bridge.setGimbalPitch(w.gimbalPitchDeg);
       bridge.goTo(end.position, end.altitudeM, end.speedMs ?? mission.speedMs, end.headingDeg);
-      this.commandedIndex = end.index;
-      this.photoRequested = false;
-      this.settleStart = undefined;
+      this.commanded(end.index);
     }
     const run = toLocal(w.position, end.position);
     const len = Math.hypot(run.x, run.y);
@@ -360,7 +352,7 @@ export class FlightSession {
     }
     // The camera is still saving the last photo (a slow card), or pausing after a failed one: rather
     // than be refused, take this one later at a stop.
-    if (this.flyPending.size > 0 || this.now() < this.retryAfter) {
+    if (this.cameraBusy()) {
       this.log.push(`photo ${w.index}: camera still busy as the drone passed, taking it at a stop`);
       this.stopAt.add(w.index);
       return;
@@ -377,7 +369,20 @@ export class FlightSession {
     return still || this.now() - this.settleStart >= SETTLE_MAX_S;
   }
 
+  /** Heading for a new waypoint: no photo asked for there yet, and a fresh settling wait. */
+  private commanded(index: number | undefined): void {
+    this.commandedIndex = index;
+    this.photoRequested = false;
+    this.settleStart = undefined;
+  }
+
+  /** Still saving a photo taken on the fly, or pausing after a failed one. */
+  private cameraBusy(): boolean {
+    return this.flyPending.size > 0 || this.now() < this.retryAfter;
+  }
+
   private stopFilming(): void {
+    if (!this.filming) return;
     this.o.bridge.stopVideo();
     this.filming = false;
     this.log.push("filming stopped");
@@ -422,7 +427,6 @@ export class FlightSession {
 
   /** Every waypoint done: the drone's own Return to Home, or land straight down if the mission says so. */
   private finish(): void {
-    if (this.filming) this.stopFilming();
     if (this.o.mission.endWith !== "land") return this.goHome("complete");
     this.o.bridge.land();
     this.returnReason = "complete";
@@ -430,7 +434,6 @@ export class FlightSession {
   }
 
   private goHome(reason: ReturnReason): void {
-    if (this.filming) this.stopFilming();
     this.o.bridge.returnHome();
     this.returnReason = reason;
     this.setState("returning");
@@ -461,6 +464,8 @@ export class FlightSession {
 
   private setState(s: SessionState): void {
     if (s === this.state) return;
+    // Whatever ends the flight (the app, the pilot or the drone itself) also ends the film.
+    if (s === "returning" || s === "landing" || s === "landed") this.stopFilming();
     this.log.push(`${this.state} -> ${s}${s === "returning" && this.returnReason ? ` (${this.returnReason})` : ""}`);
     this.state = s;
   }

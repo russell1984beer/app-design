@@ -11,7 +11,7 @@ import type { Mission, ScanProgress } from "../src/mission.ts";
 import { planGrid, planSurvey, withFilm } from "../src/planner.ts";
 import { DEFAULT_SAFETY, insideGeofence, type SafetySettings } from "../src/safety.ts";
 import { SimDrone, type SimOptions } from "../src/sim-drone.ts";
-import { FIELD, FIELD_HOME, ORIGIN, PLOT, PLOT_BEARING, PLOT_HOME, alongAxis, landed, run } from "./helpers.ts";
+import { FIELD, FIELD_HOME, GARDEN_HOME, ORIGIN, PLOT, PLOT_BEARING, PLOT_HOME, alongAxis, landed, run } from "./helpers.ts";
 
 type Setup = {
   boundary?: typeof PLOT;
@@ -328,7 +328,7 @@ test("refuses to take off before the failsafe is configured on the drone", () =>
 });
 
 for (const edgeLap of [false, true]) test(`garden survey${edgeLap ? " with the edge lap" : ""}: never crosses the property boundary and lands back where it took off`, () => {
-  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25); // middle of the rear garden
+  const home = GARDEN_HOME;
   const mission = planSurvey(PLOT, { edgeLap });
   const sim = new SimDrone({ home });
   const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
@@ -347,13 +347,10 @@ for (const edgeLap of [false, true]) test(`garden survey${edgeLap ? " with the e
 });
 
 /** The garden survey from the middle of the rear garden, optionally with the fly-over film. */
-function smoothSurvey(film = false) {
-  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
-  const scan = planSurvey(PLOT);
-  const mission = film ? withFilm(scan, alongAxis(ORIGIN, PLOT_BEARING, 41), alongAxis(ORIGIN, PLOT_BEARING, 9)) : scan;
-  const sim = new SimDrone({ home });
-  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
-  return { home, scan, mission, sim, session };
+function smoothSurvey(o: { film?: boolean; plan?: Parameters<typeof planSurvey>[1]; sim?: Partial<SimOptions> } = {}) {
+  const scan = planSurvey(PLOT, o.plan);
+  const mission = o.film ? withFilm(scan, alongAxis(ORIGIN, PLOT_BEARING, 41), alongAxis(ORIGIN, PLOT_BEARING, 9)) : scan;
+  return { scan, ...setup({ home: GARDEN_HOME, mission, sim: o.sim }) };
 }
 
 test("smooth survey: photos along each run are taken on the fly, the ends at a stop, each where planned", () => {
@@ -386,11 +383,8 @@ test("smooth survey: a photo that fails on the fly is taken again at a stop, and
 });
 
 test("slow memory card: photos the camera is too busy for are taken at a stop, and the scan finishes", () => {
-  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
-  const mission = planSurvey(PLOT);
   // Each photo takes 4 s to save, longer than the 2.5 s between photos on the fly.
-  const sim = new SimDrone({ home, photoSaveS: 4 });
-  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  const { mission, sim, session } = smoothSurvey({ sim: { photoSaveS: 4 } });
   session.start();
   run(sim, session, { until: landed(sim, session), maxS: 3600 });
   assert.equal(session.returnReason, "complete", session.log.slice(-5).join(" | "));
@@ -400,10 +394,7 @@ test("slow memory card: photos the camera is too busy for are taken at a stop, a
 });
 
 test("slow memory card with a longer time between photos: the drone flies slower and never stops for them", () => {
-  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
-  const mission = planSurvey(PLOT, { photoIntervalS: 5 });
-  const sim = new SimDrone({ home, photoSaveS: 4 });
-  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
+  const { mission, sim, session } = smoothSurvey({ plan: { photoIntervalS: 5 }, sim: { photoSaveS: 4 } });
   session.start();
   run(sim, session, { until: landed(sim, session), maxS: 3600 });
   assert.equal(session.returnReason, "complete");
@@ -414,11 +405,8 @@ test("slow memory card with a longer time between photos: the drone flies slower
 });
 
 test("first photo fails (the 18 Oct slow card): it waits before trying again instead of giving up", () => {
-  const home = alongAxis(ORIGIN, PLOT_BEARING, 28.25);
-  const mission = planSurvey(PLOT);
-  const sim = new SimDrone({ home });
+  const { mission, sim, session } = smoothSurvey();
   sim.failOnce.add(0);
-  const session = new FlightSession({ mission, boundary: PLOT, home, settings: DEFAULT_SAFETY, bridge: sim, clock: () => sim.timeS });
   session.start();
   run(sim, session, { until: landed(sim, session) });
   assert.equal(session.returnReason, "complete");
@@ -426,7 +414,7 @@ test("first photo fails (the 18 Oct slow card): it waits before trying again ins
 });
 
 test("fly-over film: recorded after the photos, inside the plot, then home with nothing left recording", () => {
-  const { scan, sim, session } = smoothSurvey(true);
+  const { scan, sim, session } = smoothSurvey({ film: true });
   let furthestOut = 0;
   let photosWhileFilming = 0;
   let photosBefore = 0;
@@ -449,7 +437,7 @@ test("fly-over film: recorded after the photos, inside the plot, then home with 
 });
 
 test("the Return button during the film stops the recording", () => {
-  const { sim, session } = smoothSurvey(true);
+  const { sim, session } = smoothSurvey({ film: true });
   session.start();
   run(sim, session, { until: () => sim.filming && sim.filmS > 5 });
   session.pilotReturnHome();
