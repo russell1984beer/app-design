@@ -173,7 +173,10 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
   });
   const extra: CheckItem[] = [];
   // Say what is actually missing: a drone that is connected but has no GPS fix is not "not connected".
-  if (!t?.signalOk) extra.push({ id: "link", status: "block", message: drone.bridge.linkReport() });
+  // In the simulator the drone only gets a position once the simulator runs, and launch() starts it,
+  // so there the controller and drone being linked is enough.
+  const linked = s.mode === "sim" ? !!t?.linkUp || !!t?.signalOk : !!t?.signalOk;
+  if (!linked) extra.push({ id: "link", status: "block", message: drone.bridge.linkReport() });
   if (s.mode === "real") {
     if (s.testsPassed.length < SIM_TEST_COUNT) {
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
@@ -229,9 +232,17 @@ export function resumable(kind: "survey" | "roof", s: AppState = S): { done: num
   return done > 0 && done < mission.waypoints.length ? { done, total: mission.waypoints.length } : null;
 }
 
+const SIM_POSITION_WAIT_MS = 20_000;
+
 /** Take off and fly the plan. Saves progress after every photo so the scan can resume. */
 export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
-  if (S.mode === "sim" && !drone.simOn) await drone.setSimulator(true);
+  if (S.mode === "sim") {
+    if (!drone.simOn) await drone.setSimulator(true);
+    // The simulator gives the drone its pretend GPS position a moment after it starts.
+    const until = Date.now() + SIM_POSITION_WAIT_MS;
+    while (!drone.telemetry?.signalOk && Date.now() < until) await new Promise((r) => setTimeout(r, 250));
+    if (!drone.telemetry?.signalOk) throw new Error("The simulator is on but the drone has no position yet. Wait a few seconds and tap Start again.");
+  }
   const kind = plan.kind;
   const saved = resume && kind !== "check" ? S.resume[kind] : undefined;
   const progress = saved && saved.progress.missionId === plan.mission.id ? saved.progress : undefined;
