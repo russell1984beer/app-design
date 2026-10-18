@@ -97,6 +97,8 @@ class DroneController(
   private var photosLeft: Int? = null
   /** Speed (north, east, down, m/s) and attitude, so photos at a stop wait until the drone is still and level. */
   private var velocity: Velocity3D? = null
+  /** GPS satellites the drone sees, for the log: tells "no fix yet" from "position not coming through". */
+  private var satellites: Int? = null
   private var attitude: Attitude? = null
   private var virtualStickEnabled = false
   private var authority: FlightControlAuthority? = null
@@ -202,6 +204,7 @@ class DroneController(
     listen(FlightControllerKey.KeyIsFlying) { if (it != null) isFlying = it }
     listen(FlightControllerKey.KeyAreMotorsOn) { if (it != null) motorsOn = it }
     listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
+    listen(FlightControllerKey.KeyGPSSatelliteCount) { satellites = it }
     listen(FlightControllerKey.KeyAircraftVelocity) { velocity = it }
     listen(FlightControllerKey.KeyAircraftAttitude) { attitude = it }
     listen(FlightControllerKey.KeyWindSpeed) { windSpeed = it }
@@ -732,7 +735,7 @@ class DroneController(
     }
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
-      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw photosLeft=$photosLeft mode=${djiFlightMode?.name}")
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} satellites=${satellites ?: "-"} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw photosLeft=$photosLeft mode=${djiFlightMode?.name}")
     }
     try {
       sendTelemetry(now)

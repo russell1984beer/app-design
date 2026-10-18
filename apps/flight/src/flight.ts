@@ -172,7 +172,8 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     photosNeeded: mission.waypoints.length - (resume && saved?.progress.missionId === mission.id ? saved.progress.completedWaypoints.length : 0),
   });
   const extra: CheckItem[] = [];
-  if (!t?.signalOk) extra.push({ id: "link", status: "block", message: "Drone not connected. Plug the phone into the RC-N2 and switch the drone on." });
+  // Say what is actually missing: a drone that is connected but has no GPS fix is not "not connected".
+  if (!t?.signalOk) extra.push({ id: "link", status: "block", message: drone.bridge.linkReport() });
   if (s.mode === "real") {
     if (s.testsPassed.length < SIM_TEST_COUNT) {
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
