@@ -37,6 +37,9 @@ const NO_DRONE: DjiDroneNative = {
     throw new Error("No drone module on this device.");
   },
   setSimulatorWind() {},
+  renderPdfPage: async () => {
+    throw new Error("A PDF drawing can be opened on the Android phone. Here, use a picture of it (a screenshot of the PDF).");
+  },
 };
 
 export default requireOptionalNativeModule<DjiDroneNative>("DjiDrone") ?? NO_DRONE;

@@ -1,5 +1,5 @@
 // Plotwise: the app, laid out like the prototype (prototype/plotwise-prototype.html): a map of the
-// plot on top, a panel for the current tab underneath, and six tabs along the bottom.
+// plot on top, a panel for the current tab underneath, and the tabs along the bottom.
 
 import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
@@ -11,16 +11,18 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { canFly } from "./modules/dji-drone";
 import { drone } from "./src/drone";
 import { EmergencyBar } from "./src/EmergencyBar";
+import { LineUp } from "./src/LineUp";
 import { MapView } from "./src/MapView";
 import { loadSavedLidar } from "./src/lidar";
 import { loadSavedSurvey } from "./src/survey";
 import { DesignPanel } from "./src/panels/DesignPanel";
 import { MaterialsPanel } from "./src/panels/MaterialsPanel";
 import { PlanPanel } from "./src/panels/PlanPanel";
+import { ProjectsPanel } from "./src/panels/ProjectsPanel";
 import { RoofPanel } from "./src/panels/RoofPanel";
 import { ScanPanel } from "./src/panels/ScanPanel";
 import { SurveyPanel } from "./src/panels/SurveyPanel";
-import { commit, go, loadSaved, useApp, type Tab } from "./src/store";
+import { commit, currentProject, go, loadSaved, useApp, type Tab } from "./src/store";
 import { TestBench } from "./src/TestBench";
 import { C } from "./src/theme";
 
@@ -74,14 +76,23 @@ function Shell() {
     );
   }
 
+  if (s.lineUp) {
+    return (
+      <>
+        <SystemBars />
+        <LineUp />
+      </>
+    );
+  }
+
   const header = (
     <View style={[styles.header, wide && { paddingHorizontal: 0 }]}>
       <Text style={styles.brand}>Plotwise</Text>
-      <Text style={styles.proj}>Test property, whole plot</Text>
+      <Text style={styles.proj}>{currentProject().name}</Text>
     </View>
   );
 
-  const Panel = { plan: PlanPanel, scan: ScanPanel, survey: SurveyPanel, design: DesignPanel, roof: RoofPanel, quote: MaterialsPanel }[s.tab];
+  const Panel = { projects: ProjectsPanel, plan: PlanPanel, scan: ScanPanel, survey: SurveyPanel, design: DesignPanel, roof: RoofPanel, quote: MaterialsPanel }[s.tab];
 
   return (
     <View style={[styles.body, { paddingTop: insets.top }]}>
@@ -126,6 +137,7 @@ function Shell() {
 }
 
 const TABS: [Tab, string][] = [
+  ["projects", "Projects"],
   ["plan", "Plan"],
   ["scan", "Scan"],
   ["survey", "Survey"],
@@ -159,6 +171,7 @@ function TabIcon({ id, colour }: { id: Tab; colour: string }) {
   const p = { stroke: colour, strokeWidth: 1.8, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" } as const;
   return (
     <Svg width={22} height={20} viewBox="0 0 24 24">
+      {id === "projects" && <Path d="M3 7h6l2 2h10v10H3zM3 7v12" {...p} />}
       {id === "plan" && (
         <>
           <Path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z" {...p} />

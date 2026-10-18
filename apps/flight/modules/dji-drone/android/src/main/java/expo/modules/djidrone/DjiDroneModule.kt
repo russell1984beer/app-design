@@ -75,5 +75,16 @@ class DjiDroneModule : Module() {
       FlyZones.around(lat, lng) { zones, error -> if (zones != null) promise.resolve(zones) else promise.reject("FLYSAFE", error, null) }
     }
     Function("setSimulatorWind") { northMs: Double, eastMs: Double -> controller?.setSimulatorWind(northMs, eastMs) }
+    AsyncFunction("renderPdfPage") { uri: String, outUri: String, maxSide: Int, promise: Promise ->
+      val context = appContext.reactContext ?: return@AsyncFunction promise.reject("NO_CONTEXT", "The app is not ready yet.", null)
+      // Off the main thread: a big page takes a moment to draw.
+      Thread {
+        try {
+          promise.resolve(PdfPages.renderFirstPage(context, uri, outUri, maxSide))
+        } catch (e: Exception) {
+          promise.reject("PDF", "Could not read the PDF: ${e.message}", e)
+        }
+      }.start()
+    }
   }
 }

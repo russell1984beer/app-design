@@ -12,7 +12,7 @@ import { readSurvey, type ScanDetails, type SurveyPackage } from "../../../packa
 import { SIM_HOME } from "./drone";
 import { planToGps } from "./flight";
 import { currentLidar, fillGapsFromLidar, lidarSurvey } from "./lidar";
-import { S, commit } from "./store";
+import { HOME_PROJECT_ID, S, commit } from "./store";
 
 const SURVEY_FILE = "survey.json";
 
@@ -64,11 +64,12 @@ function lidarOnlySurvey(): SurveyPackage | null {
   return lidarCache.survey;
 }
 
+/** Each project's survey in its own file (the first project keeps the original name). */
 function surveyFile(): File {
-  return new File(Paths.document, SURVEY_FILE);
+  return new File(Paths.document, S.projectId === HOME_PROJECT_ID ? SURVEY_FILE : `survey-${S.projectId}.json`);
 }
 
-/** Read the saved survey when the app starts. */
+/** Read the open project's saved survey (when the app starts, or another project is opened). */
 export async function loadSavedSurvey(): Promise<void> {
   // The browser preview can be given a survey to show.
   const demo = (globalThis as { __PLOTWISE_DEMO_SURVEY__?: string }).__PLOTWISE_DEMO_SURVEY__;
@@ -79,6 +80,7 @@ export async function loadSavedSurvey(): Promise<void> {
     commit();
     return;
   }
+  current = null;
   try {
     const f = surveyFile();
     if (!f.exists) return;

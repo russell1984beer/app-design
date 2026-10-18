@@ -10,7 +10,35 @@ import { DEFAULT_SAFETY, type SafetySettings } from "../../../packages/flight-co
 import { PHOTO_INTERVAL_S } from "../../../packages/flight-core/src/planner.ts";
 import { DEFAULT_PRICES, History, TEST_PLOT, existingFeatures, type Prices, type ScanDetails, type Item, type Kind, type Plot, type Pt } from "../../../packages/garden-core/src/index.ts";
 
-export type Tab = "plan" | "scan" | "survey" | "design" | "roof" | "quote";
+export type Tab = "projects" | "plan" | "scan" | "survey" | "design" | "roof" | "quote";
+
+/** What belongs to one property; the rest (flight settings, prices, safety) is shared by all. */
+export const PROJECT_FIELDS = ["plot", "home", "scanned", "items", "nextId", "existInit", "style", "styleNote", "roof", "resume", "lastScan", "goneSpots"] as const;
+export type ProjectField = (typeof PROJECT_FIELDS)[number];
+
+/** One property: where it is, its plot drawing, and (while another is open) its own saved data. */
+export type Project = {
+  id: string;
+  name: string;
+  postcode: string;
+  /** The middle of the postcode area (from postcodes.io): where the satellite map starts. */
+  postcodeAt: LatLng | null;
+  /** The plot drawing (e.g. the Land Registry title plan), copied into the app's files. */
+  drawing: { file: string; widthPx: number; heightPx: number } | null;
+  /** Where the drawing was lined up on the satellite map. */
+  overlay: { centre: LatLng; rotationDeg: number; metresPerPx: number } | null;
+  /** The boundary corners as marked: far end left, far end right, street end right, street end left. */
+  corners: LatLng[] | null;
+  /** This project's own fields while another project is open; null for the open one (they are in S). */
+  data: Partial<Pick<AppState, ProjectField>> | null;
+};
+
+/** The first project: the owner's own property, whose garden the existing features were measured on. */
+export const HOME_PROJECT_ID = "home";
+
+export function newProject(id: string, name: string): Project {
+  return { id, name, postcode: "", postcodeAt: null, drawing: null, overlay: null, corners: null, data: null };
+}
 export type FlightMode = "sim" | "real";
 
 export type AppState = {
@@ -70,12 +98,17 @@ export type AppState = {
   /** Tall spots in the LIDAR the owner says are gone (e.g. trees cut down since), on the plan. */
   goneSpots: Pt[];
   showBench: boolean;
+  /** The properties in the app, and the one open now. */
+  projects: Project[];
+  projectId: string;
+  /** The full-screen view for lining a plot drawing up on the satellite map. */
+  lineUp: boolean;
   /** Bumped on every change; the map redraws when it changes. */
   v: number;
 };
 
 /** Raise this, and add a step to loadSaved, when saved data needs correcting. */
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 export const S: AppState = {
   tab: "plan",
@@ -119,16 +152,41 @@ export const S: AppState = {
   firstFlightDoneAt: null,
   goneSpots: [],
   showBench: false,
+  projects: [newProject(HOME_PROJECT_ID, "My property")],
+  projectId: HOME_PROJECT_ID,
+  lineUp: false,
   v: 0,
 };
+
+/** The data a new project starts with (the plot is a placeholder until its corners are marked). */
+export function freshProjectData(): Pick<AppState, ProjectField> {
+  return {
+    plot: { ...TEST_PLOT },
+    home: [TEST_PLOT.widthM / 2, TEST_PLOT.rearGardenM / 2],
+    scanned: false,
+    items: [],
+    nextId: 1,
+    existInit: false,
+    style: null,
+    styleNote: "",
+    roof: { photosTaken: 0, showExample: false, sel: null },
+    resume: {},
+    lastScan: null,
+    goneSpots: [],
+  };
+}
+
+export function currentProject(): Project {
+  return S.projects.find((p) => p.id === S.projectId) ?? S.projects[0];
+}
 
 export const history = new History();
 
 export const nextId = () => S.nextId++;
 
-/** Add the features already in the garden the first time a survey is loaded. */
+/** Add the features already in the garden the first time a survey is loaded (the owner's own property only). */
 export function ensureExisting(): void {
-  if (S.existInit || !S.scanned) return;
+  if (S.existInit || !S.scanned || S.projectId !== HOME_PROJECT_ID) return;
   S.existInit = true;
   S.items.push(...existingFeatures(S.plot, nextId));
 }
@@ -136,7 +194,7 @@ export function ensureExisting(): void {
 /** Snap to 10 cm when snapping is on. */
 export const sn = (v: number) => (S.snap ? Math.round(v * 10) / 10 : v);
 
-const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "photoIntervalS", "safety", "scanned", "items", "nextId", "existInit", "saveVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots"] as const;
+const KEEP = ["plot", "home", "alt", "ov", "edgeLap", "film", "photosPerRun", "photoIntervalS", "safety", "scanned", "items", "nextId", "existInit", "saveVersion", "style", "styleNote", "snap", "roof", "resume", "prices", "lastScan", "testsPassed", "firstFlightDoneAt", "goneSpots", "projects", "projectId"] as const;
 const STORE_KEY = "plotwise-state-v1";
 
 const listeners = new Set<() => void>();
@@ -185,6 +243,8 @@ export async function loadSaved(): Promise<void> {
         S.items = S.items.filter((i) => !i.exist);
         S.existInit = false;
       }
+      // v4 added projects: an older save had none, so it keeps the default list, whose one project
+      // ("My property") is everything already saved. Nothing to move.
       S.saveVersion = SAVE_VERSION;
     }
   } catch {
