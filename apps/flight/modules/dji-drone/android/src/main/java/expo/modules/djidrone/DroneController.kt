@@ -117,7 +117,7 @@ class DroneController(
   private var pendingPhoto: PendingPhoto? = null
   private var running = false
 
-  private class PendingPhoto(val waypointIndex: Int, var deadlineMs: Long, var shutterFired: Boolean = false)
+  private class PendingPhoto(val waypointIndex: Int, var deadlineMs: Long, var shutterFired: Boolean = false, val askedAtMs: Long = 0)
 
   // ---- Lifecycle -------------------------------------------------------------------------------
 
@@ -392,7 +392,7 @@ class DroneController(
       photoFailed(waypointIndex, "camera busy")
       return@post
     }
-    val photo = PendingPhoto(waypointIndex, scheduler.nowMs() + PHOTO_TIMEOUT_MS)
+    val photo = PendingPhoto(waypointIndex, scheduler.nowMs() + PHOTO_TIMEOUT_MS, askedAtMs = scheduler.nowMs())
     pendingPhoto = photo
     action(CameraKey.KeyStartShootPhoto) { e ->
       if (pendingPhoto !== photo) return@action
@@ -539,7 +539,13 @@ class DroneController(
     }
     trackLinkLoss(now)
     sendSticks(now)
-    pendingPhoto?.let { if (now > it.deadlineMs) { pendingPhoto = null; photoFailed(it.waypointIndex, "no photo reported by the camera") } }
+    pendingPhoto?.let {
+      if (now > it.deadlineMs) {
+        pendingPhoto = null
+        Log.w(TAG, "Photo ${it.waypointIndex} not saved within ${PHOTO_TIMEOUT_MS / 1000} s (storage ${storageInUse?.name})")
+        photoFailed(it.waypointIndex, "no photo reported by the camera")
+      }
+    }
     emitTelemetry(now)
     scheduler.postDelayed(TICK_MS) { tick() }
   }
@@ -781,6 +787,8 @@ class DroneController(
     val photo = pendingPhoto ?: return
     if (info == null || !photo.shutterFired) return
     pendingPhoto = null
+    // How long the card takes to save a photo: on-the-fly photos come every PHOTO_INTERVAL_S (2.5 s).
+    Log.i(TAG, "Photo ${photo.waypointIndex} saved ${"%.1f".format((scheduler.nowMs() - photo.askedAtMs) / 1000.0)} s after asking (storage ${storageInUse?.name})")
     emit(
       "onDroneEvent",
       mapOf("type" to "photoTaken", "waypointIndex" to photo.waypointIndex, "file" to "${info.dir_no}/${info.file_no}"),
