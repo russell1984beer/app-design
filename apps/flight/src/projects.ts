@@ -105,9 +105,13 @@ export async function pickDrawing(): Promise<"picked" | "cancelled"> {
   const copy = new File(Paths.document, name);
   let width: number;
   let height: number;
+  let paperWidthMm: number | undefined;
   if (isPdf) {
     if (!DjiDrone.renderPdfPage) throw new Error("This version of the app cannot open PDFs. Use a screenshot of the title plan instead.");
-    [width, height] = await DjiDrone.renderPdfPage(asset.uri, copy.uri, PDF_PAGE_PX);
+    const [w, h, paperPt] = await DjiDrone.renderPdfPage(asset.uri, copy.uri, PDF_PAGE_PX);
+    [width, height] = [w, h];
+    // Points are 1/72 inch.
+    if (paperPt) paperWidthMm = (paperPt / 72) * 25.4;
   } else {
     new File(asset.uri).copy(copy);
     ({ width, height } = await Image.getSize(copy.uri));
@@ -117,7 +121,7 @@ export async function pickDrawing(): Promise<"picked" | "cancelled"> {
     if (old.exists) old.delete();
   }
   // A new drawing has to be lined up again.
-  p.drawing = { file: name, widthPx: width, heightPx: height };
+  p.drawing = { file: name, widthPx: width, heightPx: height, ...(paperWidthMm ? { paperWidthMm } : {}) };
   p.overlay = null;
   p.corners = null;
   commit();

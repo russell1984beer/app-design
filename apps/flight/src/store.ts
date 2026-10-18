@@ -24,7 +24,7 @@ export type Project = {
   /** The middle of the postcode area (from postcodes.io): where the satellite map starts. */
   postcodeAt: LatLng | null;
   /** The plot drawing (e.g. the Land Registry title plan), copied into the app's files. */
-  drawing: { file: string; widthPx: number; heightPx: number } | null;
+  drawing: { file: string; widthPx: number; heightPx: number; /** Paper width (PDFs), so a printed scale gives the real size. */ paperWidthMm?: number } | null;
   /** Where the drawing was lined up on the satellite map. */
   overlay: { centre: LatLng; rotationDeg: number; metresPerPx: number } | null;
   /** The boundary corners as marked: far end left, far end right, street end right, street end left. */

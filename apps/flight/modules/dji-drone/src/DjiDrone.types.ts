@@ -81,6 +81,6 @@ export interface DjiDroneNative {
   /** Erase every photo on the drone's storage (on the ground, motors off). */
   formatStorage(): Promise<void>;
   setSimulatorWind(northMs: number, eastMs: number): void;
-  /** A PDF's first page as a PNG (Android); resolves [width, height] in pixels. Missing from older builds. */
+  /** A PDF's first page as a PNG (Android); resolves [width, height] in pixels, then the paper size in points. Missing from older builds. */
   renderPdfPage?(uri: string, outUri: string, maxSide: number): Promise<number[]>;
 }

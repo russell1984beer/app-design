@@ -31,8 +31,12 @@ export function LineUp() {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [z, setZ] = useState(19);
   const [mapCentre, setMapCentre] = useState<LatLng>(start);
-  // Starts about 60 m across: a title plan usually shows a little more than the plot.
-  const [ov, setOv] = useState<NonNullable<Project["overlay"]>>(p.overlay ?? { centre: start, rotationDeg: 0, metresPerPx: 60 / drawing.widthPx });
+  /** Metres on the ground per drawing pixel at a printed scale (PDFs know their paper size). */
+  const atScale = (scale: number) => (drawing.paperWidthMm! / 1000) * scale / drawing.widthPx;
+  // A PDF starts at 1:1250, the usual scale of title and location plans; a picture about 60 m across.
+  const [ov, setOv] = useState<NonNullable<Project["overlay"]>>(
+    p.overlay ?? { centre: start, rotationDeg: 0, metresPerPx: drawing.paperWidthMm ? atScale(1250) : 60 / drawing.widthPx },
+  );
   const [mode, setMode] = useState<"move" | "corners">("move");
   const [corners, setCorners] = useState<LatLng[]>(p.corners ?? []);
   const [opacity, setOpacity] = useState(0.55);
@@ -139,6 +143,16 @@ export function LineUp() {
               <Chip label="⟳ 1°" onPress={() => turn(1)} />
               <Chip label="⟳ 5°" onPress={() => turn(5)} />
             </Chips>
+            {drawing.paperWidthMm && (
+              <>
+                <Note>Scale printed on the plan (sets its size exactly; then only small changes should be needed):</Note>
+                <Chips>
+                  {[500, 1250, 2500].map((sc) => (
+                    <Chip key={sc} label={`1:${sc}`} pressed={Math.abs(ov.metresPerPx / atScale(sc) - 1) < 0.001} onPress={() => setOv({ ...ov, metresPerPx: atScale(sc) })} />
+                  ))}
+                </Chips>
+              </>
+            )}
             <Chips>
               <Chip label="Smaller" onPress={() => scale(1 / 1.1)} />
               <Chip label="−2%" onPress={() => scale(1 / 1.02)} />

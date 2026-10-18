@@ -16,7 +16,11 @@ import kotlin.math.roundToInt
  * Uses Android's own PDF renderer, so nothing extra is needed.
  */
 object PdfPages {
-  /** Renders page 1 of the PDF at `uri` to a PNG at `outUri`, longest side `maxSide` px. Returns [width, height]. */
+  /**
+   * Renders page 1 of the PDF at `uri` to a PNG at `outUri`, longest side `maxSide` px. Returns
+   * [width, height] in pixels and the page's paper size [width, height] in points (1/72 inch), from
+   * which a plan's printed scale gives its real size.
+   */
   fun renderFirstPage(context: Context, uri: String, outUri: String, maxSide: Int): List<Int> {
     val source = Uri.parse(uri)
     val pfd = if (source.scheme == "content") {
@@ -39,7 +43,7 @@ object PdfPages {
           page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
           FileOutputStream(File(Uri.parse(outUri).path ?: outUri)).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
           bitmap.recycle()
-          return listOf(w, h)
+          return listOf(w, h, page.width, page.height)
         } finally {
           page.close()
         }
