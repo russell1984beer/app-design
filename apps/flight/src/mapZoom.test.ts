@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { MAX_ZOOM, NO_ZOOM, toPlan, turnBox, turnPt, zoomAt, zoomedView, type VB } from "./mapZoom.ts";
+import { MAX_ZOOM, NO_ZOOM, boxAround, levelTurn, toPlan, turnBox, turnPt, zoomAt, zoomedView, type VB } from "./mapZoom.ts";
 
 // The garden view: a tall, thin plot (about 13 x 51 m with the margins) on a phone-shaped map.
 const BASE: VB = [-2.4, -2.2, 12.8, 51];
@@ -38,4 +38,14 @@ test("a quarter turn clockwise puts the plan's top edge down the right-hand side
   assert.deepEqual(turnPt(turnPt([3, 7], 270), -270), [3, 7]);
   assert.deepEqual(turnBox([0, 0, 7, 46], 90), [-46, 0, 46, 7]);
   assert.deepEqual(turnBox([0, 0, 7, 46], 0), [0, 0, 7, 46]);
+});
+
+test("a traced outline is turned so its longest side lies level along the bottom", () => {
+  // A long side slanting down to the right, the rest of the shape above it on screen.
+  const ring: [number, number][] = [[0, 0], [100, 50], [90, 20], [20, -10]];
+  const deg = levelTurn(ring);
+  const [a, b] = [turnPt(ring[0], deg), turnPt(ring[1], deg)];
+  assert.ok(Math.abs(a[1] - b[1]) < 0.2); // the turn is rounded to a tenth of a degree
+  for (const p of ring) assert.ok(turnPt(p, deg)[1] <= Math.max(a[1], b[1]) + 1e-6);
+  assert.deepEqual(boxAround([[1, 2], [5, 9]], 1), [0, 1, 6, 9]);
 });

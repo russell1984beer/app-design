@@ -74,3 +74,31 @@ export function turnBox(vb: VB, deg: number): VB {
   const ys = pts.map((p) => p[1]);
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
 }
+
+/**
+ * The turn (degrees clockwise) that lays an outline's longest side level along the bottom of the
+ * screen, with the rest of the outline above it: a traced site then sits square on the screen.
+ */
+export function levelTurn(ring: [number, number][]): number {
+  let best = 0;
+  let longest = -1;
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len > longest) [longest, best] = [len, i];
+  });
+  const [a, b] = [ring[best], ring[(best + 1) % ring.length]];
+  let deg = (-Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
+  // Screen y grows downwards: the outline must come out above (smaller y than) the side.
+  const mid = ring.reduce((m, p) => [m[0] + p[0] / ring.length, m[1] + p[1] / ring.length], [0, 0]);
+  if (turnPt(mid as [number, number], deg)[1] > turnPt(a, deg)[1]) deg += 180;
+  return Math.round(((deg % 360) + 360) % 360 * 10) / 10;
+}
+
+/** The box round some points, with `margin` all round. */
+export function boxAround(pts: [number, number][], margin: number): VB {
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
+  return [x0 - margin, y0 - margin, Math.max(...xs) - x0 + 2 * margin, Math.max(...ys) - y0 + 2 * margin];
+}

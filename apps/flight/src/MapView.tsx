@@ -53,7 +53,7 @@ import { firstFlightMission, gpsToPlan, missionOnPlan, planToGps, roofScan, surv
 import { HOME_PROJECT_ID, S, commit, currentProject, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
 import { aboveSeaLevelM, currentLidar } from "./lidar";
-import { MAX_ZOOM, NO_ZOOM, fit, toPlan, turnBox, turnPt, zoomAt, zoomedView, type Zoom } from "./mapZoom";
+import { MAX_ZOOM, NO_ZOOM, boxAround, fit, levelTurn, toPlan, turnBox, turnPt, zoomAt, zoomedView, type Zoom } from "./mapZoom";
 import { C } from "./theme";
 
 type VB = [number, number, number, number];
@@ -105,11 +105,14 @@ export function MapView() {
   const setZoom = (z: Zoom) => setZooms((all) => ({ ...all, [s.tab]: z }));
   const gesture = useRef<Gesture | null>(null);
 
-  // The map may be drawn turned (the roof plan never is). The view, zoom and pinch work in the turned
+  // The map may be drawn turned (the roof plan never is): a traced site with its longest side level
+  // along the bottom, then the owner's quarter turns. The view, zoom and pinch work in the turned
   // drawing's own coordinates; touches are turned back onto the plan.
-  const turn = s.tab === "roof" ? 0 : (currentProject().mapTurnDeg ?? 0);
+  const ring = s.tab === "roof" ? undefined : s.plot.boundary;
+  const quarters = currentProject().mapTurnDeg ?? 0;
+  const turn = s.tab === "roof" ? 0 : ((ring ? levelTurn(ring) : 0) + quarters) % 360;
   labelTurn = turn;
-  const base = turnBox(viewBoxFor(s), turn);
+  const base = ring ? boxAround(ring.map((p) => turnPt(p, turn)), Math.max(s.plot.widthM, s.plot.lengthM) * 0.06) : turnBox(viewBoxFor(s), turn);
   const vb = zoomedView(base, zoom);
   const { scale, ox, oy } = fit(vb, size.w, size.h);
   const px = (n: number) => n / scale;
@@ -202,7 +205,7 @@ export function MapView() {
             label="⟳"
             hint="Turn the map a quarter turn"
             onPress={() => {
-              currentProject().mapTurnDeg = (turn + 90) % 360;
+              currentProject().mapTurnDeg = (quarters + 90) % 360;
               // The old zoom was for the map the other way round.
               setZooms({});
               commit();
