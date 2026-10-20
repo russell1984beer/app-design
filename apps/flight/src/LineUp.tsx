@@ -3,7 +3,7 @@
 // traces its boundary point by point); the app works the plot out.
 
 import { useRef, useState } from "react";
-import { Image, PanResponder, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, PanResponder, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle, Polygon, Polyline, Text as SText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,6 +26,7 @@ const MAX_TRACE = 60;
 
 /** Zoomed out this far, a whole town fits on the screen: enough to find the site from a wrong postcode. */
 const MIN_ZOOM = 14;
+const MAX_ZOOM = 19;
 
 /** A tap moves less than this; more is a drag. */
 const TAP_PX = 10;
@@ -35,8 +36,10 @@ export function LineUp() {
   const insets = useSafeAreaInsets();
   const drawing = p.drawing!;
   const start = p.overlay?.centre ?? p.postcodeAt!;
+  const { width: winW, height: winH } = useWindowDimensions();
+  const sideways = winW > winH;
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [z, setZ] = useState(19);
+  const [z, setZ] = useState(MAX_ZOOM);
   const [mapCentre, setMapCentre] = useState<LatLng>(start);
   /** Metres on the ground per drawing pixel at a printed scale (PDFs know their paper size). */
   const atScale = (scale: number) => (drawing.paperWidthMm! / 1000) * scale / drawing.widthPx;
@@ -51,6 +54,33 @@ export function LineUp() {
   /** What a drag moves in "Move the plan": the plan, or the satellite photo under it. */
   const [dragWhat, setDragWhat] = useState<"plan" | "photo">("plan");
   const [found, setFound] = useState<{ ok: boolean; text: string } | null>(null);
+
+  /**
+   * Zoom in as far as the traced boundary (or, before one is traced, the whole turned plan sheet) still
+   * fits on the map, and centre the photo on it.
+   */
+  const fitPlan = (w = size.w, h = size.h) => {
+    let across: number;
+    let down: number;
+    let centre = ov.centre;
+    if (trace.length >= 3) {
+      // In world pixels at the closest zoom; each zoom out halves them.
+      const px = trace.map((q) => latLngToWorldPx(q, MAX_ZOOM));
+      const [x0, x1] = [Math.min(...px.map((q) => q.x)), Math.max(...px.map((q) => q.x))];
+      const [y0, y1] = [Math.min(...px.map((q) => q.y)), Math.max(...px.map((q) => q.y))];
+      [across, down] = [(x1 - x0) * metresPerPx(centre.lat, MAX_ZOOM), (y1 - y0) * metresPerPx(centre.lat, MAX_ZOOM)];
+      centre = worldPxToLatLng((x0 + x1) / 2, (y0 + y1) / 2, MAX_ZOOM);
+    } else {
+      const a = (ov.rotationDeg * Math.PI) / 180;
+      const [pw, ph] = [drawing.widthPx * ov.metresPerPx, drawing.heightPx * ov.metresPerPx];
+      across = Math.abs(pw * Math.cos(a)) + Math.abs(ph * Math.sin(a));
+      down = Math.abs(pw * Math.sin(a)) + Math.abs(ph * Math.cos(a));
+    }
+    let fit = MAX_ZOOM;
+    while (fit > MIN_ZOOM && (across / metresPerPx(centre.lat, fit) > w * 0.9 || down / metresPerPx(centre.lat, fit) > h * 0.9)) fit--;
+    setZ(fit);
+    setMapCentre(centre);
+  };
 
   const c = latLngToWorldPx(mapCentre, z);
   const toScreen = (q: LatLng) => {
@@ -70,14 +100,18 @@ export function LineUp() {
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         const n = now.current;
-        // Dragging the photo: remember the map's middle (world pixels); dragging the plan: where it is on screen.
-        dragFrom.current = n.mode === "move" && n.dragWhat === "photo" ? { x: n.c.x, y: n.c.y } : n.toScreen(n.ov.centre);
+        // Dragging the photo (always, while marking corners or tracing): remember the map's middle (world
+        // pixels); dragging the plan: where it is on screen.
+        dragFrom.current = n.mode !== "move" || n.dragWhat === "photo" ? { x: n.c.x, y: n.c.y } : n.toScreen(n.ov.centre);
       },
       onPanResponderMove: (_, g) => {
         const n = now.current;
-        if (n.mode !== "move" || !dragFrom.current) return;
-        if (n.dragWhat === "photo") setMapCentre(worldPxToLatLng(dragFrom.current.x - g.dx, dragFrom.current.y - g.dy, n.z));
-        else setOv({ ...n.ov, centre: n.toLatLng(dragFrom.current.x + g.dx, dragFrom.current.y + g.dy) });
+        if (!dragFrom.current) return;
+        if (n.mode !== "move" || n.dragWhat === "photo") {
+          // A tap that wobbles a little does not move the photo.
+          if (n.mode !== "move" && Math.abs(g.dx) + Math.abs(g.dy) <= TAP_PX) return;
+          setMapCentre(worldPxToLatLng(dragFrom.current.x - g.dx, dragFrom.current.y - g.dy, n.z));
+        } else setOv({ ...n.ov, centre: n.toLatLng(dragFrom.current.x + g.dx, dragFrom.current.y + g.dy) });
       },
       onPanResponderRelease: (e, g) => {
         const n = now.current;
@@ -110,8 +144,17 @@ export function LineUp() {
   const scale = (f: number) => setOv({ ...ov, metresPerPx: ov.metresPerPx * f });
 
   return (
-    <View style={[styles.body, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <View style={styles.map} onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...touch.panHandlers}>
+    <View style={[styles.body, sideways && styles.bodySideways, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View
+        style={styles.map}
+        onLayout={(e) => {
+          const { width: w, height: h } = e.nativeEvent.layout;
+          // The first time, open with the whole plan on the screen.
+          if (size.w === 0) fitPlan(w, h);
+          setSize({ w, h });
+        }}
+        {...touch.panHandlers}
+      >
         {/* Pictures only: the touches go to the map underneath. */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
         {size.w > 0 &&
@@ -143,8 +186,13 @@ export function LineUp() {
         <Text style={styles.credit}>{CREDIT}</Text>
       </View>
 
-      <ScrollView style={styles.panel} contentContainerStyle={{ padding: 16 }}>
+      <ScrollView style={[styles.panel, sideways && styles.panelSideways]} contentContainerStyle={{ padding: 16 }}>
         <H2 small>Line up the title plan</H2>
+        <Chips>
+          <Chip label="Zoom out" onPress={() => setZ(Math.max(MIN_ZOOM, z - 1))} />
+          <Chip label="Zoom in" onPress={() => setZ(Math.min(MAX_ZOOM, z + 1))} />
+          <Chip label={trace.length >= 3 ? "Fit the boundary on the screen" : "Fit the plan on the screen"} onPress={() => fitPlan()} />
+        </Chips>
         <Seg
           options={[
             ["move", "Move the plan"],
@@ -211,17 +259,13 @@ export function LineUp() {
               <Chip label="More see-through" onPress={() => setOpacity(Math.max(0.15, opacity - 0.15))} />
               <Chip label="Less see-through" onPress={() => setOpacity(Math.min(1, opacity + 0.15))} />
             </Chips>
-            <Chips>
-              <Chip label="Zoom out" onPress={() => setZ(Math.max(MIN_ZOOM, z - 1))} />
-              <Chip label="Zoom in" onPress={() => setZ(Math.min(19, z + 1))} />
-              <Chip label="Centre the photo on the plan" onPress={() => setMapCentre(ov.centre)} />
-            </Chips>
           </>
         ) : mode === "trace" ? (
           <>
             <Note>
               For a plot that is not a simple rectangle. Start at a corner of the far end (the end away from the road or the entrance), then tap every turn
-              of the boundary line in order, all the way round. The shape closes itself; there is no need to tap the first point again.
+              of the boundary line in order, all the way round. The shape closes itself; there is no need to tap the first point again. Drag to move the
+              photo; zoom in for the fiddly bits.
             </Note>
             <Text style={styles.next}>
               {trace.length === 0 ? "Next: point 1, a corner of the far end" : `${trace.length} point${trace.length === 1 ? "" : "s"} so far${trace.length < 3 ? " (at least 3 needed)" : ""}`}
@@ -293,5 +337,8 @@ const styles = StyleSheet.create({
   map: { flex: 1, overflow: "hidden", backgroundColor: "#333" },
   credit: { position: "absolute", left: 6, bottom: 4, fontSize: 10, color: C.white, textShadowColor: "#000", textShadowRadius: 3 },
   panel: { maxHeight: "45%", backgroundColor: C.paper, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  // Phone on its side: the map on the left, full height; the controls beside it.
+  bodySideways: { flexDirection: "row" },
+  panelSideways: { maxHeight: "100%", width: "40%", borderTopRightRadius: 0, borderBottomLeftRadius: 20 },
   next: { fontWeight: "700", color: C.ink, marginVertical: 6 },
 });
