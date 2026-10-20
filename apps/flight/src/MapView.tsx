@@ -50,13 +50,16 @@ import {
 
 import { SIM_HOME, drone, useDrone } from "./drone";
 import { firstFlightMission, gpsToPlan, missionOnPlan, planToGps, roofScan, surveyMission } from "./flight";
-import { HOME_PROJECT_ID, S, commit, history, nextId, sn, useApp, type AppState } from "./store";
+import { HOME_PROJECT_ID, S, commit, currentProject, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
 import { aboveSeaLevelM, currentLidar } from "./lidar";
-import { MAX_ZOOM, NO_ZOOM, fit, toPlan, zoomAt, zoomedView, type Zoom } from "./mapZoom";
+import { MAX_ZOOM, NO_ZOOM, fit, toPlan, turnBox, turnPt, zoomAt, zoomedView, type Zoom } from "./mapZoom";
 import { C } from "./theme";
 
 type VB = [number, number, number, number];
+
+/** How far the map is turned while drawing (set by the map each time it draws); labels turn back by it to stay upright. */
+let labelTurn = 0;
 
 const f2 = (p: Pt) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`;
 const ptsStr = (P: Pt[]) => P.map(f2).join(" ");
@@ -102,17 +105,21 @@ export function MapView() {
   const setZoom = (z: Zoom) => setZooms((all) => ({ ...all, [s.tab]: z }));
   const gesture = useRef<Gesture | null>(null);
 
-  const base = viewBoxFor(s);
+  // The map may be drawn turned (the roof plan never is). The view, zoom and pinch work in the turned
+  // drawing's own coordinates; touches are turned back onto the plan.
+  const turn = s.tab === "roof" ? 0 : (currentProject().mapTurnDeg ?? 0);
+  labelTurn = turn;
+  const base = turnBox(viewBoxFor(s), turn);
   const vb = zoomedView(base, zoom);
   const { scale, ox, oy } = fit(vb, size.w, size.h);
   const px = (n: number) => n / scale;
-  const toM = (e: GestureResponderEvent): Pt => [vb[0] + (e.nativeEvent.locationX - ox) / scale, vb[1] + (e.nativeEvent.locationY - oy) / scale];
+  const toM = (e: GestureResponderEvent): Pt => turnPt([vb[0] + (e.nativeEvent.locationX - ox) / scale, vb[1] + (e.nativeEvent.locationY - oy) / scale], -turn);
 
   // Line widths and labels follow the zoom in steps, so a pinch does not redraw everything each frame.
   const step = Math.round(Math.log2(scale) * 4);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const lidar = currentLidar();
-  const content = useMemo(() => layers(s, px), [s.v, step, size.w, size.h, lidar?.fetchedAt, lidar?.home.join()]);
+  const content = useMemo(() => layers(s, px), [s.v, step, size.w, size.h, lidar?.fetchedAt, lidar?.home.join(), turn]);
 
   /** Two fingers on the map: where they are on screen (relative to the map) and how far apart. */
   const fingers = (e: GestureResponderEvent) => {
@@ -180,14 +187,28 @@ export function MapView() {
     >
       {size.w > 0 && (
         <Svg width={size.w} height={size.h} viewBox={vb.join(" ")} pointerEvents="none">
-          {content}
-          <DroneOverlay px={px} />
+          <G transform={`rotate(${turn})`}>
+            {content}
+            <DroneOverlay px={px} />
+          </G>
         </Svg>
       )}
       <View style={zoomStyles.buttons}>
         <ZoomButton label="+" hint="Zoom in" disabled={zoom.k >= MAX_ZOOM} onPress={() => zoomBy(1.6)} />
         <ZoomButton label="−" hint="Zoom out" disabled={zoom.k <= 1} onPress={() => zoomBy(1 / 1.6)} />
         {zoom.k > 1 && <ZoomButton label="Fit" hint="Show the whole plot" onPress={() => setZoom(NO_ZOOM)} />}
+        {s.tab !== "roof" && (
+          <ZoomButton
+            label="⟳"
+            hint="Turn the map a quarter turn"
+            onPress={() => {
+              currentProject().mapTurnDeg = (turn + 90) % 360;
+              // The old zoom was for the map the other way round.
+              setZooms({});
+              commit();
+            }}
+          />
+        )}
       </View>
     </View>
   );
@@ -449,7 +470,7 @@ function T({
   const common = { x: 0, y: 0, fontSize: fontPx, fontWeight: weight ?? "400", textAnchor: anchor ?? "start", fontFamily: "sans-serif" } as const;
   return (
     <G transform={transform}>
-      <G transform={`translate(${x ?? 0} ${y ?? 0}) scale(${k})`}>
+      <G transform={`translate(${x ?? 0} ${y ?? 0}) rotate(${-labelTurn}) scale(${k})`}>
         <SText {...common} fill={C.paper} stroke={C.paper} strokeWidth={3} strokeLinejoin="round">
           {children}
         </SText>

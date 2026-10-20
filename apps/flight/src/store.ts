@@ -31,6 +31,8 @@ export type Project = {
   corners: LatLng[] | null;
   /** The boundary traced point by point, when it is not a rectangle (corners then hold the rectangle round it). */
   boundary?: LatLng[] | null;
+  /** How far the map is turned clockwise on screen (0, 90, 180 or 270), e.g. to lay a long site across a wide screen. Only the drawing turns. */
+  mapTurnDeg?: number;
   /** This project's own fields while another project is open; null for the open one (they are in S). */
   data: Partial<Pick<AppState, ProjectField>> | null;
 };

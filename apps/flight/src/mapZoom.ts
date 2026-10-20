@@ -51,3 +51,26 @@ export function zoomAt(base: VB, w: number, h: number, k: number, p: [number, nu
   const y = p[1] - (sy - f.oy) / f.scale;
   return { k: kk, c: [x + vw / 2, y + vh / 2] };
 }
+
+/**
+ * A plan point as drawn on a map turned `deg` clockwise (quarter turns; the map's drawing is turned,
+ * the plan itself is not). Negative `deg` turns it back.
+ */
+export function turnPt(p: [number, number], deg: number): [number, number] {
+  const a = (deg * Math.PI) / 180;
+  const [c, s] = [Math.round(Math.cos(a) * 1e9) / 1e9, Math.round(Math.sin(a) * 1e9) / 1e9];
+  return [p[0] * c - p[1] * s, p[0] * s + p[1] * c];
+}
+
+/** The box round a plan view once the map is turned `deg` clockwise. */
+export function turnBox(vb: VB, deg: number): VB {
+  const pts = [
+    [vb[0], vb[1]],
+    [vb[0] + vb[2], vb[1]],
+    [vb[0], vb[1] + vb[3]],
+    [vb[0] + vb[2], vb[1] + vb[3]],
+  ].map((p) => turnPt(p as [number, number], deg));
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
+}

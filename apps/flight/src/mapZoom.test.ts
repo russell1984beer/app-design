@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { MAX_ZOOM, NO_ZOOM, toPlan, zoomAt, zoomedView, type VB } from "./mapZoom.ts";
+import { MAX_ZOOM, NO_ZOOM, toPlan, turnBox, turnPt, zoomAt, zoomedView, type VB } from "./mapZoom.ts";
 
 // The garden view: a tall, thin plot (about 13 x 51 m with the margins) on a phone-shaped map.
 const BASE: VB = [-2.4, -2.2, 12.8, 51];
@@ -30,4 +30,12 @@ test("a pinch keeps the spot between the fingers under them", () => {
 
 test("pinching all the way out goes back to the whole plot", () => {
   assert.deepEqual(zoomAt(BASE, W, H, 0.5, [3, 20], 100, 100), NO_ZOOM);
+});
+
+test("a quarter turn clockwise puts the plan's top edge down the right-hand side", () => {
+  assert.deepEqual(turnPt([10, 0], 90), [0, 10]);
+  assert.deepEqual(turnPt([0, 10], 90), [-10, 0]);
+  assert.deepEqual(turnPt(turnPt([3, 7], 270), -270), [3, 7]);
+  assert.deepEqual(turnBox([0, 0, 7, 46], 90), [-46, 0, 46, 7]);
+  assert.deepEqual(turnBox([0, 0, 7, 46], 0), [0, 0, 7, 46]);
 });
