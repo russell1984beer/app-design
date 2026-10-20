@@ -569,13 +569,19 @@ class DroneController(
       return
     }
     val loc = location ?: return
-    val out = goTo.update(Position(loc.latitude, loc.longitude, loc.altitude), compassHeading, target, now)
+    val pos = Position(loc.latitude, loc.longitude, loc.altitude)
+    val out = goTo.update(pos, compassHeading, target, now)
     if (out.fault != null) {
       target = null
       status("error", out.fault)
     }
-    // While a photo is being taken, hold still.
-    send(if (pendingPhoto != null) StickCommand.hold(compassHeading) else out.command)
+    // A photo at a stop: hold still until the shutter has fired (the card may take seconds more to
+    // save it; the drone need not wait for that). A photo on the fly (the target is the end of the
+    // run, further on) never holds: on 19 Oct holding until the photo was saved stopped the drone at
+    // every photo of a smooth run.
+    val atStop = target?.let { val (n, e) = GoToController.offsetM(pos, it); hypot(n, e) < STOP_PHOTO_RADIUS_M } ?: true
+    val holdForPhoto = pendingPhoto?.shutterFired == false && atStop
+    send(if (holdForPhoto) StickCommand.hold(compassHeading) else out.command)
   }
 
   private fun send(c: StickCommand) {
@@ -915,6 +921,8 @@ class DroneController(
     const val TAG = "DjiDrone"
     const val TICK_MS = 100L
     /** A slow memory card took over 5 s to save one 48 MP photo (18 Oct). */
+    /** Within this of the target, a photo is a stop photo (flight-core takes those within 0.5 m). */
+    const val STOP_PHOTO_RADIUS_M = 0.6
     const val PHOTO_TIMEOUT_MS = 15_000L
     /** A file this soon after asking, once the app has given up, is still the photo asked for. */
     const val LATE_PHOTO_MS = 30_000L
