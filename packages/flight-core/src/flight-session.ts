@@ -56,6 +56,12 @@ const OBSTACLE_RESUME_GRACE_S = 15;
 const ARRIVED_M = 0.5;
 const ARRIVED_ALT_M = 0.3;
 const MAX_PHOTO_ATTEMPTS = 3;
+/**
+ * A photo that fails every attempt is skipped (the overlap covers one gap); this many skipped in a row
+ * means the camera itself is in trouble, and the drone comes home. On 19 Oct one slow photo on a slow
+ * card ended a scan 47 photos in.
+ */
+const MAX_SKIPPED_IN_A_ROW = 2;
 /** After a failed photo, wait this long before the next one (the camera may still be saving). */
 const PHOTO_RETRY_DELAY_S = 4;
 
@@ -100,6 +106,9 @@ export class FlightSession {
   private filming = false;
   /** No photo before this time (a pause after a failed one). */
   private retryAfter = -Infinity;
+  /** Photos given up on after every attempt failed (the scan carried on without them). */
+  readonly skippedPhotos: number[] = [];
+  private skippedInARow = 0;
 
   constructor(options: FlightSessionOptions) {
     this.o = options;
@@ -440,6 +449,18 @@ export class FlightSession {
   }
 
   private recordPhoto(index: number): void {
+    const skipped = this.skippedPhotos.indexOf(index);
+    if (skipped >= 0) {
+      // Saved after all (a slow card): not missing.
+      this.skippedPhotos.splice(skipped, 1);
+      this.log.push(`photo ${index} arrived late after all`);
+    }
+    this.skippedInARow = 0;
+    this.markDone(index);
+  }
+
+  /** Done with this waypoint: saved for resuming, and the scan moves on. */
+  private markDone(index: number): void {
     this.flyPending.delete(index);
     if (!this.progress.completedWaypoints.includes(index)) {
       this.progress.completedWaypoints.push(index);
@@ -459,7 +480,14 @@ export class FlightSession {
     if (attempts < MAX_PHOTO_ATTEMPTS) {
       this.photoRequested = false;
       this.retryAfter = this.now() + PHOTO_RETRY_DELAY_S;
-    } else if (this.state === "scanning") this.goHome("cameraFault");
+    } else if (this.state === "scanning") {
+      if (++this.skippedInARow >= MAX_SKIPPED_IN_A_ROW) return this.goHome("cameraFault");
+      // Skip it and fly on; marked done so the scan does not stop here (or come back for it on a resume).
+      this.log.push(`photo ${index} skipped after ${attempts} attempts`);
+      this.skippedPhotos.push(index);
+      this.retryAfter = -Infinity;
+      this.markDone(index);
+    }
   }
 
   private setState(s: SessionState): void {

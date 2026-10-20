@@ -313,13 +313,25 @@ test("geofence: a waypoint outside the property is never reached", () => {
   assert.ok(distanceM(sim.telemetry().position, home) < 1);
 });
 
-test("camera fault: after repeated failed photos the drone comes home", () => {
+test("camera fault: when photo after photo fails the drone comes home", () => {
   const { sim, session } = setup();
   sim.failPhotos = true;
   session.start();
   run(sim, session, { until: landed(sim, session) });
   assert.equal(session.returnReason, "cameraFault");
-  assert.equal(session.progress.completedWaypoints.length, 0);
+  assert.equal(sim.photos.length, 0);
+  assert.equal(session.skippedPhotos.length, 1, "the first is skipped, the second brings it home");
+});
+
+test("one photo that keeps failing is skipped and the scan carries on (19 Oct: a slow card ended a scan)", () => {
+  const { sim, session, mission } = setup();
+  const bad = mission.waypoints.filter((w) => w.photo)[5].index;
+  sim.failAlways.add(bad);
+  session.start();
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "complete");
+  assert.deepEqual(session.skippedPhotos, [bad]);
+  assert.equal(sim.photos.length, mission.waypoints.filter((w) => w.photo).length - 1);
 });
 
 test("refuses to take off before the failsafe is configured on the drone", () => {

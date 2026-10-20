@@ -121,6 +121,8 @@ class DroneController(
   private var pendingPhoto: PendingPhoto? = null
   /** When the last photo was asked for: how long the card takes to save it, even after the app gave up. */
   private var lastPhotoAskedAtMs = 0L
+  /** A photo the app gave up waiting for (the shutter fired): a file arriving soon after is still that photo. */
+  private var latePhoto: PendingPhoto? = null
   private var running = false
 
   private class PendingPhoto(val waypointIndex: Int, var deadlineMs: Long, var shutterFired: Boolean = false)
@@ -399,6 +401,7 @@ class DroneController(
       return@post
     }
     lastPhotoAskedAtMs = scheduler.nowMs()
+    latePhoto = null
     val photo = PendingPhoto(waypointIndex, lastPhotoAskedAtMs + PHOTO_TIMEOUT_MS)
     pendingPhoto = photo
     action(CameraKey.KeyStartShootPhoto) { e ->
@@ -549,6 +552,7 @@ class DroneController(
     pendingPhoto?.let {
       if (now > it.deadlineMs) {
         pendingPhoto = null
+        if (it.shutterFired) latePhoto = it
         Log.w(TAG, "Photo ${it.waypointIndex} not saved within ${PHOTO_TIMEOUT_MS / 1000} s (storage ${storageInUse?.name})")
         photoFailed(it.waypointIndex, "no photo reported by the camera")
       }
@@ -792,6 +796,14 @@ class DroneController(
 
   private fun onMediaFile(info: GeneratedMediaFileInfo?) {
     val photo = pendingPhoto
+    val late = latePhoto
+    if (photo == null && info != null && late != null && scheduler.nowMs() - lastPhotoAskedAtMs < LATE_PHOTO_MS) {
+      // 19 Oct: photo 47 was saved 10.9 s after asking, just after the app had given up on it.
+      latePhoto = null
+      Log.i(TAG, "Photo ${late.waypointIndex} saved late, ${"%.1f".format((scheduler.nowMs() - lastPhotoAskedAtMs) / 1000.0)} s after asking (storage ${storageInUse?.name})")
+      emit("onDroneEvent", mapOf("type" to "photoTaken", "waypointIndex" to late.waypointIndex, "file" to "${info.dir_no}/${info.file_no}"))
+      return
+    }
     if (photo == null) {
       if (info != null) Log.i(TAG, "A file was saved ${"%.1f".format((scheduler.nowMs() - lastPhotoAskedAtMs) / 1000.0)} s after the last photo was asked for (late photo or video)")
       return
@@ -903,7 +915,9 @@ class DroneController(
     const val TAG = "DjiDrone"
     const val TICK_MS = 100L
     /** A slow memory card took over 5 s to save one 48 MP photo (18 Oct). */
-    const val PHOTO_TIMEOUT_MS = 10_000L
+    const val PHOTO_TIMEOUT_MS = 15_000L
+    /** A file this soon after asking, once the app has given up, is still the photo asked for. */
+    const val LATE_PHOTO_MS = 30_000L
     const val VIDEO_MODE_SETTLE_MS = 1000L
     const val TAKEOFF_WAIT_MS = 30_000L
     const val HANDOVER_WAIT_MS = 5_000L

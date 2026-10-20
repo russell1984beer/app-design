@@ -43,6 +43,8 @@ export class SimDrone implements DroneBridge {
   failPhotos = false;
   /** Waypoints whose first photo fails (then works). */
   failOnce = new Set<number>();
+  /** Waypoints whose photo always fails. */
+  failAlways = new Set<number>();
   /** Log of things the drone did by itself. */
   log: string[] = [];
 
@@ -317,7 +319,7 @@ export class SimDrone implements DroneBridge {
     this.pendingPhoto.remainingS -= dt;
     if (this.pendingPhoto.remainingS <= 0) {
       const index = this.pendingPhoto.index;
-      if (this.failPhotos || this.failOnce.delete(index)) {
+      if (this.failPhotos || this.failAlways.has(index) || this.failOnce.delete(index)) {
         this.events.push({ type: "photoFailed", waypointIndex: index, reason: "simulated camera fault" });
         this.pendingPhoto = undefined;
         return;
