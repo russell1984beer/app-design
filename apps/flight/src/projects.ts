@@ -88,6 +88,27 @@ export async function findPostcode(postcode: string): Promise<void> {
   commit();
 }
 
+/**
+ * A place or address in the UK, from OpenStreetMap's search (free, no key), for when the postcode's
+ * middle is not where the plot is (a big postcode area, or a park with no address of its own).
+ */
+export async function findPlace(query: string): Promise<{ at: LatLng; name: string }> {
+  const q = query.trim();
+  if (!q) throw new Error("Type a place, street or address to search for.");
+  let res: Response;
+  try {
+    res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=gb&q=${encodeURIComponent(q)}`, {
+      headers: { "User-Agent": "Plotwise garden survey app", "Accept-Language": "en-GB" },
+    });
+  } catch {
+    throw new Error("Could not reach the map search. Check the phone's internet connection.");
+  }
+  if (!res.ok) throw new Error(`The map search answered ${res.status}. Try again in a minute.`);
+  const body = (await res.json()) as { lat: string; lon: string; display_name: string }[];
+  if (!body[0]) throw new Error("Nothing found. Try adding the town, e.g. \"Station Road, Ashford\".");
+  return { at: { lat: Number(body[0].lat), lng: Number(body[0].lon) }, name: body[0].display_name };
+}
+
 /** Longest side of a PDF page drawn as a picture: fine enough to read a title plan's boundary line. */
 const PDF_PAGE_PX = 3000;
 

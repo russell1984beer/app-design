@@ -190,7 +190,7 @@ export function currentLidar(): LidarSite | null {
   if (!site) return null;
   const p = currentProject();
   if (p.id === HOME_PROJECT_ID) return site;
-  const at = p.corners?.[0] ?? p.postcodeAt;
+  const at = p.corners?.[0] ?? p.overlay?.centre ?? p.postcodeAt;
   return at && distanceM(at, site.anchor) <= POSTCODE_REACH_M ? site : null;
 }
 

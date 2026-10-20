@@ -10,10 +10,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { areaM2, type LatLng } from "../../../packages/flight-core/src/geo.ts";
 import { latLngToWorldPx, metresPerPx, plotFromCorners, rectAroundPolygon, tilesAround, worldPxToLatLng } from "../../../packages/flight-core/src/georef.ts";
 
-import { applyBoundary, applyCorners, drawingUri } from "./projects";
+import { applyBoundary, applyCorners, drawingUri, findPlace } from "./projects";
 import { S, commit, currentProject, type Project } from "./store";
 import { C } from "./theme";
-import { Btn, Card, Chip, Chips, H2, Line, Note, Seg } from "./ui";
+import { Btn, Card, Chip, Chips, Field, H2, Line, Note, Seg, Status } from "./ui";
 
 /** Esri's World Imagery satellite tiles (free to view, with this credit shown). */
 const tileUrl = (z: number, x: number, y: number) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
@@ -23,6 +23,9 @@ const CORNER_NAMES = ["far end, left", "far end, right", "street end, right", "s
 
 /** Enough for a boundary with many turns; more would be fiddly to tap anyway. */
 const MAX_TRACE = 60;
+
+/** Zoomed out this far, a whole town fits on the screen: enough to find the site from a wrong postcode. */
+const MIN_ZOOM = 14;
 
 /** A tap moves less than this; more is a drag. */
 const TAP_PX = 10;
@@ -45,6 +48,9 @@ export function LineUp() {
   const [corners, setCorners] = useState<LatLng[]>(p.boundary ? [] : (p.corners ?? []));
   const [trace, setTrace] = useState<LatLng[]>(p.boundary ?? []);
   const [opacity, setOpacity] = useState(0.55);
+  /** What a drag moves in "Move the plan": the plan, or the satellite photo under it. */
+  const [dragWhat, setDragWhat] = useState<"plan" | "photo">("plan");
+  const [found, setFound] = useState<{ ok: boolean; text: string } | null>(null);
 
   const c = latLngToWorldPx(mapCentre, z);
   const toScreen = (q: LatLng) => {
@@ -55,20 +61,23 @@ export function LineUp() {
   const mpp = metresPerPx(mapCentre.lat, z);
 
   // The touch handler is made once, so it reads the latest values through a ref.
-  const now = useRef({ mode, ov, corners, trace, toScreen, toLatLng });
-  now.current = { mode, ov, corners, trace, toScreen, toLatLng };
+  const now = useRef({ mode, ov, corners, trace, toScreen, toLatLng, dragWhat, c, z });
+  now.current = { mode, ov, corners, trace, toScreen, toLatLng, dragWhat, c, z };
   const dragFrom = useRef<{ x: number; y: number } | null>(null);
   const touch = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        dragFrom.current = now.current.toScreen(now.current.ov.centre);
+        const n = now.current;
+        // Dragging the photo: remember the map's middle (world pixels); dragging the plan: where it is on screen.
+        dragFrom.current = n.mode === "move" && n.dragWhat === "photo" ? { x: n.c.x, y: n.c.y } : n.toScreen(n.ov.centre);
       },
       onPanResponderMove: (_, g) => {
         const n = now.current;
         if (n.mode !== "move" || !dragFrom.current) return;
-        setOv({ ...n.ov, centre: n.toLatLng(dragFrom.current.x + g.dx, dragFrom.current.y + g.dy) });
+        if (n.dragWhat === "photo") setMapCentre(worldPxToLatLng(dragFrom.current.x - g.dx, dragFrom.current.y - g.dy, n.z));
+        else setOv({ ...n.ov, centre: n.toLatLng(dragFrom.current.x + g.dx, dragFrom.current.y + g.dy) });
       },
       onPanResponderRelease: (e, g) => {
         const n = now.current;
@@ -147,7 +156,35 @@ export function LineUp() {
         />
         {mode === "move" ? (
           <>
-            <Note>Drag the plan until its boundary sits on your plot in the photo, then turn and size it to match. Lines on houses and fences make good guides.</Note>
+            <Note>
+              First find the site in the photo: search for it, or drag the photo (zoom out to look further). Then drag the plan until its boundary sits on
+              the plot, and turn and size it to match. Lines on houses and fences make good guides.
+            </Note>
+            <Field
+              label="Find a place"
+              value=""
+              placeholder="e.g. Station Road, Ashford"
+              onCommit={async (q) => {
+                if (!q.trim()) return;
+                try {
+                  const place = await findPlace(q);
+                  // The photo and the plan both go there; the plan then only needs fine adjusting.
+                  setMapCentre(place.at);
+                  setOv({ ...ov, centre: place.at });
+                  setFound({ ok: true, text: `Found: ${place.name}` });
+                } catch (e) {
+                  setFound({ ok: false, text: (e as Error).message });
+                }
+              }}
+            />
+            {found && <Status status={found.ok ? "pass" : "block"} text={found.text} />}
+            <Chips>
+              <Chip label="Drag moves the plan" pressed={dragWhat === "plan"} onPress={() => setDragWhat("plan")} />
+              <Chip label="Drag moves the photo" pressed={dragWhat === "photo"} onPress={() => setDragWhat("photo")} />
+            </Chips>
+            <Chips>
+              <Chip label="Bring the plan to the middle of the photo" onPress={() => setOv({ ...ov, centre: mapCentre })} />
+            </Chips>
             <Chips>
               <Chip label="Turn ⟲ 5°" onPress={() => turn(-5)} />
               <Chip label="⟲ 1°" onPress={() => turn(-1)} />
@@ -175,7 +212,7 @@ export function LineUp() {
               <Chip label="Less see-through" onPress={() => setOpacity(Math.min(1, opacity + 0.15))} />
             </Chips>
             <Chips>
-              <Chip label="Zoom out" onPress={() => setZ(Math.max(17, z - 1))} />
+              <Chip label="Zoom out" onPress={() => setZ(Math.max(MIN_ZOOM, z - 1))} />
               <Chip label="Zoom in" onPress={() => setZ(Math.min(19, z + 1))} />
               <Chip label="Centre the photo on the plan" onPress={() => setMapCentre(ov.centre)} />
             </Chips>
