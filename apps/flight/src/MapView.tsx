@@ -52,6 +52,7 @@ import { currentLidar } from "./lidar";
 import { aboveSeaLevelM } from "./lidarMath";
 import { MAX_ZOOM, NO_ZOOM, boxAround, fit, levelTurn, toPlan, turnBox, turnPt, zoomAt, zoomedView, type Zoom } from "./mapZoom";
 import { C } from "./theme";
+import { roundButton } from "./ui";
 
 type VB = [number, number, number, number];
 
@@ -207,7 +208,7 @@ function ZoomButton({ label, hint, onPress, disabled }: { label: string; hint: s
       disabled={disabled}
       onPress={onPress}
       hitSlop={6}
-      style={({ pressed }) => [zoomStyles.button, disabled && { opacity: 0.35 }, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [roundButton, disabled && { opacity: 0.35 }, pressed && { opacity: 0.7 }]}
     >
       <Text style={[zoomStyles.label, label.length > 1 && { fontSize: 13 }]}>{label}</Text>
     </Pressable>
@@ -216,16 +217,6 @@ function ZoomButton({ label, hint, onPress, disabled }: { label: string; hint: s
 
 const zoomStyles = StyleSheet.create({
   buttons: { position: "absolute", right: 8, top: 8, gap: 8 },
-  button: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   label: { fontSize: 22, fontWeight: "700", color: C.ink },
 });
 
@@ -599,16 +590,28 @@ function photoLayer(s: AppState, px: (n: number) => number) {
   );
 }
 
+/** Where the house's two label lines go, and the box they cover on the plan (other labels keep clear of it). */
+function houseLabel(s: AppState, px: (n: number) => number) {
+  const { rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
+  const ridge = `roof ridge about ${s.plot.ridgeHeightM} m`;
+  const x = HW / 2;
+  const y = GH + HD / 2;
+  const ridgeY = y + Math.max(1.3, px(fontPxFor(0.91, px) + 3));
+  const half = px((ridge.length * fontPxFor(0.91, px) * 0.55 + 6) / 2);
+  return { x, y, ridgeY, ridge, box: [x - half, y - px(fontPxFor(1.23, px)), x + half, ridgeY + px(3)] as [number, number, number, number] };
+}
+
 function houseBox(s: AppState, px: (n: number) => number) {
   const { rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
+  const l = houseLabel(s, px);
   return (
     <>
       <Rect x={0} y={GH} width={HW} height={HD} fill="#D3D7D2" stroke="#6D7772" strokeWidth={px(1.5)} />
-      <T x={HW / 2} y={GH + HD / 2} size={1.23} weight="700" anchor="middle" fill="#3E4A47" px={px}>
+      <T x={l.x} y={l.y} size={1.23} weight="700" anchor="middle" fill="#3E4A47" px={px}>
         House
       </T>
-      <T x={HW / 2} y={GH + HD / 2 + Math.max(1.3, px(fontPxFor(0.91, px) + 3))} size={0.91} anchor="middle" fill="#3E4A47" px={px}>
-        {`roof ridge about ${s.plot.ridgeHeightM} m`}
+      <T x={l.x} y={l.ridgeY} size={0.91} anchor="middle" fill="#3E4A47" px={px}>
+        {l.ridge}
       </T>
     </>
   );
@@ -620,13 +623,27 @@ function planBase(s: AppState, px: (n: number) => number) {
   return (
     <>
       <Rect width={W} height={H} fill="#EEF2EA" />
-      {t.contours.map((c) => (
-        <Path key={c.level} d={c.segments.map(([a, b]) => `M${f2(a)}L${f2(b)}`).join("")} stroke="#B9A48C" strokeWidth={px(c.major ? 1.2 : 0.6)} fill="none" />
-      ))}
+      {contourPaths(t, "#B9A48C", px(1.2), px(0.6))}
       <Rect x={0} y={GH + HD} width={W} height={H - GH - HD} fill="#E2DED4" opacity={0.6} />
       {houseBox(s, px)}
     </>
   );
+}
+
+/** The level lines, major ones drawn thicker. */
+function contourPaths(t: ReturnType<typeof terrainFor>, colour: string, major: number, minor: number) {
+  return t.contours.map((c) => (
+    <Path key={c.level} d={c.segments.map(([a, b]) => `M${f2(a)}L${f2(b)}`).join("")} stroke={colour} strokeWidth={c.major ? major : minor} fill="none" />
+  ));
+}
+
+/** Remembers only the latest result, worked out again when its key changes. */
+function latestOnly<T>(): (key: string, make: () => T) => T {
+  let last: { key: string; value: T } | null = null;
+  return (key, make) => {
+    if (last?.key !== key) last = { key, value: make() };
+    return last.value;
+  };
 }
 
 export const HEIGHT_BANDS: [number, string, string][] = [
@@ -638,13 +655,12 @@ export const HEIGHT_BANDS: [number, string, string][] = [
 
 /** How tall things stand above the ground (surface minus ground), on the survey's grid. */
 type HeightCell = { x: number; y: number; cell: number; h: number };
-const heightCache = new Map<string, { cells: HeightCell[]; peaks: HeightCell[] }>();
+const heightCache = latestOnly<{ cells: HeightCell[]; peaks: HeightCell[] }>();
 
 function heights(s: AppState): { cells: HeightCell[]; peaks: HeightCell[] } {
   const sv = currentSurvey();
   const key = `${sv?.createdAt}|${sv?.label ?? ""}|${JSON.stringify(s.plot)}`;
-  let h = heightCache.get(key);
-  if (!h) {
+  return heightCache(key, () => {
     const cells = heightCells(s);
     // Tallest first; a spot within 4 m of one already picked is the same tree or roof (the 1 m
     // LIDAR gives several equal 0.5 m squares per pixel, which used to be labelled twice).
@@ -653,11 +669,8 @@ function heights(s: AppState): { cells: HeightCell[]; peaks: HeightCell[] } {
       if (peaks.length >= 10) break;
       if (!peaks.some((o) => Math.hypot(o.x - c.x, o.y - c.y) < 4)) peaks.push(c);
     }
-    h = { cells, peaks };
-    heightCache.clear();
-    heightCache.set(key, h);
-  }
-  return h;
+    return { cells, peaks };
+  });
 }
 
 /** The labelled tall spots (plan position of their middle, and height). */
@@ -706,9 +719,7 @@ function contourLayer(s: AppState, px: (n: number) => number) {
     <>
       <G opacity={0.35}>{photoLayer(s, px)}</G>
       <Rect width={W} height={H} fill="#F3F5EF" opacity={0.55} />
-      {t.contours.map((c) => (
-        <Path key={c.level} d={c.segments.map(([a, b]) => `M${f2(a)}L${f2(b)}`).join("")} stroke={C.contour} strokeWidth={px(c.major ? 1.6 : 0.7)} fill="none" />
-      ))}
+      {contourPaths(t, C.contour, px(1.6), px(0.7))}
       {spots.map((p) => (
         <G key={f2(p)}>
           <Circle cx={p[0]} cy={p[1]} r={0.26} fill={C.ink} />
@@ -833,10 +844,7 @@ function fontPxFor(size: number, px: (n: number) => number): number {
  */
 function itemLabels(s: AppState, px: (n: number) => number): ReactNode[] {
   type Box = [number, number, number, number];
-  const placed: Box[] = [];
-  const { rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;
-  const houseHalf = px((`roof ridge about ${s.plot.ridgeHeightM} m`.length * fontPxFor(0.91, px) * 0.55 + 6) / 2);
-  placed.push([HW / 2 - houseHalf, GH + HD / 2 - px(fontPxFor(1.23, px)), HW / 2 + houseHalf, GH + HD / 2 + Math.max(1.3, px(fontPxFor(0.91, px) + 3)) + px(3)]);
+  const placed: Box[] = [houseLabel(s, px).box];
   const hits = (b: Box) => placed.some((o) => b[0] < o[2] && o[0] < b[2] && b[1] < o[3] && o[1] < b[3]);
   const sizeOf = (it: Item) => {
     const [x0, y0, x1, y1] = bbox(it);
@@ -928,33 +936,28 @@ function handlesLayer(s: AppState, px: (n: number) => number) {
   if (s.tab !== "design" || s.dmode !== "layout" || s.drawing) return null;
   const it = s.items.find((i) => i.id === s.sel);
   if (!it) return null;
-  const out: ReactNode[] = [];
-  if (it.pts) {
-    it.pts.forEach((p, i) => {
-      const q = it.pts![(i + 1) % it.pts!.length];
-      const mx = (p[0] + q[0]) / 2;
-      const my = (p[1] + q[1]) / 2;
-      out.push(
-        <G key={`m${i}`}>
-          <Circle cx={mx} cy={my} r={0.28} fill="#fff" stroke={C.ink} strokeWidth={px(1.5)} />
-          <Path d={`M${mx - 0.15} ${my}h.3M${mx} ${my - 0.15}v.3`} stroke={C.ink} strokeWidth={px(1.5)} />
-        </G>,
+  const draw = ({ id, at: [x, y] }: Handle): ReactNode => {
+    if (id[0] === "m")
+      return (
+        <G key={id}>
+          <Circle cx={x} cy={y} r={0.28} fill="#fff" stroke={C.ink} strokeWidth={px(1.5)} />
+          <Path d={`M${x - 0.15} ${y}h.3M${x} ${y - 0.15}v.3`} stroke={C.ink} strokeWidth={px(1.5)} />
+        </G>
       );
-    });
-    it.pts.forEach((p, i) => out.push(sq(p, s.vsel === i, px, `v${i}`)));
-    return <>{out}</>;
-  }
-  if (isRound(it.kind)) return sq([it.x + it.w / 2, it.y], false, px, "rs");
-  const c = rotP(it.w / 2, it.h / 2, it.a);
-  const r = rotP(0, -it.h / 2 - 1.3, it.a);
-  const t = rotP(0, -it.h / 2, it.a);
-  return (
-    <>
-      <Line x1={it.x + t[0]} y1={it.y + t[1]} x2={it.x + r[0]} y2={it.y + r[1]} stroke={C.ink} strokeWidth={px(1.5)} />
-      {sq([it.x + c[0], it.y + c[1]], false, px, "rs")}
-      <Circle cx={it.x + r[0]} cy={it.y + r[1]} r={0.34} fill={C.hivis} stroke={C.ink} strokeWidth={px(2)} />
-    </>
-  );
+    if (id[0] === "v") return sq([x, y], s.vsel === Number(id.slice(1)), px, id);
+    if (id === "rs") return sq([x, y], false, px, id);
+    // Rotate: a stalk from the top edge to a yellow knob.
+    const t = rotP(0, -it.h / 2, it.a);
+    return (
+      <G key={id}>
+        <Line x1={it.x + t[0]} y1={it.y + t[1]} x2={x} y2={y} stroke={C.ink} strokeWidth={px(1.5)} />
+        <Circle cx={x} cy={y} r={0.34} fill={C.hivis} stroke={C.ink} strokeWidth={px(2)} />
+      </G>
+    );
+  };
+  // Midpoints under the corners.
+  const hs = handles(it);
+  return <>{[...hs.filter((h) => h.id[0] === "m"), ...hs.filter((h) => h.id[0] !== "m")].map(draw)}</>;
 }
 
 function drawLayer(s: AppState, px: (n: number) => number) {
@@ -979,20 +982,16 @@ function drawLayer(s: AppState, px: (n: number) => number) {
 
 const monthDay = (s: AppState) => MONTHS.find((m) => m.id === s.month)!.day;
 
-let hoursCache = { key: "", node: null as ReactNode };
+const hoursCache = latestOnly<ReactNode>();
 function hoursLayer(s: AppState) {
   const key = s.month + s.plot.gardenBearingDeg + JSON.stringify(s.items.filter((i) => ["tree", "shed", "greenhouse"].includes(i.kind)).map((i) => [i.x, i.y, i.w, i.h, i.a, i.pts]));
-  if (hoursCache.key === key) return hoursCache.node;
-  const cells = sunHoursGrid(s.plot, s.items, monthDay(s));
-  const node = (
+  return hoursCache(key, () => (
     <G opacity={0.85}>
-      {cells.map((c) => (
+      {sunHoursGrid(s.plot, s.items, monthDay(s)).map((c) => (
         <Rect key={`${c.x},${c.y}`} x={c.x} y={c.y} width={0.52} height={0.52} fill={HOURS_COLOUR[c.band]} />
       ))}
     </G>
-  );
-  hoursCache = { key, node };
-  return node;
+  ));
 }
 
 function shadowLayer(s: AppState) {

@@ -3,7 +3,7 @@
 // time, with the pilot watching. Real flights unlock once all of them have passed.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { FlightSession } from "../../../packages/flight-core/src/flight-session.ts";
 import { fromLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
@@ -14,6 +14,8 @@ import { DjiDrone } from "../modules/dji-drone";
 import { DroneStorage } from "./DroneStorage";
 import { SIM_HOME, drone, useDrone } from "./drone";
 import { S, commit, commitNow } from "./store";
+import { C } from "./theme";
+import { Btn, Stats } from "./ui";
 /**
  * A 12 m x 20 m test area round the take-off point, mostly north of it. It is placed where the
  * simulated drone actually is (the simulator keeps its last position until it is restarted).
@@ -138,7 +140,6 @@ const SCENARIOS: Scenario[] = [
 ];
 
 export function TestBench() {
-  const c = LIGHT;
   const d = useDrone();
   const telemetry = d.telemetry;
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -236,10 +237,9 @@ export function TestBench() {
   }, [result, scenario]);
 
   return (
-    <View style={[styles.root, { backgroundColor: c.bg }]}>
+    <View style={[styles.root, { backgroundColor: C.ground }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Button
-          c={c}
+        <Btn
           label="← Back to the app"
           onPress={() => {
             S.showBench = false;
@@ -247,71 +247,73 @@ export function TestBench() {
           }}
           disabled={flying}
         />
-        <Text style={[styles.title, { color: c.ink }]}>Simulator test bench</Text>
-        <Text style={{ color: c.muted }}>
+        <Text style={[styles.title, { color: C.ink }]}>Simulator test bench</Text>
+        <Text style={{ color: C.muted }}>
           Passed: {S.testsPassed.length} of {SCENARIOS.length}. Real flights unlock when all have passed.
         </Text>
-        <Text style={[styles.note, { color: c.warn }]}>Propellers OFF. Drone on a table. Controller on, phone plugged into it.</Text>
+        <Text style={[styles.note, { color: C.warn }]}>Propellers OFF. Drone on a table. Controller on, phone plugged into it.</Text>
         <DroneStorage />
 
-        <View style={[styles.card, { backgroundColor: c.card }]}>
-          <Text style={[styles.label, { color: c.muted }]}>Drone</Text>
-          <Text style={{ color: c.ink }}>{d.status}</Text>
-          <Text style={{ color: telemetry?.signalOk ? c.ok : c.warn }}>{d.bridge.linkReport()}</Text>
-          <View style={styles.row}>
-            <Stat c={c} k="Link" v={telemetry?.signalOk ? "OK" : "None"} bad={!telemetry?.signalOk} />
-            <Stat c={c} k="Mode" v={telemetry?.flightMode ?? "–"} />
-            <Stat c={c} k="Height" v={telemetry ? `${telemetry.altitudeM.toFixed(1)} m` : "–"} />
-            <Stat c={c} k="Battery" v={telemetry ? `${telemetry.batteryPercent}%` : "–"} />
-            <Stat c={c} k="Wind" v={telemetry?.wind ? `${telemetry.wind.speedMs.toFixed(1)} m/s` : "–"} />
-          </View>
-          <Button c={c} label={d.simOn ? "Stop simulator" : "Start simulator"} onPress={toggleSimulator} disabled={flying} />
+        <View style={[styles.card, { backgroundColor: C.white }]}>
+          <Text style={[styles.label, { color: C.muted }]}>Drone</Text>
+          <Text style={{ color: C.ink }}>{d.status}</Text>
+          <Text style={{ color: telemetry?.signalOk ? C.ok : C.warn }}>{d.bridge.linkReport()}</Text>
+          <Stats
+            items={[
+              [telemetry?.signalOk ? "OK" : "None", "Link"],
+              [telemetry?.flightMode ?? "–", "Mode"],
+              [telemetry ? `${telemetry.altitudeM.toFixed(1)} m` : "–", "Height"],
+              [telemetry ? `${telemetry.batteryPercent}%` : "–", "Battery"],
+              [telemetry?.wind ? `${telemetry.wind.speedMs.toFixed(1)} m/s` : "–", "Wind"],
+            ]}
+          />
+          <Btn label={d.simOn ? "Stop simulator" : "Start simulator"} onPress={toggleSimulator} disabled={flying} />
         </View>
 
         {session && (
-          <View style={[styles.card, { backgroundColor: c.card }]}>
-            <Text style={[styles.label, { color: c.muted }]}>{scenario?.title}</Text>
-            <Text style={{ color: c.ink, fontWeight: "600" }}>
+          <View style={[styles.card, { backgroundColor: C.white }]}>
+            <Text style={[styles.label, { color: C.muted }]}>{scenario?.title}</Text>
+            <Text style={{ color: C.ink, fontWeight: "600" }}>
               {session.state}
               {session.returnReason ? ` (${session.returnReason})` : ""} · photos {session.progress.completedWaypoints.length}/
               {mission.waypoints.length}
             </Text>
             {result && (
-              <Text style={{ color: result === "PASS" ? c.ok : c.warn, fontWeight: "700" }}>
+              <Text style={{ color: result === "PASS" ? C.ok : C.warn, fontWeight: "700" }}>
                 {result === "PASS" ? "PASS" : `CHECK: expected ${scenario?.expect}`}
               </Text>
             )}
-            <Button c={c} label="RETURN HOME" danger onPress={() => d.returnHome()} disabled={!flying} />
+            <Btn label="RETURN HOME" danger onPress={() => d.returnHome()} disabled={!flying} />
           </View>
         )}
 
         {checks.length > 0 && (
-          <View style={[styles.card, { backgroundColor: c.card }]}>
+          <View style={[styles.card, { backgroundColor: C.white }]}>
             {checks.map((i) => (
-              <Text key={i.id + i.message} style={{ color: i.status === "block" ? c.bad : c.warn }}>
+              <Text key={i.id + i.message} style={{ color: i.status === "block" ? C.stop : C.warn }}>
                 {i.status === "block" ? "STOP" : "CHECK"}: {i.message}
               </Text>
             ))}
           </View>
         )}
 
-        <Text style={[styles.label, { color: c.muted }]}>Tests, in order</Text>
+        <Text style={[styles.label, { color: C.muted }]}>Tests, in order</Text>
         {SCENARIOS.map((sc) => (
-          <View key={sc.id} style={[styles.card, { backgroundColor: c.card }]}>
-            <Text style={{ color: c.ink, fontWeight: "700" }}>
+          <View key={sc.id} style={[styles.card, { backgroundColor: C.white }]}>
+            <Text style={{ color: C.ink, fontWeight: "700" }}>
               {sc.title}
               {S.testsPassed.includes(sc.id) ? "  ✓ passed" : ""}
             </Text>
-            <Text style={{ color: c.ink }}>{sc.instructions}</Text>
-            <Text style={{ color: c.muted }}>Expected: {sc.expect}</Text>
-            <Button c={c} label="Run" onPress={() => run(sc)} disabled={!d.simOn || flying || !telemetry?.signalOk} />
+            <Text style={{ color: C.ink }}>{sc.instructions}</Text>
+            <Text style={{ color: C.muted }}>Expected: {sc.expect}</Text>
+            <Btn label="Run" onPress={() => run(sc)} disabled={!d.simOn || flying || !telemetry?.signalOk} />
           </View>
         ))}
 
-        <Text style={[styles.label, { color: c.muted }]}>Log</Text>
-        <View style={[styles.card, { backgroundColor: c.card }]}>
+        <Text style={[styles.label, { color: C.muted }]}>Log</Text>
+        <View style={[styles.card, { backgroundColor: C.white }]}>
           {d.log.map((l, i) => (
-            <Text key={i} style={[styles.mono, { color: c.muted }]}>
+            <Text key={i} style={[styles.mono, { color: C.muted }]}>
               {l}
             </Text>
           ))}
@@ -321,32 +323,6 @@ export function TestBench() {
   );
 }
 
-type Colors = typeof LIGHT;
-
-function Stat({ c, k, v, bad }: { c: Colors; k: string; v: string; bad?: boolean }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={[styles.label, { color: c.muted }]}>{k}</Text>
-      <Text style={{ color: bad ? c.bad : c.ink, fontWeight: "600" }}>{v}</Text>
-    </View>
-  );
-}
-
-function Button({ c, label, onPress, disabled, danger }: { c: Colors; label: string; onPress: () => void; disabled?: boolean; danger?: boolean }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      disabled={disabled}
-      style={[styles.button, { backgroundColor: danger ? c.bad : c.accent, opacity: disabled ? 0.4 : 1 }]}
-    >
-      <Text style={{ color: c.onAccent, fontWeight: "700", textAlign: "center" }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-const LIGHT = { bg: "#e9eee9", card: "#ffffff", ink: "#14211b", muted: "#56665e", accent: "#1d6b47", onAccent: "#ffffff", ok: "#23824f", warn: "#a86f00", bad: "#b8322a" };
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { padding: 16, gap: 12 },
@@ -354,8 +330,5 @@ const styles = StyleSheet.create({
   note: { fontWeight: "600" },
   card: { borderRadius: 12, padding: 12, gap: 8 },
   label: { fontSize: 12, textTransform: "uppercase", letterSpacing: 0.8 },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  stat: { minWidth: 70, gap: 2 },
-  button: { borderRadius: 10, paddingVertical: 12, paddingHorizontal: 14 },
   mono: { fontFamily: "monospace", fontSize: 11 },
 });

@@ -5,6 +5,7 @@ import { NavigationBar } from "expo-navigation-bar";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { roundButton } from "./src/ui";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
@@ -110,7 +111,7 @@ function Shell() {
                 accessibilityLabel={menuOpen ? "Hide the tabs" : "Show the tabs"}
                 onPress={() => setMenuOpen(!menuOpen)}
                 hitSlop={8}
-                style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [roundButton, styles.menuBtn, pressed && { opacity: 0.7 }]}
               >
                 <Svg width={22} height={22} viewBox="0 0 24 24">
                   {menuOpen ? (
@@ -214,18 +215,5 @@ const styles = StyleSheet.create({
   navBtn: { flex: 1, alignItems: "center", gap: 3, paddingTop: 9, paddingBottom: 11 },
   navIcon: { borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
   navText: { fontSize: 11, color: C.muted },
-  // A round button like the map's zoom buttons.
-  menuBtn: {
-    position: "absolute",
-    left: 8,
-    bottom: 8,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  menuBtn: { position: "absolute", left: 8, bottom: 8 },
 });

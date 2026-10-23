@@ -17,6 +17,18 @@ export function Note({ children, style }: { children: ReactNode; style?: object 
   return <Text style={[s.note, style]}>{children}</Text>;
 }
 
+/** The round white button over the map (zoom, turn, show the tabs). */
+export const roundButton: ViewStyle = {
+  width: 42,
+  height: 42,
+  borderRadius: 21,
+  backgroundColor: "rgba(255,255,255,0.92)",
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.18)",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
 export function Btn({
   label,
   onPress,
