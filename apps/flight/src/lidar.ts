@@ -6,7 +6,6 @@
 // Positions come from GPS through a Helmert shift, so they are good to a few metres: everything
 // that uses them allows for that.
 
-import { useEffect, useReducer } from "react";
 import { inflate } from "pako";
 import { File, Paths } from "expo-file-system";
 
@@ -16,6 +15,7 @@ import { parseArcGrid, parseTiff, type Raster } from "../../../packages/garden-c
 import type { Pt } from "../../../packages/garden-core/src/index.ts";
 
 import type { LidarSite } from "./lidarMath";
+import { placeCache } from "./placeCache";
 import { HOME_PROJECT_ID, currentProject } from "./store";
 
 const DTM_URL = "https://environment.data.gov.uk/spatialdata/lidar-composite-digital-terrain-model-dtm-1m/wcs";
@@ -102,11 +102,31 @@ const toStored = (r: Raster): StoredRaster => ({
 });
 const fromStored = (r: StoredRaster): Raster => ({ ...r, values: Float64Array.from(r.values, (v) => (v === null ? NaN : v)) });
 
-let site: LidarSite | null = null;
-let lastError: { at: number; anchor: LatLng; error: string } | null = null;
-let loading = false;
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+async function download(anchor: LatLng, home: Pt): Promise<LidarSite> {
+  const c = wgs84ToGrid(anchor.lat, anchor.lng);
+  const box = { e0: Math.floor(c.e - RADIUS_M), e1: Math.ceil(c.e + RADIUS_M), n0: Math.floor(c.n - RADIUS_M), n1: Math.ceil(c.n + RADIUS_M) };
+  const dtm = await coverage(DTM_URL, box);
+  let dsm: Raster | null = null;
+  try {
+    dsm = await coverage(DSM_URL, box);
+  } catch {
+    // Levels still work without it; obstacle heights do not.
+  }
+  const site: LidarSite = { fetchedAt: new Date().toISOString(), anchor, home, dtm, dsm };
+  try {
+    const f = new File(Paths.document, FILE);
+    if (f.exists) f.delete();
+    f.create();
+    const stored: Stored = { format: "plotwise-lidar", version: 1, fetchedAt: site.fetchedAt, anchor, home, dtm: toStored(dtm), dsm: dsm ? toStored(dsm) : null };
+    f.write(JSON.stringify(stored));
+  } catch {
+    // Still used until the app is closed.
+  }
+  return site;
+}
+
+// The phone keeps one site, with no time limit. A failed fetch is tried again after 5 minutes.
+const lidar = placeCache<LidarSite, [home: Pt]>({ keepMs: Infinity, samePlaceM: SAME_SITE_M, retryAfterErrorMs: 5 * 60_000, load: download });
 
 export async function loadSavedLidar(): Promise<void> {
   try {
@@ -114,46 +134,19 @@ export async function loadSavedLidar(): Promise<void> {
     if (!f.exists) return;
     const s = JSON.parse(await f.text()) as Stored;
     if (s.format !== "plotwise-lidar") return;
-    site = { fetchedAt: s.fetchedAt, anchor: s.anchor, home: s.home, dtm: fromStored(s.dtm), dsm: s.dsm ? fromStored(s.dsm) : null };
-    emit();
+    lidar.set(s.anchor, { fetchedAt: s.fetchedAt, anchor: s.anchor, home: s.home, dtm: fromStored(s.dtm), dsm: s.dsm ? fromStored(s.dsm) : null });
   } catch {
-    site = null;
+    // A damaged file: fetched again when needed.
   }
 }
 
-export async function fetchLidar(anchor: LatLng, home: Pt): Promise<void> {
-  if (loading) return;
-  loading = true;
-  emit();
-  try {
-    const c = wgs84ToGrid(anchor.lat, anchor.lng);
-    const box = { e0: Math.floor(c.e - RADIUS_M), e1: Math.ceil(c.e + RADIUS_M), n0: Math.floor(c.n - RADIUS_M), n1: Math.ceil(c.n + RADIUS_M) };
-    const dtm = await coverage(DTM_URL, box);
-    let dsm: Raster | null = null;
-    try {
-      dsm = await coverage(DSM_URL, box);
-    } catch {
-      // Levels still work without it; obstacle heights do not.
-    }
-    site = { fetchedAt: new Date().toISOString(), anchor, home, dtm, dsm };
-    lastError = null;
-    const f = new File(Paths.document, FILE);
-    if (f.exists) f.delete();
-    f.create();
-    const stored: Stored = { format: "plotwise-lidar", version: 1, fetchedAt: site.fetchedAt, anchor, home, dtm: toStored(dtm), dsm: dsm ? toStored(dsm) : null };
-    f.write(JSON.stringify(stored));
-  } catch (e) {
-    lastError = { at: Date.now(), anchor, error: (e as Error).message };
-  } finally {
-    loading = false;
-    emit();
-  }
-}
+export const fetchLidar = (anchor: LatLng, home: Pt) => lidar.refresh(anchor, home);
 
 /** Say where on the plan the drone was when the LIDAR was fetched (lines the levels up again). */
 export function setLidarHome(home: Pt): void {
+  const site = lidar.latest();
   if (!site) return;
-  site = { ...site, home };
+  lidar.set(site.anchor, { ...site, home });
   try {
     const f = new File(Paths.document, FILE);
     if (f.exists) {
@@ -164,14 +157,11 @@ export function setLidarHome(home: Pt): void {
   } catch {
     // The change still holds until the app is closed.
   }
-  emit();
 }
 
-/** The LIDAR for this take-off point, if fetched. */
+/** The LIDAR for this take-off point, if fetched (with no take-off point: whatever the phone has). */
 export function lidarFor(anchor: LatLng | null): LidarSite | null {
-  if (!site) return null;
-  if (anchor && distanceM(site.anchor, anchor) > SAME_SITE_M) return null;
-  return site;
+  return anchor ? lidar.current(anchor) : lidar.latest();
 }
 
 /** A postcode's middle can be this far from the property itself. */
@@ -183,6 +173,7 @@ const POSTCODE_REACH_M = 300;
  * own, always used it before projects had locations.)
  */
 export function currentLidar(): LidarSite | null {
+  const site = lidar.latest();
   if (!site) return null;
   const p = currentProject();
   if (p.id === HOME_PROJECT_ID) return site;
@@ -192,25 +183,12 @@ export function currentLidar(): LidarSite | null {
 
 /** Why there is no LIDAR for this take-off point yet: still fetching, or the error. */
 export function lidarStatus(anchor: LatLng): { loading: boolean; error: string | null } {
-  const err = lastError && distanceM(lastError.anchor, anchor) < SAME_SITE_M ? lastError.error : null;
-  return { loading, error: err };
+  return { loading: lidar.loading(), error: lidar.error(anchor) };
 }
 
 /** Fetch the LIDAR for this take-off point if there is none yet, and redraw when it arrives. */
 export function useLidar(anchor: LatLng | null, home: Pt): { site: LidarSite | null; loading: boolean; error: string | null } {
-  const [, bump] = useReducer((n: number) => n + 1, 0);
-  useEffect(() => {
-    listeners.add(bump);
-    return () => {
-      listeners.delete(bump);
-    };
-  }, []);
-  const have = lidarFor(anchor);
-  const err = lastError && anchor && distanceM(lastError.anchor, anchor) < SAME_SITE_M ? lastError : null;
-  useEffect(() => {
-    // An error is tried again after 5 minutes.
-    if (anchor && !have && !loading && (!err || Date.now() - err.at > 5 * 60_000)) fetchLidar(anchor, home);
-  }, [anchor?.lat, anchor?.lng, !!have]);
-  return { site: have, loading, error: have ? null : (err?.error ?? null) };
+  const { error, loading } = lidar.use(anchor, home);
+  const site = lidarFor(anchor);
+  return { site, loading, error: site ? null : error };
 }
-
