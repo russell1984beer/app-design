@@ -1,14 +1,13 @@
-import { useState } from "react";
 import { View } from "react-native";
 
 import { useDrone } from "../drone";
-import { anchorFor, offsetWords, takeoffMismatch, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
+import { anchorFor, offsetWords, takeoffMismatch, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, surveyStats, useLaunch, type FlightPlan, type Launch } from "../flight";
 import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 import { scanDetailsToSend, shareScanDetails } from "../survey";
 import { refreshFlyZones, useFlyZones } from "../flysafe";
 import { useLidar } from "../lidar";
-import { TAKEOFF_WARN_M } from "../placement";
+import { TAKEOFF_BLOCK_M, TAKEOFF_WARN_M } from "../placement";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
 import { DroneStorage } from "../DroneStorage";
@@ -66,7 +65,8 @@ function TakeoffPointCheck() {
   return (
     <View style={{ marginBottom: 10 }}>
       <Status
-        status="block"
+        // Matches the pre-flight check: a warning from 2.5 m, no take-off from 5 m.
+        status={Math.abs(off.alongM) >= TAKEOFF_BLOCK_M ? "block" : "warn"}
         text={`The drone is not on the take-off point: going by where your house shows up in the LIDAR, it is about ${offsetWords(off.alongM)} than the yellow spot on the plan.`}
       />
       <Note>Either carry the drone to the yellow spot, or move the yellow spot to where the drone is. Every flight starts from the yellow spot.</Note>
@@ -177,25 +177,18 @@ export function PreflightList({ plan }: { plan: FlightPlan | { error: string } |
   );
 }
 
+/** Carries on a scan that stopped part-way, when there is one. */
+export function ResumeButton({ launch: l, what }: { launch: Launch; what: string }) {
+  if (!l.resume) return null;
+  return <Btn label={`Resume ${what} (${l.resume.done} of ${l.resume.total} photos done)`} onPress={() => l.start(true)} disabled={!l.ready} />;
+}
+
 export function ScanPanel() {
   const s = useApp();
   const d = useDrone();
-  const [error, setError] = useState<string | null>(null);
   const st = surveyStats(s);
   const job = d.job?.kind === "survey" ? d.job : null;
-  const resume = resumable("survey");
-  const plan = prepareFlight("survey", s, d.telemetry, !!resume);
-
-  async function takeOff(fromSaved: boolean) {
-    setError(null);
-    const p = prepareFlight("survey", S, d.telemetry, fromSaved);
-    if ("error" in p || !p.check.canTakeOff) return;
-    try {
-      await launch(p, fromSaved);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  const l = useLaunch("survey");
 
   if (d.job?.kind === "check") {
     return (
@@ -214,8 +207,8 @@ export function ScanPanel() {
         <FlightProgress kind="survey" />
         {landed && (
           <>
-            <PreflightList plan={plan} />
-            {resume && <Btn label={`Resume scan (${resume.done} of ${resume.total} photos done)`} onPress={() => takeOff(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
+            <PreflightList plan={l.plan} />
+            <ResumeButton launch={l} what="scan" />
             {s.mode === "real" && s.lastScan && (
               <Btn label="Make a survey from the photos so far: send the scan details to the PC" alt onPress={() => shareScanDetails(scanDetailsToSend()!).catch(() => {})} />
             )}
@@ -242,7 +235,7 @@ export function ScanPanel() {
             go("survey");
           }}
         />
-        <Btn label="Scan again" alt onPress={() => takeOff(false)} disabled={"error" in plan || !plan.check.canTakeOff} />
+        <Btn label="Scan again" alt onPress={() => l.start(false)} disabled={!l.ready} />
       </View>
     );
   }
@@ -255,10 +248,10 @@ export function ScanPanel() {
       </Lead>
       <DroneStatus />
       <Stats items={surveyStatItems()} />
-      <PreflightList plan={plan} />
-      {error && <Status status="block" text={error} />}
-      {resume && <Btn label={`Resume scan (${resume.done} of ${resume.total} photos done)`} onPress={() => takeOff(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
-      <Btn label={resume ? "Start again from the beginning" : "Take off and scan"} alt={!!resume} onPress={() => takeOff(false)} disabled={"error" in plan || !plan.check.canTakeOff} />
+      <PreflightList plan={l.plan} />
+      {l.error && <Status status="block" text={l.error} />}
+      <ResumeButton launch={l} what="scan" />
+      <Btn label={l.resume ? "Start again from the beginning" : "Take off and scan"} alt={!!l.resume} onPress={() => l.start(false)} disabled={!l.ready} />
       <FirstFlightStart />
       <Btn label="Edit flight plan" alt onPress={() => go("plan")} />
       <Btn

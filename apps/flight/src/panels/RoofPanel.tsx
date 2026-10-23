@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { View } from "react-native";
 
 import { gsdCm, MINI_4_PRO } from "../../../../packages/flight-core/src/camera.ts";
@@ -7,37 +6,24 @@ import { EXAMPLE_ROOF_ISSUES, SEVERITY, reportSummary, roofArea } from "../../..
 
 import { canFly } from "../../modules/dji-drone";
 import { SIM_HOME, useDrone } from "../drone";
-import { launch, prepareFlight, resumable, roofScan } from "../flight";
+import { roofScan, useLaunch } from "../flight";
 import { RoofCloseup } from "../RoofCloseup";
 import { S, commit, useApp } from "../store";
 import { Btn, Card, Check, Chip, H2, Lead, Line, Note, Row, Stats, Status } from "../ui";
-import { DroneStatus, FlightProgress, PreflightList } from "./ScanPanel";
+import { DroneStatus, FlightProgress, PreflightList, ResumeButton } from "./ScanPanel";
 
 export function RoofPanel() {
   const s = useApp();
   const d = useDrone();
-  const [error, setError] = useState<string | null>(null);
   const scan = roofScan(s, SIM_HOME);
   const area = Math.round(roofArea(s.plot));
   const job = d.job?.kind === "roof" ? d.job : null;
-  const resume = resumable("roof");
-  const plan = prepareFlight("roof", s, d.telemetry, !!resume);
+  // A new scan starts the photo count again.
+  const l = useLaunch("roof", { beforeStart: (fromSaved) => (S.roof = { photosTaken: fromSaved ? S.roof.photosTaken : 0, showExample: false, sel: null }) });
   // Detail on the roof from the lower circle: straight-line distance to the middle of the slope.
   const low = scan.orbits[scan.orbits.length - 1];
   const slant = Math.hypot(scan.radiusM - s.plot.houseWidthM / 4, low.altitudeM - s.plot.ridgeHeightM * 0.8);
   const detailMm = gsdCm(MINI_4_PRO, slant) * 10;
-
-  async function inspect(fromSaved: boolean) {
-    setError(null);
-    const p = prepareFlight("roof", S, d.telemetry, fromSaved);
-    if ("error" in p || !p.check.canTakeOff) return;
-    S.roof = { photosTaken: fromSaved ? S.roof.photosTaken : 0, showExample: false, sel: null };
-    try {
-      await launch(p, fromSaved);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
 
   if (s.roof.showExample) return <ExampleReport area={area} />;
 
@@ -55,7 +41,7 @@ export function RoofPanel() {
             : `Keep the drone in sight. Circle ${Math.floor(done / perOrbit) + 1} of ${scan.orbits.length}, ${orbit.heightAboveRidgeM} m above the ridge. It will return to the take-off point when finished.`}
         </Lead>
         <FlightProgress kind="roof" />
-        {landed && resume && <Btn label={`Resume roof scan (${resume.done} of ${resume.total} photos)`} onPress={() => inspect(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
+        {landed && <ResumeButton launch={l} what="roof scan" />}
       </View>
     );
   }
@@ -76,7 +62,7 @@ export function RoofPanel() {
             commit();
           }}
         />
-        <Btn label="Inspect again" alt onPress={() => inspect(false)} disabled={"error" in plan || !plan.check.canTakeOff} />
+        <Btn label="Inspect again" alt onPress={() => l.start(false)} disabled={!l.ready} />
       </View>
     );
   }
@@ -101,10 +87,10 @@ export function RoofPanel() {
       {canFly ? (
         <>
       <DroneStatus />
-      <PreflightList plan={plan} />
-      {error && <Status status="block" text={error} />}
-      {resume && <Btn label={`Resume roof scan (${resume.done} of ${resume.total} photos)`} onPress={() => inspect(true)} disabled={"error" in plan || !plan.check.canTakeOff} />}
-      <Btn label="Inspect roof" alt={!!resume} onPress={() => inspect(false)} disabled={"error" in plan || !plan.check.canTakeOff} />
+      <PreflightList plan={l.plan} />
+      {l.error && <Status status="block" text={l.error} />}
+      <ResumeButton launch={l} what="roof scan" />
+      <Btn label="Inspect roof" alt={!!l.resume} onPress={() => l.start(false)} disabled={!l.ready} />
         </>
       ) : (
         <Note style={{ marginTop: 8 }}>Roof scans are flown from the Android phone plugged into the drone controller.</Note>

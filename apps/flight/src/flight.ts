@@ -1,6 +1,8 @@
 // Turns the plan into real flights: GPS positions for the plot and roof, the garden and roof
 // missions, and the pre-flight checks for the chosen mode (DJI simulator or real flight).
 
+import { useState } from "react";
+
 import type { Telemetry } from "../../../packages/flight-core/src/bridge.ts";
 import { gsdCm, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
 import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
@@ -10,9 +12,9 @@ import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/r
 import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
 import { clipToY, plotOutline, pointInside, spanAtX, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
 
-import { SIM_HOME, drone } from "./drone";
+import { SIM_HOME, drone, useDrone } from "./drone";
 import { TAKEOFF_BLOCK_M, TAKEOFF_WARN_M, planPointFromCorner, planToGps, gpsToPlan, takeoffSpotCheck } from "./placement";
-import { S, commit, commitNow, currentProject, type AppState } from "./store";
+import { S, commit, commitNow, currentProject, useApp, type AppState } from "./store";
 import { recordScan } from "./survey";
 import { currentFlyZones } from "./flysafe";
 import { lidarFor, lidarStatus } from "./lidar";
@@ -326,6 +328,38 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
   });
   commit();
 }
+
+/** Every pre-flight check passed: the take-off buttons are enabled only then. */
+export function canStart(plan: FlightPlan | { error: string } | null): plan is FlightPlan {
+  return !!plan && !("error" in plan) && plan.check.canTakeOff;
+}
+
+/**
+ * The one take-off path for the Scan, Roof and First-flight panels. `plan` is what the pre-flight
+ * list shows (none while `active` is false, so a folded panel does no planning). `start` plans again
+ * from the latest telemetry and takes off only if every check still passes.
+ */
+export function useLaunch(kind: FlightKind, opts: { active?: boolean; beforeStart?: (fromSaved: boolean) => void } = {}) {
+  const s = useApp();
+  const d = useDrone();
+  const [error, setError] = useState<string | null>(null);
+  const resume = kind === "check" ? null : resumable(kind, s);
+  const plan = opts.active === false ? null : prepareFlight(kind, s, d.telemetry, !!resume);
+  async function start(fromSaved: boolean): Promise<void> {
+    setError(null);
+    const p = prepareFlight(kind, S, d.telemetry, fromSaved);
+    if (!canStart(p)) return;
+    opts.beforeStart?.(fromSaved);
+    try {
+      await launch(p, fromSaved);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+  return { plan, resume, start, error, ready: canStart(plan) };
+}
+
+export type Launch = ReturnType<typeof useLaunch>;
 
 export const RETURN_REASON: Record<string, string> = {
   complete: "Scan complete.",

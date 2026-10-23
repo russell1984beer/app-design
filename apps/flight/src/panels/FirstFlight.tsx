@@ -10,7 +10,7 @@ import { FIRST_FLIGHT } from "../../../../packages/flight-core/src/planner.ts";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, useDrone } from "../drone";
-import { anchorFor, firstFlightMission, launch, prepareFlight, RETURN_REASON, STATE_TEXT } from "../flight";
+import { anchorFor, firstFlightMission, RETURN_REASON, STATE_TEXT, useLaunch } from "../flight";
 import { S, commitNow, useApp } from "../store";
 import { Btn, H2, Lead, Note, P, Readout, Status } from "../ui";
 import { useForecast } from "../weather";
@@ -19,11 +19,9 @@ import { PreflightList } from "./ScanPanel";
 /** Shown on the Scan tab before any scan: what the check is, and the button to fly it. */
 export function FirstFlightStart() {
   const s = useApp();
-  const d = useDrone();
-  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const plan = prepareFlight("check", s, d.telemetry);
-  const photoCount = firstFlightMission(s, SIM_HOME).estimate.photoCount;
+  // Planned only while the panel is open (the Scan tab redraws on every telemetry update).
+  const l = useLaunch("check", { active: open });
   const done = s.firstFlightDoneAt;
 
   if (!open) {
@@ -40,16 +38,7 @@ export function FirstFlightStart() {
     );
   }
 
-  async function fly() {
-    setError(null);
-    const p = prepareFlight("check", S, d.telemetry);
-    if ("error" in p || !p.check.canTakeOff) return;
-    try {
-      await launch(p, false);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
+  const photoCount = firstFlightMission(s, SIM_HOME).estimate.photoCount;
 
   return (
     <View style={{ marginTop: 14 }}>
@@ -67,9 +56,9 @@ export function FirstFlightStart() {
         <P>4. It comes back over the take-off point and lands straight down.</P>
       </Readout>
       {s.mode === "sim" && <Note style={{ marginBottom: 8, color: "#B7791F", fontWeight: "700" }}>DJI simulator is selected: propellers OFF. Switch to Real flight for the real check.</Note>}
-      <PreflightList plan={plan} />
-      {error && <Status status="block" text={error} />}
-      <Btn label="Take off for the first flight check" onPress={fly} disabled={"error" in plan || !plan.check.canTakeOff} />
+      <PreflightList plan={l.plan} />
+      {l.error && <Status status="block" text={l.error} />}
+      <Btn label="Take off for the first flight check" onPress={() => l.start(false)} disabled={!l.ready} />
       <Btn label="Not now" alt onPress={() => setOpen(false)} />
     </View>
   );
