@@ -8,7 +8,7 @@ import type { Raster } from "../../../packages/garden-core/src/raster.ts";
 
 import { gridHeight, slopeCells, terrainFromSurvey } from "../../../packages/garden-core/src/index.ts";
 
-import { aboveSeaLevelM, fillGapsFromLidar, lidarSurvey, obstacleHeights, type LidarSite } from "./lidarMath.ts";
+import { aboveSeaLevelM, fillGapsFromLidar, lidarHeights, lidarSurvey, obstaclesFrom, type LidarSite } from "./lidarMath.ts";
 
 const HOME: LatLng = { lat: 52.0, lng: -1.0 };
 const at = (north: number, east: number) => fromLocal(HOME, { x: east, y: north });
@@ -35,7 +35,7 @@ function site(): LidarSite {
 test("obstacle heights: the tree beside the route counts, the mast far off does not", () => {
   const area = [at(5, -3), at(25, -3), at(25, 3), at(5, 3)];
   const mission = planGrid(area, { altitudeM: 10 });
-  const o = obstacleHeights(site(), HOME, mission, area)!;
+  const o = obstaclesFrom([lidarHeights(site(), HOME)!], HOME, mission, area, "LIDAR")!;
   assert.ok(Math.abs(o.routeTallestM - 6.3) < 0.6, `route ${o.routeTallestM}`); // tree plus the slope up to it
   assert.ok(o.areaTallestM < 8, `area ${o.areaTallestM}`);
   assert.equal(o.source, "LIDAR");
@@ -44,7 +44,7 @@ test("obstacle heights: the tree beside the route counts, the mast far off does 
 test("obstacle heights: a flight area reaching the mast sees it", () => {
   const area = [at(-5, -3), at(25, -3), at(25, 50), at(-5, 50)];
   const mission = planGrid([at(5, -3), at(25, -3), at(25, 3), at(5, 3)], { altitudeM: 10 });
-  const o = obstacleHeights(site(), HOME, mission, area)!;
+  const o = obstaclesFrom([lidarHeights(site(), HOME)!], HOME, mission, area, "LIDAR")!;
   assert.ok(o.areaTallestM > 17, `area ${o.areaTallestM}`);
 });
 
@@ -103,8 +103,8 @@ test("a tall spot marked as gone (tree cut down) is ignored by the clearance che
   const area = [at(5, -3), at(25, -3), at(25, 3), at(5, 3)];
   const mission = planGrid(area, { altitudeM: 10 });
   const s = { ...site(), fetchedAt: "gone-test" };
-  const before = obstacleHeights(s, HOME, mission, area)!;
-  const after = obstacleHeights(s, HOME, mission, area, [at(15, 0)])!;
+  const before = obstaclesFrom([lidarHeights(s, HOME)!], HOME, mission, area, "LIDAR")!;
+  const after = obstaclesFrom([lidarHeights(s, HOME, [at(15, 0)])!], HOME, mission, area, "LIDAR")!;
   assert.ok(before.routeTallestM > 5);
   assert.ok(after.routeTallestM < 1, `after ${after.routeTallestM}`);
   const plot = { widthM: 7, lengthM: 43, rearGardenM: 29.5, houseDepthM: 8, houseWidthM: 7, ridgeHeightM: 8.5, gardenBearingDeg: 0 } as never;

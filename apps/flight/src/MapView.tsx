@@ -13,11 +13,8 @@ import {
   area,
   bbox,
   centre,
-  contours,
   corners,
-  draftTerrain,
   existingFeatures,
-  terrainFromSurvey,
   fillOf,
   fmtLevel,
   inHouse,
@@ -26,14 +23,12 @@ import {
   isOval,
   isRound,
   itemName,
-  levelFn,
   localOf,
   materialOf,
   planVector,
   rotP,
   shadows,
   sizeText,
-  slopeCells,
   solarHour,
   sunHoursGrid,
   sunPosition,
@@ -43,16 +38,18 @@ import {
   plotOutline,
   suggestPlants,
   type Item,
-  type Plot,
   type Pt,
   type SlopeBand,
 } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone, useDrone } from "./drone";
-import { firstFlightMission, gpsToPlan, missionOnPlan, planToGps, roofScan, surveyMission } from "./flight";
+import { firstFlightMission, missionOnPlan, roofScan, surveyMission } from "./flight";
+import { gpsToPlan, planToGps } from "./placement";
+import { terrainFor } from "./terrain";
 import { HOME_PROJECT_ID, S, commit, currentProject, history, nextId, sn, useApp, type AppState } from "./store";
 import { currentSurvey } from "./survey";
-import { aboveSeaLevelM, currentLidar } from "./lidar";
+import { currentLidar } from "./lidar";
+import { aboveSeaLevelM } from "./lidarMath";
 import { MAX_ZOOM, NO_ZOOM, boxAround, fit, levelTurn, toPlan, turnBox, turnPt, zoomAt, zoomedView, type Zoom } from "./mapZoom";
 import { C } from "./theme";
 
@@ -66,21 +63,6 @@ const ptsStr = (P: Pt[]) => P.map(f2).join(" ");
 
 const SLOPE_COLOUR: Record<SlopeBand, string> = { under4: "#D3E3C6", "4to8": "#ECE09C", "8to15": "#E9B46B", over15: "#D8784C" };
 const HOURS_COLOUR = { "6plus": "#F2CF5B", "3to6": "#C9DC9A", under3: "#8FA7A0" } as const;
-
-/** Cached per plot: the terrain and its contour and slope drawings. */
-const terrainCache = new Map<string, { z: ReturnType<typeof draftTerrain>; lvl: (x: number, y: number) => number; contours: ReturnType<typeof contours>; slope: ReturnType<typeof slopeCells> }>();
-export function terrainFor(plot: Plot) {
-  const survey = currentSurvey();
-  const key = JSON.stringify(plot) + (survey?.createdAt ?? "draft");
-  let t = terrainCache.get(key);
-  if (!t) {
-    // The real survey's ground heights once one is opened; the draft from the title plan until then.
-    const z = survey ? terrainFromSurvey(survey) : draftTerrain(plot);
-    t = { z, lvl: levelFn(plot, z), contours: contours(plot, z), slope: slopeCells(plot, z) };
-    terrainCache.set(key, t);
-  }
-  return t;
-}
 
 function roofView(s: AppState): VB {
   const { widthM: W, rearGardenM: GH, houseDepthM: HD, houseWidthM: HW } = s.plot;

@@ -7,7 +7,7 @@ import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import type { ObstacleHeights } from "../../../packages/flight-core/src/safety.ts";
 import { gridHeight, measuredAt } from "../../../packages/garden-core/src/index.ts";
 
-import { gpsToPlan, planToGps } from "./flight";
+import { gpsToPlan, planToGps } from "./placement";
 import { lidarFor } from "./lidar";
 import { lidarHeights, obstaclesFrom, type HeightAbove } from "./lidarMath";
 import type { AppState } from "./store";
@@ -21,6 +21,7 @@ export function obstacleHeightsFor(s: AppState, anchor: LatLng, mission: Mission
   const ll = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
   const key = [ll(anchor), s.home.join(","), JSON.stringify(s.plot), mission.id, area.map(ll).join(";"), survey?.createdAt, lidar?.fetchedAt, JSON.stringify(s.goneSpots)].join("|");
   if (cache.has(key)) return cache.get(key)!;
+  if (cache.size >= 4) cache.clear();
 
   const { widthM: W, lengthM: L } = s.plot;
   // Inside the plot where the drone measured (a scan that stopped part-way leaves the rest to the LIDAR).

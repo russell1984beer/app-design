@@ -103,19 +103,6 @@ export function obstaclesFrom(sources: HeightAbove[], home: LatLng, mission: Mis
   return { routeTallestM: Math.max(0, route), areaTallestM: Math.max(0, areaMax), source };
 }
 
-const obstacleCache = new Map<string, ObstacleHeights | null>();
-
-/** The LIDAR alone (kept for the tests and as the simple case). */
-export function obstacleHeights(s: LidarSite, home: LatLng, mission: Mission, area: LatLng[], gone: LatLng[] = []): ObstacleHeights | null {
-  const ll = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
-  const key = [s.fetchedAt, ll(home), mission.id, ...area.map(ll), "gone", ...gone.map(ll)].join("|");
-  if (!obstacleCache.has(key)) {
-    const h = lidarHeights(s, home, gone);
-    obstacleCache.set(key, h ? obstaclesFrom([h], home, mission, area, "LIDAR") : null);
-  }
-  return obstacleCache.get(key)!;
-}
-
 /**
  * The LIDAR as a survey of the plot, for the Survey tab until a drone survey is opened: ground and
  * surface heights on a 0.5 m grid over the plan. `toGps` turns a plan point into a GPS position.
@@ -231,6 +218,7 @@ export function takeoffOffset(s: LidarSite, plot: Plot, toGps: (p: Pt) => LatLng
   const key = `${s.fetchedAt}|${cacheKey}|${JSON.stringify(plot)}`;
   if (offsetCache.has(key)) return offsetCache.get(key)!;
   const result = computeOffset(s, plot, toGps);
+  if (offsetCache.size >= 4) offsetCache.clear();
   offsetCache.set(key, result);
   return result;
 }

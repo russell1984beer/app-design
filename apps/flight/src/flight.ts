@@ -3,19 +3,20 @@
 
 import type { Telemetry } from "../../../packages/flight-core/src/bridge.ts";
 import { gsdCm, MINI_4_PRO } from "../../../packages/flight-core/src/camera.ts";
-import { fromLocal, toLocal, type LatLng } from "../../../packages/flight-core/src/geo.ts";
+import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import { planFirstFlight, planSurvey, surveyPhotoChoice, withFilm } from "../../../packages/flight-core/src/planner.ts";
 import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/roof.ts";
 import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
-import { clipToY, eastNorthToPlan, planToEastNorth, plotOutline, pointInside, spanAtX, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
+import { clipToY, plotOutline, pointInside, spanAtX, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone } from "./drone";
-import { planPointFromCorner, takeoffSpotCheck } from "./placement";
+import { TAKEOFF_BLOCK_M, TAKEOFF_WARN_M, planPointFromCorner, planToGps, gpsToPlan, takeoffSpotCheck } from "./placement";
 import { S, commit, commitNow, currentProject, type AppState } from "./store";
 import { recordScan } from "./survey";
 import { currentFlyZones } from "./flysafe";
-import { lidarFor, lidarStatus, takeoffOffset, type TakeoffOffset } from "./lidar";
+import { lidarFor, lidarStatus } from "./lidar";
+import { takeoffOffset, type TakeoffOffset } from "./lidarMath";
 import { obstacleHeightsFor } from "./obstacles";
 import { currentForecast } from "./weather";
 
@@ -33,21 +34,6 @@ export function takeoffMismatch(s: AppState, anchor: LatLng | null): TakeoffOffs
 /** Plain words for which way the drone is off the marked take-off point. */
 export function offsetWords(alongM: number): string {
   return `${Math.abs(alongM).toFixed(0)} m ${alongM > 0 ? "nearer the house" : "nearer the bottom of the garden"}`;
-}
-
-/** Beyond these, the drone is not where the plan thinks: warn, then block (all routes would be shifted). */
-export const OFFSET_WARN_M = 2.5;
-const OFFSET_BLOCK_M = 5;
-
-/** A plan point as a GPS position, given the GPS position of the home point. */
-export function planToGps(s: AppState, anchor: LatLng, p: Pt): LatLng {
-  const en = planToEastNorth(s.plot, s.home, p);
-  return fromLocal(anchor, { x: en.east, y: en.north });
-}
-
-export function gpsToPlan(s: AppState, anchor: LatLng, p: LatLng): Pt {
-  const v = toLocal(anchor, p);
-  return eastNorthToPlan(s.plot, s.home, { east: v.x, north: v.y });
 }
 
 /** The plot's boundary in GPS: the traced outline when there is one, otherwise the rectangle. Flights and the geofence use it. */
@@ -262,7 +248,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
     // The house in the LIDAR against the plan: checks the drone's spot, or the title plan's line-up.
     const off = takeoffMismatch(s, anchor);
     const lineUp = !!markedCorner();
-    if (off && Math.abs(off.alongM) >= OFFSET_BLOCK_M)
+    if (off && Math.abs(off.alongM) >= TAKEOFF_BLOCK_M)
       extra.push({
         id: "takeoffPoint",
         status: "block",
@@ -270,7 +256,7 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
           ? `The plot as lined up on the title plan seems to be about ${Math.abs(off.alongM).toFixed(0)} m off the house in the LIDAR. The whole flight would be shifted. Check the line-up on the Projects tab.`
           : `The drone seems to be about ${offsetWords(off.alongM)} than the take-off point on the plan (the house shows up shifted in the LIDAR). The whole flight would be shifted too. Carry the drone to the take-off point, or move the take-off point (button above).`,
       });
-    else if (off && Math.abs(off.alongM) >= OFFSET_WARN_M)
+    else if (off && Math.abs(off.alongM) >= TAKEOFF_WARN_M)
       extra.push({
         id: "takeoffPoint",
         status: "warn",

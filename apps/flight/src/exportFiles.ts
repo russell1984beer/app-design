@@ -7,7 +7,7 @@ import * as Sharing from "expo-sharing";
 
 import { planDxf, quoteHtml } from "../../../packages/garden-core/src/index.ts";
 
-import { terrainFor } from "./MapView";
+import { terrainFor } from "./terrain";
 import { S } from "./store";
 
 const stamp = () => new Date().toISOString().slice(0, 10);

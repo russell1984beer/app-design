@@ -2,12 +2,13 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { useDrone } from "../drone";
-import { anchorFor, offsetWords, OFFSET_WARN_M, takeoffMismatch, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
+import { anchorFor, offsetWords, takeoffMismatch, RETURN_REASON, SIM_TEST_COUNT, STATE_TEXT, launch, prepareFlight, resumable, surveyStats, type FlightPlan } from "../flight";
 import { S, commit, go, useApp, type FlightMode } from "../store";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 import { scanDetailsToSend, shareScanDetails } from "../survey";
 import { refreshFlyZones, useFlyZones } from "../flysafe";
 import { useLidar } from "../lidar";
+import { TAKEOFF_WARN_M } from "../placement";
 import { hasForecastKey, refreshForecast, useForecast } from "../weather";
 import { Bar, Btn, H2, Lead, Note, P, Readout, Seg, Stats, Status } from "../ui";
 import { DroneStorage } from "../DroneStorage";
@@ -60,7 +61,7 @@ function TakeoffPointCheck() {
   const s = useApp();
   const d = useDrone();
   const off = takeoffMismatch(s, anchorFor(s, d.telemetry));
-  if (!off || Math.abs(off.alongM) < OFFSET_WARN_M || d.flying) return null;
+  if (!off || Math.abs(off.alongM) < TAKEOFF_WARN_M || d.flying) return null;
   const newY = Math.min(Math.max(s.home[1] + off.alongM, 1), s.plot.rearGardenM - 1);
   return (
     <View style={{ marginBottom: 10 }}>

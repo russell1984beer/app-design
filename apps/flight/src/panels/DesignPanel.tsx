@@ -30,11 +30,11 @@ import {
   type Plant,
 } from "../../../../packages/garden-core/src/index.ts";
 
-import { terrainFor } from "../MapView";
+import { terrainFor } from "../terrain";
 import { S, commit, go, history, nextId, useApp } from "../store";
 import { C } from "../theme";
 import { Btn, Check, Chip, Chips, Field, H2, Legend, Lead, Note, P, Readout, Row, Seg, Stepper } from "../ui";
-import { EmptyState } from "./SurveyPanel";
+import { EmptyState } from "./EmptyState";
 
 const newWork = () => S.items.filter((i) => !i.exist);
 

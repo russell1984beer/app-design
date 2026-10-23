@@ -4,10 +4,10 @@ import { Text, View } from "react-native";
 import { DEFAULT_PRICES, PRICE_LIST, gbp, quantities } from "../../../../packages/garden-core/src/index.ts";
 
 import { sharePlanDxf, shareQuotePdf } from "../exportFiles";
-import { terrainFor } from "../MapView";
+import { terrainFor } from "../terrain";
 import { S, commit, go, useApp } from "../store";
 import { Btn, Card, Field, H2, Lead, Line, Note, Row, Status } from "../ui";
-import { EmptyState } from "./SurveyPanel";
+import { EmptyState } from "./EmptyState";
 
 export function MaterialsPanel() {
   const s = useApp();

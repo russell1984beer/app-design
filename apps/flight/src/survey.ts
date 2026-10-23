@@ -10,8 +10,9 @@ import * as Sharing from "expo-sharing";
 import { SCAN_FORMAT, readSurvey, type ScanDetails, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME } from "./drone";
-import { planToGps } from "./flight";
-import { currentLidar, fillGapsFromLidar, lidarSurvey } from "./lidar";
+import { planToGps } from "./placement";
+import { currentLidar } from "./lidar";
+import { fillGapsFromLidar, lidarSurvey } from "./lidarMath";
 import { HOME_PROJECT_ID, S, commit } from "./store";
 
 const SURVEY_FILE = "survey.json";
