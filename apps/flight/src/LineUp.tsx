@@ -287,8 +287,7 @@ export function LineUp() {
                   label={`Use this boundary (${trace.length} points)`}
                   onPress={() => {
                     applyBoundary(trace, ov);
-                    S.lineUp = false;
-                    commit();
+                    close();
                   }}
                 />
               </>
@@ -317,8 +316,7 @@ export function LineUp() {
                   label="Use these measurements"
                   onPress={() => {
                     applyCorners(corners, ov);
-                    S.lineUp = false;
-                    commit();
+                    close();
                   }}
                 />
               </>

@@ -118,10 +118,9 @@ export type AppState = {
 const SAVE_VERSION = 4;
 
 export const S: AppState = {
+  // The open project's plot, design and scan; the defaults are in freshProjectData.
+  ...freshProjectData(),
   tab: "plan",
-  plot: TEST_PLOT,
-  // Middle of the rear garden; moved by tapping the Plan map.
-  home: [TEST_PLOT.widthM / 2, TEST_PLOT.rearGardenM / 2],
   alt: 20,
   ov: 75,
   edgeLap: false,
@@ -131,13 +130,10 @@ export const S: AppState = {
   safety: DEFAULT_SAFETY,
   checks: [false, false, false],
   mode: "sim",
-  scanned: false,
   layer: "contours",
   tool: "dist",
   pts: [],
   closed: false,
-  items: [],
-  nextId: 1,
   sel: null,
   vsel: null,
   placing: null,
@@ -146,18 +142,11 @@ export const S: AppState = {
   month: "jun",
   time: 15,
   hours: false,
-  style: null,
-  styleNote: "",
   snap: true,
-  existInit: false,
   saveVersion: SAVE_VERSION,
-  roof: { photosTaken: 0, showExample: false, sel: null },
-  resume: {},
   prices: DEFAULT_PRICES,
-  lastScan: null,
   testsPassed: [],
   firstFlightDoneAt: null,
-  goneSpots: [],
   showBench: false,
   projects: [newProject(HOME_PROJECT_ID, "My property")],
   projectId: HOME_PROJECT_ID,
@@ -165,7 +154,7 @@ export const S: AppState = {
   v: 0,
 };
 
-/** The data a new project starts with (the plot is a placeholder until its corners are marked). */
+/** The data a new project starts with (the plot is a placeholder until its corners are marked). The take-off point starts in the middle of the rear garden; moved by tapping the Plan map. */
 export function freshProjectData(): Pick<AppState, ProjectField> {
   return {
     plot: { ...TEST_PLOT },
@@ -207,23 +196,25 @@ const STORE_KEY = "plotwise-state-v1";
 const listeners = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
+function save(): void {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = undefined;
+  const kept = Object.fromEntries(KEEP.map((k) => [k, S[k]]));
+  AsyncStorage.setItem(STORE_KEY, JSON.stringify(kept)).catch(() => {});
+}
+
 export function commit(): void {
   ensureExisting();
   S.v++;
   for (const l of listeners) l();
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    const kept = Object.fromEntries(KEEP.map((k) => [k, S[k]]));
-    AsyncStorage.setItem(STORE_KEY, JSON.stringify(kept)).catch(() => {});
-  }, 500);
+  saveTimer = setTimeout(save, 500);
 }
 
 /** Save straight away (scan progress must not be lost if the app is closed mid-flight). */
 export function commitNow(): void {
   commit();
-  if (saveTimer) clearTimeout(saveTimer);
-  const kept = Object.fromEntries(KEEP.map((k) => [k, S[k]]));
-  AsyncStorage.setItem(STORE_KEY, JSON.stringify(kept)).catch(() => {});
+  save();
 }
 
 export async function loadSaved(): Promise<void> {

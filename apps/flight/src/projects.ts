@@ -54,16 +54,18 @@ export function renameProject(name: string): void {
   commit();
 }
 
+/** Delete a file in the app's documents folder, if it is there. */
+function removeDoc(name: string): void {
+  const f = new File(Paths.document, name);
+  if (f.exists) f.delete();
+}
+
 /** Delete a project that is not open, with its drawing and survey files. */
 export function deleteProject(id: string): void {
   if (id === S.projectId || id === HOME_PROJECT_ID) return;
   const p = S.projects.find((x) => x.id === id);
   if (!p) return;
-  for (const name of [p.drawing?.file, `survey-${id}.json`]) {
-    if (!name) continue;
-    const f = new File(Paths.document, name);
-    if (f.exists) f.delete();
-  }
+  for (const name of [p.drawing?.file, `survey-${id}.json`]) if (name) removeDoc(name);
   S.projects = S.projects.filter((x) => x.id !== id);
   commit();
 }
@@ -138,10 +140,7 @@ export async function pickDrawing(): Promise<"picked" | "cancelled"> {
     new File(asset.uri).copy(copy);
     ({ width, height } = await Image.getSize(copy.uri));
   }
-  if (p.drawing) {
-    const old = new File(Paths.document, p.drawing.file);
-    if (old.exists) old.delete();
-  }
+  if (p.drawing) removeDoc(p.drawing.file);
   // A new drawing has to be lined up again.
   p.drawing = { file: name, widthPx: width, heightPx: height, ...(paperWidthMm ? { paperWidthMm } : {}) };
   p.overlay = null;
@@ -157,7 +156,7 @@ export const drawingUri = (p: Project): string | null => (p.drawing ? new File(P
  * The plot from the marked corners: its width, length and direction, and where it is. The house and
  * the front garden keep their depths; the rear garden takes the rest of the length.
  */
-export function applyCorners(corners: LatLng[], overlay: Project["overlay"]): void {
+function placeCorners(corners: LatLng[], overlay: Project["overlay"]): void {
   const g = plotFromCorners(corners);
   const front = S.plot.lengthM - S.plot.rearGardenM - S.plot.houseDepthM;
   const lengthM = Math.round(g.lengthM * 10) / 10;
@@ -177,6 +176,10 @@ export function applyCorners(corners: LatLng[], overlay: Project["overlay"]): vo
   p.corners = corners;
   p.boundary = null;
   p.overlay = overlay;
+}
+
+export function applyCorners(corners: LatLng[], overlay: Project["overlay"]): void {
+  placeCorners(corners, overlay);
   commit();
 }
 
@@ -186,7 +189,7 @@ export function applyCorners(corners: LatLng[], overlay: Project["overlay"]): vo
  * geofence follow.
  */
 export function applyBoundary(points: LatLng[], overlay: Project["overlay"]): void {
-  applyCorners(rectAroundPolygon(points), overlay);
+  placeCorners(rectAroundPolygon(points), overlay);
   const farLeft = currentProject().corners![0];
   // On the plan, placed from the rectangle just set (the same corner and direction the flights use).
   const boundary = points.map((q): Pt => {
