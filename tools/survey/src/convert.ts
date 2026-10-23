@@ -7,6 +7,7 @@ import jpeg from "jpeg-js";
 
 import { fromLocal } from "../../../packages/flight-core/src/geo.ts";
 import {
+  SCAN_FORMAT,
   SURVEY_FORMAT,
   fillHoles,
   planToEastNorth,
@@ -28,7 +29,7 @@ export type Raster = {
   bands: ArrayLike<number>[];
 };
 
-export async function readRaster(path: string): Promise<Raster> {
+async function readRaster(path: string): Promise<Raster> {
   const buf = await readFile(path);
   const tiff = await fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   const img = await tiff.getImage();
@@ -78,7 +79,7 @@ function sample(r: Raster, band: number, px: number, py: number): number | null 
   return wsum > 0.5 ? sum / wsum : null;
 }
 
-export function heightGrid(scan: ScanDetails, dem: Raster, cellM = 0.25): { grid: HeightGrid; coverage: number } {
+function heightGrid(scan: ScanDetails, dem: Raster, cellM = 0.25): { grid: HeightGrid; coverage: number } {
   const cols = Math.ceil(scan.plot.widthM / cellM);
   const rows = Math.ceil(scan.plot.lengthM / cellM);
   const raw: (number | null)[] = [];
@@ -96,7 +97,7 @@ export function heightGrid(scan: ScanDetails, dem: Raster, cellM = 0.25): { grid
 }
 
 /** The aerial photo cut to the plot rectangle and turned so the far end of the garden is at the top. */
-export function plotPhoto(scan: ScanDetails, ortho: Raster, pxPerM = 40): SurveyPackage["photo"] {
+function plotPhoto(scan: ScanDetails, ortho: Raster, pxPerM = 40): SurveyPackage["photo"] {
   const w = Math.round(scan.plot.widthM * pxPerM);
   const h = Math.round(scan.plot.lengthM * pxPerM);
   const data = Buffer.alloc(w * h * 4);
@@ -154,7 +155,7 @@ export function adjustScan(scan: ScanDetails, a: { bearingDeg?: number; backM?: 
 
 export function readScan(text: string): ScanDetails {
   const s = JSON.parse(text) as ScanDetails;
-  if (s.format !== "plotwise-scan" || !s.plot || !s.home || !s.anchor) {
+  if (s.format !== SCAN_FORMAT || !s.plot || !s.home || !s.anchor) {
     throw new Error("That is not a Plotwise scan details file (plotwise-scan-….json, shared from the app after a scan).");
   }
   return s;

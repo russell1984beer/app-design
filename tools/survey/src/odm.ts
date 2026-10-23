@@ -4,10 +4,10 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-export const ODM_IMAGE = "opendronemap/odm:3.5.6";
+const ODM_IMAGE = "opendronemap/odm:3.5.6";
 
 /** ODM settings for a garden survey: ground and surface models and the aerial photo, at 2 cm. */
-export const ODM_ARGS = ["--dsm", "--dtm", "--dem-resolution", "2", "--orthophoto-resolution", "2", "--skip-3dmodel", "--skip-report"];
+const ODM_ARGS = ["--dsm", "--dtm", "--dem-resolution", "2", "--orthophoto-resolution", "2", "--skip-3dmodel", "--skip-report"];
 
 export function listPhotos(dir: string): string[] {
   if (!existsSync(dir)) throw new Error(`The photo folder was not found: ${dir}`);

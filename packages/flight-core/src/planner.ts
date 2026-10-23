@@ -23,7 +23,7 @@ const PHOTO_PAUSE_S = 2;
  */
 export const PHOTO_INTERVAL_S = 2.5;
 
-export type GridSettings = {
+type GridSettings = {
   /** Height above take-off point, metres. */
   altitudeM: number;
   /** Overlap between photos along a line, 0–1. */
@@ -54,9 +54,9 @@ export type GridSettings = {
 };
 
 /** Passes closer than this would mean a very long flight for no gain. */
-export const MIN_LINE_SPACING_M = 1;
+const MIN_LINE_SPACING_M = 1;
 /** Side overlap below this leaves gaps that photogrammetry cannot join. */
-export const MIN_SIDE_OVERLAP = 0.6;
+const MIN_SIDE_OVERLAP = 0.6;
 
 export const DEFAULT_GRID: GridSettings = {
   altitudeM: 20,
@@ -154,7 +154,7 @@ export function planGrid(boundary: LatLng[], overrides: Partial<GridSettings> = 
   return { id: missionId("grid", waypoints), kind: "grid", speedMs: s.speedMs, waypoints, estimate };
 }
 
-export type SurveySettings = {
+type SurveySettings = {
   altitudeM: number;
   /** Photo overlap, 0–1. Sets both the gap between passes and between photos. */
   overlap: number;
@@ -191,10 +191,10 @@ export function surveyPhotoChoice(boundary: LatLng[], overrides: Partial<SurveyS
   return { recommended, min, max, runs };
 }
 
-export const DEFAULT_SURVEY: SurveySettings = { altitudeM: 20, overlap: 0.75, speedMs: 4, edgeLap: false, edgePhotoCount: 24, edgeGimbalPitchDeg: -60 };
+const DEFAULT_SURVEY: SurveySettings = { altitudeM: 20, overlap: 0.75, speedMs: 4, edgeLap: false, edgePhotoCount: 24, edgeGimbalPitchDeg: -60 };
 
 /** The garden survey's fixed pattern, from the prototype: gaps between passes and between photos. */
-export function surveySpacing(altitudeM: number, overlap: number): { passM: number; photoM: number } {
+function surveySpacing(altitudeM: number, overlap: number): { passM: number; photoM: number } {
   return {
     passM: Math.max(MIN_LINE_SPACING_M, 0.75 * altitudeM * (1 - overlap)),
     photoM: Math.max(0.5, 0.5 * altitudeM * (1 - overlap)),
@@ -267,7 +267,7 @@ export function planSurvey(boundary: LatLng[], overrides: Partial<SurveySettings
   return mission;
 }
 
-export type OrbitSettings = {
+type OrbitSettings = {
   center: LatLng;
   radiusM: number;
   altitudeM: number;
@@ -310,7 +310,7 @@ export function planOrbit(o: Partial<OrbitSettings> & Pick<OrbitSettings, "cente
   return buildMission("orbit", waypoints, s.speedMs);
 }
 
-export type FirstFlightSettings = {
+type FirstFlightSettings = {
   /** Height above the take-off point, metres, for the hover and the scan. */
   altitudeM: number;
   /** Hover above the take-off point this long first, for the checks (wind, unplugged cable). */
@@ -341,7 +341,7 @@ export function planFirstFlight(home: LatLng, area: LatLng[], overrides: Partial
   return { ...mission, endWith: "land" };
 }
 
-export type FilmSettings = {
+type FilmSettings = {
   altitudeM: number;
   /** Camera tilt while filming: -90 straight down, 0 the horizon. */
   gimbalPitchDeg: number;

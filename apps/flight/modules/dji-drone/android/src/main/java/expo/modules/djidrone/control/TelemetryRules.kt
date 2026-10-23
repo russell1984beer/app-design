@@ -4,9 +4,10 @@ package expo.modules.djidrone.control
 // in by name so these rules can be unit-tested without the SDK.
 
 object TelemetryRules {
-  /** Link to the drone is good: controller and aircraft connected and fresh position data. */
+  /** Position data older than this means the link is not good (NativeDroneBridge.ts has its own event-age limit). */
   const val STALE_AFTER_MS = 2000L
 
+  /** Link to the drone is good: controller and aircraft connected and fresh position data. */
   fun signalOk(rcConnected: Boolean, aircraftConnected: Boolean, msSinceLocation: Long): Boolean =
     rcConnected && aircraftConnected && msSinceLocation < STALE_AFTER_MS
 

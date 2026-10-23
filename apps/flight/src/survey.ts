@@ -7,7 +7,7 @@ import { Platform } from "react-native";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
-import { readSurvey, type ScanDetails, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
+import { SCAN_FORMAT, readSurvey, type ScanDetails, type SurveyPackage } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME } from "./drone";
 import { planToGps } from "./flight";
@@ -124,7 +124,7 @@ export function removeSurvey(): void {
  * sent to the PC for processing, also when it stopped part-way.
  */
 export function recordScan(anchor: { lat: number; lng: number }, photoCount: number, flownAt: string): void {
-  S.lastScan = { format: "plotwise-scan", version: 1, flownAt, plot: S.plot, home: S.home, anchor, photoCount };
+  S.lastScan = { format: SCAN_FORMAT, version: 1, flownAt, plot: S.plot, home: S.home, anchor, photoCount };
 }
 
 /**
@@ -134,7 +134,7 @@ export function recordScan(anchor: { lat: number; lng: number }, photoCount: num
  */
 export function scanDetailsToSend(): ScanDetails | null {
   if (S.lastScan) return S.lastScan;
-  const base = { format: "plotwise-scan" as const, version: 1 as const, flownAt: new Date().toISOString(), plot: S.plot };
+  const base = { format: SCAN_FORMAT, version: 1 as const, flownAt: new Date().toISOString(), plot: S.plot };
   const stopped = S.resume.survey;
   if (stopped && !(stopped.anchor.lat === SIM_HOME.lat && stopped.anchor.lng === SIM_HOME.lng)) {
     return { ...base, home: S.home, anchor: stopped.anchor, photoCount: stopped.progress.completedWaypoints.length };

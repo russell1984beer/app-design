@@ -14,7 +14,7 @@ export type Tab = "projects" | "plan" | "scan" | "survey" | "design" | "roof" | 
 
 /** What belongs to one property; the rest (flight settings, prices, safety) is shared by all. */
 export const PROJECT_FIELDS = ["plot", "home", "scanned", "items", "nextId", "existInit", "style", "styleNote", "roof", "resume", "lastScan", "goneSpots"] as const;
-export type ProjectField = (typeof PROJECT_FIELDS)[number];
+type ProjectField = (typeof PROJECT_FIELDS)[number];
 
 /** One property: where it is, its plot drawing, and (while another is open) its own saved data. */
 export type Project = {
@@ -192,7 +192,7 @@ export const history = new History();
 export const nextId = () => S.nextId++;
 
 /** Add the features already in the garden the first time a survey is loaded (the owner's own property only). */
-export function ensureExisting(): void {
+function ensureExisting(): void {
   if (S.existInit || !S.scanned || S.projectId !== HOME_PROJECT_ID) return;
   S.existInit = true;
   S.items.push(...existingFeatures(S.plot, nextId));

@@ -54,7 +54,7 @@ export function areaM2(polygon: LatLng[]): number {
   return Math.abs(sum) / 2;
 }
 
-export function pointInPolygon(p: Vec2, polygon: Vec2[]): boolean {
+function pointInPolygon(p: Vec2, polygon: Vec2[]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const a = polygon[i];

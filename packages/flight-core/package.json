@@ -4,7 +4,6 @@
   "private": true,
   "description": "Flight planning, safety rules and the phone-side flight controller for Plotwise. No dependencies.",
   "type": "module",
-  "main": "src/index.ts",
   "engines": {
     "node": ">=22.18"
   },

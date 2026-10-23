@@ -8,7 +8,7 @@ import type { NoFlyZone } from "../../../packages/flight-core/src/safety.ts";
 import { DjiDrone } from "../modules/dji-drone";
 import { flyZonesFromDji } from "../modules/dji-drone/src/flyZones.ts";
 
-export type FlyZoneResult = { zones: NoFlyZone[] } | { error: string };
+type FlyZoneResult = { zones: NoFlyZone[] } | { error: string };
 
 const KEEP_MS = 6 * 60 * 60 * 1000;
 const SAME_PLACE_M = 200;

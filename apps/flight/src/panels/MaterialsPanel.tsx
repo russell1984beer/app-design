@@ -44,7 +44,7 @@ export function MaterialsPanel() {
   return (
     <View>
       <H2>Materials</H2>
-      <Lead>Quantities come from the measured survey and include 5% waste where it applies.</Lead>
+      <Lead>Quantities come from the plan and the levels (drone survey, LIDAR or draft) and include 5% waste where it applies.</Lead>
       {Q.map((q, i) => (
         <Card key={i}>
           <H2 small>{q.title}</H2>

@@ -8,7 +8,7 @@ import type { DjiDroneNative, NativeStatus, NativeTelemetry, Subscription } from
 /** Telemetry older than this means the link is gone, whatever the last message said. */
 export const STALE_AFTER_MS = 2000;
 
-export type NativeDroneBridgeOptions = {
+type NativeDroneBridgeOptions = {
   now?: () => number;
   onStatus?: (status: NativeStatus) => void;
   /** Called on every telemetry update, after it is stored. Drive FlightSession.update() from here. */

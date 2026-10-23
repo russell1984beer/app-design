@@ -9,9 +9,9 @@ import { photoChoice, photosPerRun, surveyStats } from "../flight";
 import { S, commit, go, useApp } from "../store";
 import { Btn, Check, H2, Lead, Note, Seg, Stats, Status, Stepper } from "../ui";
 
-export const CHECKS: [string, string][] = [
+const CHECKS: [string, string][] = [
   ["Operator ID and Flyer ID registered", "Required by the CAA for drones with a camera"],
-  ["Airspace checked in DJI Fly", "No restrictions here today. The app does not check FlySafe zones yet"],
+  ["Airspace checked in DJI Fly", "No restrictions here today. The app also checks DJI FlySafe zones before take-off; DJI Fly has the latest"],
   ["Neighbours told about the flight", "Recommended for privacy"],
 ];
 

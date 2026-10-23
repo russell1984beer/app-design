@@ -3,7 +3,7 @@
 // Mercator formulae ("A guide to coordinate systems in Great Britain"). Good to about 2-5 m, which
 // is fine for 1 m LIDAR as long as what uses it allows for a few metres either way.
 
-export type GridRef = { e: number; n: number };
+type GridRef = { e: number; n: number };
 
 const RAD = Math.PI / 180;
 
@@ -40,7 +40,7 @@ function fromCartesian(p: { x: number; y: number; z: number }, el: { a: number; 
 }
 
 /** WGS84 latitude/longitude to OSGB36 latitude/longitude (degrees). */
-export function wgs84ToOsgb36(lat: number, lng: number): { lat: number; lng: number } {
+function wgs84ToOsgb36(lat: number, lng: number): { lat: number; lng: number } {
   const p = toCartesian(lat, lng, WGS84);
   const { tx, ty, tz, s } = HELMERT;
   const sec = RAD / 3600;

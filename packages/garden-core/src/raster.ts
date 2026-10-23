@@ -12,7 +12,7 @@ export type Raster = {
   pixelSize?: { x: number; y: number };
 };
 
-export type Inflate = (data: Uint8Array) => Uint8Array;
+type Inflate = (data: Uint8Array) => Uint8Array;
 
 // ---- ESRI ASCII grid ------------------------------------------------------------------------------
 
@@ -180,7 +180,7 @@ function unpredict(data: Uint8Array, predictor: number, w: number, rows: number,
 }
 
 /** TIFF's LZW (most significant bit first, early code-width change). */
-export function lzwDecode(input: Uint8Array): Uint8Array {
+function lzwDecode(input: Uint8Array): Uint8Array {
   const out: number[] = [];
   let dict: Uint8Array[] = [];
   const reset = () => {

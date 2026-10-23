@@ -32,8 +32,6 @@ const FILE = "lidar.json";
 type StoredRaster = { width: number; height: number; values: (number | null)[]; origin: { x: number; y: number }; pixelSize: { x: number; y: number } };
 type Stored = { format: "plotwise-lidar"; version: 1; fetchedAt: string; anchor: LatLng; home: Pt; dtm: StoredRaster; dsm: StoredRaster | null };
 
-export type LidarResult = { site: LidarSite } | { error: string };
-
 // ---- The web service ---------------------------------------------------------------------------
 
 async function text(url: string): Promise<string> {

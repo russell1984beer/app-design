@@ -41,7 +41,7 @@ export function tilesAround(centre: LatLng, z: number, widthPx: number, heightPx
   return out;
 }
 
-export type PlotFromCorners = {
+type PlotFromCorners = {
   widthM: number;
   lengthM: number;
   /** Compass direction from the house down the garden to the far end. */

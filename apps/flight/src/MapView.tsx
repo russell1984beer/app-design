@@ -89,7 +89,7 @@ function roofView(s: AppState): VB {
   return [HW / 2 - r, GH + HD / 2 - r, 2 * r, 2 * r];
 }
 
-export function viewBoxFor(s: AppState): VB {
+function viewBoxFor(s: AppState): VB {
   if (s.tab === "roof") return roofView(s);
   return [-2.4, -2.2, s.plot.widthM + 5.8, s.plot.lengthM + 8];
 }
@@ -120,8 +120,8 @@ export function MapView() {
 
   // Line widths and labels follow the zoom in steps, so a pinch does not redraw everything each frame.
   const step = Math.round(Math.log2(scale) * 4);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const lidar = currentLidar();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const content = useMemo(() => layers(s, px), [s.v, step, size.w, size.h, lidar?.fetchedAt, lidar?.home.join(), turn]);
 
   /** Two fingers on the map: where they are on screen (relative to the map) and how far apart. */
@@ -488,15 +488,14 @@ function T({
 function layers(s: AppState, px: (n: number) => number): ReactNode {
   const tab = s.tab;
   if (tab === "roof") return roofLayer(s, px);
-  const k = (n: number) => px(n);
   let body: ReactNode;
   if (tab === "plan" || tab === "scan")
-    body = <>{photoLayer(s, px)}{boundary(s, k)}{flightLayer(s, px, tab === "scan" && drone.job?.kind === "check")}{tab === "plan" && heightLabels(s, px)}</>;
-  else if (!s.scanned) body = <><G opacity={0.5}>{photoLayer(s, px)}</G>{boundary(s, k)}</>;
+    body = <>{photoLayer(s, px)}{boundary(s, px)}{flightLayer(s, px, tab === "scan" && drone.job?.kind === "check")}{tab === "plan" && heightLabels(s, px)}</>;
+  else if (!s.scanned) body = <><G opacity={0.5}>{photoLayer(s, px)}</G>{boundary(s, px)}</>;
   else if (tab === "survey") {
     const base =
       s.layer === "heights" ? <><G opacity={0.35}>{photoLayer(s, px)}</G><G opacity={0.85}>{heightsLayer(s)}</G>{heightLabels(s, px)}</> : s.layer === "photo" ? photoLayer(s, px) : s.layer === "slope" ? <><G opacity={0.3}>{photoLayer(s, px)}</G><G opacity={0.85}>{slopeLayer(s)}</G>{houseBox(s, px)}</> : <>{contourLayer(s, px)}{houseBox(s, px)}</>;
-    body = <>{base}{boundary(s, k)}{dims(s, px)}{measureLayer(s, px)}</>;
+    body = <>{base}{boundary(s, px)}{dims(s, px)}{measureLayer(s, px)}</>;
   } else {
     const sun = tab === "design" && s.dmode === "sun";
     body = (
@@ -505,7 +504,7 @@ function layers(s: AppState, px: (n: number) => number): ReactNode {
         {sun && s.hours ? hoursLayer(s) : null}
         {itemsLayer(s, px)}
         {sun && !s.hours ? shadowLayer(s) : null}
-        {boundary(s, k)}
+        {boundary(s, px)}
         {dims(s, px)}
         {northArrow(s, px)}
       </>
@@ -1140,5 +1139,3 @@ function DroneOverlay({ px }: { px: (n: number) => number }) {
     </>
   );
 }
-
-export { roofView };

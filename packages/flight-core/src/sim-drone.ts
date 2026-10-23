@@ -18,7 +18,7 @@ export type SimOptions = {
 };
 
 type Target = { pos: Vec2; altitudeM: number; speedMs: number };
-type ReturnPhase = "climb" | "fly" | "descend";
+type ReturnPhase = "climb" | "fly";
 
 const TAKEOFF_HEIGHT_M = 1.2;
 const CLIMB_MS = 3;
@@ -276,10 +276,7 @@ export class SimDrone implements DroneBridge {
       else this.returnPhase = "fly";
     } else if (this.returnPhase === "fly") {
       const arrived = this.moveHorizontal(home, this.returnSpeedMs, dt);
-      if (arrived) {
-        this.returnPhase = "descend";
-        this.mode = "landing";
-      }
+      if (arrived) this.mode = "landing";
     }
   }
 

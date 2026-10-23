@@ -61,7 +61,7 @@ export type NoFlyZone = {
   heightLimitM?: number;
 };
 
-export type CheckStatus = "pass" | "warn" | "block";
+type CheckStatus = "pass" | "warn" | "block";
 export type CheckItem = { id: string; status: CheckStatus; message: string };
 export type PreflightResult = { canTakeOff: boolean; items: CheckItem[] };
 
@@ -93,7 +93,7 @@ export function headwindMs(wind: Wind, travelBearingDeg: number): number {
   return wind.speedMs * Math.cos(((travelBearingDeg - wind.fromDeg) * Math.PI) / 180);
 }
 
-export type ReturnEstimateInput = {
+type ReturnEstimateInput = {
   position: LatLng;
   altitudeM: number;
   home: LatLng;
@@ -152,8 +152,8 @@ export type ObstacleHeights = {
 };
 
 /** Below this the flight is blocked, and below ROUTE_CLEARANCE_WARN_M it is warned about. */
-export const ROUTE_CLEARANCE_MIN_M = 3;
-export const ROUTE_CLEARANCE_WARN_M = 5;
+const ROUTE_CLEARANCE_MIN_M = 3;
+const ROUTE_CLEARANCE_WARN_M = 5;
 
 export function preflightCheck(input: PreflightInput): PreflightResult {
   const { settings: s, boundary, home, mission, forecast } = input;
@@ -249,7 +249,7 @@ export function preflightCheck(input: PreflightInput): PreflightResult {
 }
 
 /** Each photo is tried 3 times before the scan gives up, so a little room spare is asked for. */
-export const STORAGE_SPARE_PHOTOS = 5;
+const STORAGE_SPARE_PHOTOS = 5;
 
 function storageCheck(left: number, needed: number): CheckItem {
   const free = "Copy the photos off the drone, then format its storage in DJI Fly (camera settings, Storage, Format).";

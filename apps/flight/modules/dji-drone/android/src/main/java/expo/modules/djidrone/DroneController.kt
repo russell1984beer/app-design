@@ -751,11 +751,11 @@ class DroneController(
   private var emitFailed = false
 
   private fun emitTelemetry(now: Long) {
-    // A short summary in the phone's log every 5 seconds, to see what is and is not connected.
     if (listening && now - lastReadMs >= 1000) {
       lastReadMs = now
       readLatest()
     }
+    // A short summary in the phone's log every 5 seconds, to see what is and is not connected.
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
       Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} satellites=${satellites ?: "-"} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw photosLeft=$photosLeft mode=${djiFlightMode?.name}")
@@ -920,9 +920,9 @@ class DroneController(
   companion object {
     const val TAG = "DjiDrone"
     const val TICK_MS = 100L
-    /** A slow memory card took over 5 s to save one 48 MP photo (18 Oct). */
     /** Within this of the target, a photo is a stop photo (flight-core takes those within 0.5 m). */
     const val STOP_PHOTO_RADIUS_M = 0.6
+    /** A slow memory card took over 5 s to save one 48 MP photo (18 Oct). */
     const val PHOTO_TIMEOUT_MS = 15_000L
     /** A file this soon after asking, once the app has given up, is still the photo asked for. */
     const val LATE_PHOTO_MS = 30_000L

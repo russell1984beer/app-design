@@ -5,10 +5,10 @@
 import type { LatLng } from "./geo.ts";
 import type { WindForecast } from "./safety.ts";
 
-export const MET_OFFICE_HOURLY_URL = "https://data.hub.api.metoffice.gov.uk/sitespecific/v0/point/hourly";
+const MET_OFFICE_HOURLY_URL = "https://data.hub.api.metoffice.gov.uk/sitespecific/v0/point/hourly";
 
 /** Hours ahead to check: the flight plus the time to set up and swap a battery. */
-export const FORECAST_WINDOW_HOURS = 2;
+const FORECAST_WINDOW_HOURS = 2;
 
 type TimeStep = {
   time?: string;

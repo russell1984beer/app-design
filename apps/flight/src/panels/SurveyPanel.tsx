@@ -11,8 +11,8 @@ import { currentLidar, fetchLidar, setLidarHome, takeoffOffset, useLidar } from 
 import { currentSurvey, droneSurvey, openSurveyFile, removeSurvey, scanDetailsToSend, shareScanDetails } from "../survey";
 import { Big, Btn, H2, Lead, Legend, Note, P, Readout, Row, Seg, Status } from "../ui";
 
-/** Where the levels come from: the real processed survey, or the draft from the title plan. */
-export function SurveySource() {
+/** Where the levels come from: the processed drone survey, the LIDAR, or the draft from the title plan. */
+function SurveySource() {
   const s = useApp();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const survey = droneSurvey();

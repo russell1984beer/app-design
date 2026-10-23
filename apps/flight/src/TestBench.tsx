@@ -87,7 +87,6 @@ const SCENARIOS: Scenario[] = [
     atPhoto: {
       count: 4,
       run: () => {
-        DjiDrone.setSimulatorWind(-9, 0);
         drone.bridge.setTestWind({ speedMs: 9, fromDeg: 0 });
         drone.addLog("Test wind: 9 m/s from the north.");
       },

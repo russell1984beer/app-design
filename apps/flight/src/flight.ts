@@ -37,7 +37,7 @@ export function offsetWords(alongM: number): string {
 
 /** Beyond these, the drone is not where the plan thinks: warn, then block (all routes would be shifted). */
 export const OFFSET_WARN_M = 2.5;
-export const OFFSET_BLOCK_M = 5;
+const OFFSET_BLOCK_M = 5;
 
 /** A plan point as a GPS position, given the GPS position of the home point. */
 export function planToGps(s: AppState, anchor: LatLng, p: Pt): LatLng {
@@ -51,12 +51,12 @@ export function gpsToPlan(s: AppState, anchor: LatLng, p: LatLng): Pt {
 }
 
 /** The plot's boundary in GPS: the traced outline when there is one, otherwise the rectangle. Flights and the geofence use it. */
-export function plotGps(s: AppState, anchor: LatLng): LatLng[] {
+function plotGps(s: AppState, anchor: LatLng): LatLng[] {
   return plotOutline(s.plot).map((p) => planToGps(s, anchor, p));
 }
 
 /** The owner's half of the roof, seen from above. */
-export function roofPlan(s: AppState): Pt[] {
+function roofPlan(s: AppState): Pt[] {
   const { houseWidthM: HW, rearGardenM: GH, houseDepthM: HD } = s.plot;
   return [[0, GH], [HW, GH], [HW, GH + HD], [0, GH + HD]];
 }
@@ -121,7 +121,7 @@ const SUN_BLOCK_DEG = 8;
 const SUN_WARN_DEG = 20;
 
 /** The bottom of the garden (the far end of the plot) up to the take-off point, full width (inside a traced boundary). */
-export function firstFlightArea(s: AppState): Pt[] {
+function firstFlightArea(s: AppState): Pt[] {
   const W = s.plot.widthM;
   const y = s.home[1];
   const clipped = s.plot.boundary ? clipToY(s.plot.boundary, y) : [];
@@ -177,7 +177,7 @@ export function anchorFor(s: AppState, t: Telemetry | null): LatLng | null {
   return corner ? planPointFromCorner(s.plot, corner, s.home) : t.position;
 }
 
-export type FlightKind = "survey" | "roof" | "check";
+type FlightKind = "survey" | "roof" | "check";
 
 export type FlightPlan = {
   kind: FlightKind;

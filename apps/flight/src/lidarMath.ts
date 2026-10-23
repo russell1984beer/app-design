@@ -12,13 +12,13 @@ import { fillHoles, gridHeight, type Plot, type Pt, type SurveyPackage } from ".
 export type LidarSite = { fetchedAt: string; anchor: LatLng; home: Pt; dtm: Raster; dsm: Raster | null };
 
 /** GPS-to-grid positions are good to a few metres: obstacles this close to the route count. */
-export const ROUTE_BUFFER_M = 5;
+const ROUTE_BUFFER_M = 5;
 
 /**
  * The LIDAR can be years old: the owner can mark a tall spot (a tree since cut down) as gone. Within
  * this distance of a gone spot the LIDAR's surface is ignored and the ground used instead.
  */
-export const GONE_RADIUS_M = 4;
+const GONE_RADIUS_M = 4;
 
 const at = (r: Raster, p: LatLng) => {
   const g = wgs84ToGrid(p.lat, p.lng);

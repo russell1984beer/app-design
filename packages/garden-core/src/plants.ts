@@ -6,7 +6,7 @@ import type { Plot } from "./plot.ts";
 
 export type Plant = { id: string; name: string; sun: SunClass; spacingM: number; colour: string; veg?: boolean; note: string };
 
-export const PLANTS: Plant[] = [
+const PLANTS: Plant[] = [
   { id: "lav", name: "Lavender Hidcote", sun: "sun", spacingM: 0.45, colour: "#8E7CC3", note: "Scented and loved by bees" },
   { id: "sal", name: "Salvia Caradonna", sun: "sun", spacingM: 0.4, colour: "#5B4B9E", note: "Purple spikes all summer" },
   { id: "nep", name: "Catmint Walker's Low", sun: "sun", spacingM: 0.5, colour: "#9AA6D8", note: "Tough, long flowering" },

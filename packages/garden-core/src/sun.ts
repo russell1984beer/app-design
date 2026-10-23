@@ -5,7 +5,7 @@ import { planVector, type Plot, type Pt } from "./plot.ts";
 
 const RAD = Math.PI / 180;
 
-export type Month = { id: string; label: string; day: number };
+type Month = { id: string; label: string; day: number };
 export const MONTHS: Month[] = [
   { id: "mar", label: "March", day: 79 },
   { id: "jun", label: "June", day: 172 },
@@ -103,11 +103,11 @@ function inConvex(P: Pt[], x: number, y: number): boolean {
   return true;
 }
 
-export const isShaded = (sh: Shadows, x: number, y: number) =>
+const isShaded = (sh: Shadows, x: number, y: number) =>
   sh.polys.some((P) => inConvex(P, x, y)) || sh.trees.some((t) => Math.hypot(x - t.x, y - t.y) < t.r);
 
 /** Shadows every half hour while the sun is up. */
-export function daySteps(plot: Plot, items: Item[], day: number): Shadows[] {
+function daySteps(plot: Plot, items: Item[], day: number): Shadows[] {
   const steps: Shadows[] = [];
   for (let t = 4; t <= 21; t += 0.5) {
     const s = sunPosition(plot.latitudeDeg, day, t);
@@ -136,7 +136,7 @@ export function bedSun(plot: Plot, items: Item[], it: Item): { hours: number; cl
   return { hours, cls: hours >= 6 ? "sun" : hours >= 3 ? "part" : "shade" };
 }
 
-export type SunHoursBand = "6plus" | "3to6" | "under3";
+type SunHoursBand = "6plus" | "3to6" | "under3";
 
 /** Hours of sun on a 50 cm grid over the rear garden, for one month. */
 export function sunHoursGrid(plot: Plot, items: Item[], day: number): { x: number; y: number; band: SunHoursBand }[] {

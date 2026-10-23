@@ -17,7 +17,7 @@ export type Kind =
   | "hottub"
   | "trampoline";
 
-export type KindInfo = { label: string; w: number; h: number; fill: string; stroke: string };
+type KindInfo = { label: string; w: number; h: number; fill: string; stroke: string };
 
 export const KINDS: Record<Kind, KindInfo> = {
   patio: { label: "Patio", w: 4.2, h: 3.6, fill: "#CFC6B3", stroke: "#7D7462" },
@@ -39,15 +39,15 @@ export const KIND_ORDER = Object.keys(KINDS) as Kind[];
 /** Shapes that can be drawn corner by corner. */
 export const DRAWABLE: Kind[] = ["lawn", "bed", "patio", "path", "deck", "meadow", "pond"];
 
-/** [id, name, colour, price per m² where it applies] */
-export type Material = [string, string, string, number?];
+/** [id, name, colour]. Prices are in PRICE_LIST (materials.ts). */
+export type Material = [string, string, string];
 
 export const MATERIALS: Partial<Record<Kind, Material[]>> = {
   patio: [
-    ["porcelain", "Porcelain slabs", "#D7D3CB", 38],
-    ["sandstone", "Indian sandstone", "#D9C7A3", 30],
-    ["block", "Block paving", "#B98F7A", 28],
-    ["brick", "Reclaimed brick", "#B4624A", 45],
+    ["porcelain", "Porcelain slabs", "#D7D3CB"],
+    ["sandstone", "Indian sandstone", "#D9C7A3"],
+    ["block", "Block paving", "#B98F7A"],
+    ["brick", "Reclaimed brick", "#B4624A"],
   ],
   path: [
     ["gravel", "Gravel", "#DCD4C0"],
@@ -55,9 +55,9 @@ export const MATERIALS: Partial<Record<Kind, Material[]>> = {
     ["stepping", "Stepping stones in gravel", "#C9C2B0"],
   ],
   deck: [
-    ["composite", "Composite boards", "#7F7468", 95],
-    ["softwood", "Treated softwood", "#C79E6E", 45],
-    ["hardwood", "Hardwood", "#8E5B3A", 120],
+    ["composite", "Composite boards", "#7F7468"],
+    ["softwood", "Treated softwood", "#C79E6E"],
+    ["hardwood", "Hardwood", "#8E5B3A"],
   ],
   lawn: [
     ["turf", "Turf", "#9CC077"],
@@ -253,7 +253,7 @@ export function existingFeatures(plot: Plot, nextId: () => number): Item[] {
   });
 }
 
-export type Style = { label: string; desc: string; items: [Kind, number, number, number, number][] };
+type Style = { label: string; desc: string; items: [Kind, number, number, number, number][] };
 
 /** The rear garden length the styles below were laid out for (y from the far end). */
 const STYLE_GARDEN_M = 29.5;

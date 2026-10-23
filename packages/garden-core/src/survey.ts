@@ -5,7 +5,7 @@
 import type { Plot, Pt, Terrain } from "./plot.ts";
 
 export const SURVEY_FORMAT = "plotwise-survey";
-export const SCAN_FORMAT = "plotwise-scan";
+export const SCAN_FORMAT = "plotwise-scan" as const;
 
 /** What the app records about a finished scan, so the PC tool can line the survey up with the plan. */
 export type ScanDetails = {

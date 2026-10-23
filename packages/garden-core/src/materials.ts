@@ -28,7 +28,7 @@ export const gbp = (n: number) => "£" + Math.round(n).toLocaleString("en-GB");
 export type Quantity = { title: string; lines: [string, string][]; cost: number };
 
 /** Unit prices used for the estimates, in pounds. The owner can change any of them. */
-export type PriceItem = { id: string; label: string; unit: string; price: number };
+type PriceItem = { id: string; label: string; unit: string; price: number };
 
 export const PRICE_LIST: PriceItem[] = [
   { id: "patio:porcelain", label: "Porcelain slabs", unit: "m²", price: 38 },
@@ -195,5 +195,3 @@ export function quantities(it: Item, z: Terrain, prices: Prices = DEFAULT_PRICES
       return { title, lines: [["Trampoline with safety net", "1"], ["Ground anchor kit", "1"]], cost: P("trampoline") };
   }
 }
-
-export const kindLabel = (it: Item) => KINDS[it.kind].label;

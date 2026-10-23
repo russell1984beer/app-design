@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 
 import { gsdCm, MINI_4_PRO } from "../../../../packages/flight-core/src/camera.ts";
+import { MIN_CHIMNEY_CLEARANCE_M, MIN_ROOF_DISTANCE_M } from "../../../../packages/flight-core/src/roof.ts";
 import { EXAMPLE_ROOF_ISSUES, SEVERITY, reportSummary, roofArea } from "../../../../packages/garden-core/src/index.ts";
 
 import { canFly } from "../../modules/dji-drone";
@@ -84,7 +85,7 @@ export function RoofPanel() {
     <View>
       <H2>Roof inspection</H2>
       <Lead>
-        The drone circles the house twice, at about {scan.orbits.map((o) => `${o.heightAboveRidgeM} m`).join(" and ")} above the ridge, taking angled close-ups of every slope, the ridge, chimney and
+        The drone circles the house {scan.orbits.length === 2 ? "twice" : `${scan.orbits.length} times`}, at about {scan.orbits.map((o) => `${o.heightAboveRidgeM} m`).join(" and ")} above the ridge, taking angled close-ups of every slope, the ridge, chimney and
         gutters. The app will then flag anything that looks damaged.
       </Lead>
       <Stats
@@ -96,7 +97,7 @@ export function RoofPanel() {
         ]}
       />
       <Check checked disabled title="Only your half of the roof is reported" detail="Your house is semi-detached, so the circles pass over next door's roof. Tell your neighbours before you fly" />
-      <Check checked disabled title="Keeps clear of the roof" detail={`At least 2 m out from the roof edge and 2 m above the chimney and aerials. The drone's obstacle sensing may be off while the app flies it`} />
+      <Check checked disabled title="Keeps clear of the roof" detail={`At least ${MIN_ROOF_DISTANCE_M} m out from the roof edge and ${MIN_CHIMNEY_CLEARANCE_M} m above the chimney and aerials. The drone's obstacle sensing may be off while the app flies it`} />
       {canFly ? (
         <>
       <DroneStatus />

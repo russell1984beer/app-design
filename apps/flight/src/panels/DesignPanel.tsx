@@ -13,6 +13,7 @@ import {
   bedSun,
   clampToPlot,
   clockText,
+  compass,
   duplicate,
   isRound,
   itemArea,
@@ -395,7 +396,7 @@ function SunPanel() {
   return (
     <View>
       <Lead>
-        Your rear garden faces {s.plot.gardenBearingDeg > 112 && s.plot.gardenBearingDeg < 158 ? "south-east" : "this way"}, going by the north arrow on your title plan. Shadows include your
+        Your rear garden faces {compass(s.plot.gardenBearingDeg)}, going by the north arrow on your title plan. Shadows include your
         house, the neighbouring houses, 1.8 m fences, trees and any shed you add.
       </Lead>
       <Seg

@@ -40,8 +40,6 @@ export const TEST_PLOT: Plot = {
   latitudeDeg: 50.86,
 };
 
-export const frontGardenM = (p: Plot) => p.lengthM - p.rearGardenM - p.houseDepthM;
-
 export function inHouse(p: Plot, x: number, y: number): boolean {
   return x <= p.houseWidthM && y >= p.rearGardenM && y <= p.rearGardenM + p.houseDepthM;
 }
@@ -126,7 +124,7 @@ export function levelFn(p: Plot, z: Terrain): (x: number, y: number) => number {
 
 export const fmtLevel = (v: number) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
 
-export type Contour = { level: number; major: boolean; segments: [Pt, Pt][] };
+type Contour = { level: number; major: boolean; segments: [Pt, Pt][] };
 
 /** Contour lines every 25 cm, by marching squares on a 40 cm grid. */
 export function contours(p: Plot, z: Terrain): Contour[] {
@@ -176,13 +174,13 @@ export function contours(p: Plot, z: Terrain): Contour[] {
 }
 
 /** Slope at a point, measured across `spanM` (1 m: the size of the slope map's squares, so survey noise does not show as steep). */
-export function slopePercent(z: Terrain, x: number, y: number, spanM = 1): number {
+function slopePercent(z: Terrain, x: number, y: number, spanM = 1): number {
   const e = spanM / 2;
   return Math.hypot((z(x + e, y) - z(x - e, y)) / (2 * e), (z(x, y + e) - z(x, y - e)) / (2 * e)) * 100;
 }
 
 export type SlopeBand = "under4" | "4to8" | "8to15" | "over15";
-export const slopeBand = (pct: number): SlopeBand => (pct < 4 ? "under4" : pct < 8 ? "4to8" : pct < 15 ? "8to15" : "over15");
+const slopeBand = (pct: number): SlopeBand => (pct < 4 ? "under4" : pct < 8 ? "4to8" : pct < 15 ? "8to15" : "over15");
 
 /** 1 m squares coloured by slope. */
 export function slopeCells(p: Plot, z: Terrain): { x: number; y: number; w: number; h: number; band: SlopeBand }[] {

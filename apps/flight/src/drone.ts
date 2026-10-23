@@ -12,9 +12,9 @@ import { DjiDrone, NativeDroneBridge } from "../modules/dji-drone";
 /** Where the simulated drone starts: a made-up open field. Change it if the simulator complains. */
 export const SIM_HOME: LatLng = { lat: 52.0, lng: -1.0 };
 
-export type JobKind = "survey" | "roof" | "check" | "test";
+type JobKind = "survey" | "roof" | "check" | "test";
 
-export type Job = {
+type Job = {
   kind: JobKind;
   mission: Mission;
   /** GPS position of the home point. */
@@ -117,8 +117,10 @@ class DroneHub {
     }
   }
 
-  /** Start a flight. Run the pre-flight check first; FlightSession sets the drone's own failsafes. */
-  /** `anchor` places the plan; `home` is where the drone stands, where it takes off and comes back to. */
+  /**
+   * Start a flight. Run the pre-flight check first; FlightSession sets the drone's own failsafes.
+   * `anchor` places the plan; `home` is where the drone stands, where it takes off and comes back to.
+   */
   startJob(kind: JobKind, anchor: LatLng, home: LatLng, options: Omit<FlightSessionOptions, "bridge" | "home">): FlightSession {
     if (this.flying) throw new Error("A flight is already in progress");
     // A test wind from the simulator test bench must never reach a real scan.

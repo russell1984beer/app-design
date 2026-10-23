@@ -9,9 +9,11 @@ import { buildMission, planOrbit } from "./planner.ts";
 /** Closest the circle may come to the roof outline, seen from above, metres. */
 export const MIN_ROOF_DISTANCE_M = 2;
 /** Lowest the drone may fly above the ridge, metres. */
-export const MIN_HEIGHT_ABOVE_RIDGE_M = 3;
+const MIN_HEIGHT_ABOVE_RIDGE_M = 3;
 /** Gap the drone keeps above the chimney, aerials and cables, metres. */
 export const MIN_CHIMNEY_CLEARANCE_M = 2;
+/** Speed round the orbits, m/s. */
+const ORBIT_SPEED_MS = 2;
 
 export type RoofScanInput = {
   /** Outline of the owner's half of the roof, seen from above. */
@@ -30,7 +32,7 @@ export type RoofScanInput = {
   speedMs?: number;
 };
 
-export type RoofOrbit = { altitudeM: number; heightAboveRidgeM: number; gimbalPitchDeg: number };
+type RoofOrbit = { altitudeM: number; heightAboveRidgeM: number; gimbalPitchDeg: number };
 
 export type RoofScan = {
   mission: Mission;
@@ -41,10 +43,10 @@ export type RoofScan = {
   orbits: RoofOrbit[];
 };
 
-export const DEFAULT_ROOF_HEIGHTS_M = [6, 3];
+const DEFAULT_ROOF_HEIGHTS_M = [6, 3];
 
 export function planRoofScan(input: RoofScanInput): RoofScan {
-  const distanceFromRoofM = input.distanceFromRoofM ?? 2;
+  const distanceFromRoofM = input.distanceFromRoofM ?? MIN_ROOF_DISTANCE_M;
   const heights = input.heightsAboveRidgeM ?? DEFAULT_ROOF_HEIGHTS_M;
   const photosPerOrbit = input.photosPerOrbit ?? 24;
   const chimneyTopM = input.chimneyTopM ?? input.ridgeHeightM + 1;
@@ -78,14 +80,14 @@ export function planRoofScan(input: RoofScanInput): RoofScan {
       altitudeM,
       photoCount: photosPerOrbit,
       gimbalPitchDeg,
-      speedMs: input.speedMs ?? 2,
+      speedMs: input.speedMs ?? ORBIT_SPEED_MS,
       arcDeg: 360,
       startBearingDeg: normaliseDeg(input.openSideBearingDeg),
     });
     for (const w of orbit.waypoints) waypoints.push({ ...w, index: waypoints.length });
   }
 
-  const mission = buildMission("orbit", waypoints, input.speedMs ?? 2);
+  const mission = buildMission("orbit", waypoints, input.speedMs ?? ORBIT_SPEED_MS);
   const flightArea = convexHull([...waypoints.map((w) => w.position), ...input.roof, input.home]);
   return { mission, flightArea, center, radiusM, orbits };
 }

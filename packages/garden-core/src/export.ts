@@ -28,7 +28,7 @@ td{padding:3px 0;border-top:1px dashed #E1E7DD}tr:first-child td{border-top:0}.n
 <p class="meta">Plotwise materials quote · ${esc(date)} · plot about ${opts.plot.widthM.toFixed(1)} × ${opts.plot.lengthM.toFixed(1)} m</p>
 ${rows.length ? rows.map(card).join("") : "<p>No new features in the design yet.</p>"}
 <div class="total"><span>Materials total</span><span>${gbp(total)}</span></div>
-<p class="note">Quantities come from the plan and include 5% waste where it applies. Prices are estimates for materials only, excluding labour, delivery and VAT. Levels are estimates until a real drone survey is processed. Get supplier quotes before ordering.</p>
+<p class="note">Quantities come from the plan and include 5% waste where it applies. Prices are estimates for materials only, excluding labour, delivery and VAT. Levels come from the drone survey where there is one, otherwise from LIDAR or the draft plan, so check them on site. Get supplier quotes before ordering.</p>
 </body></html>`;
 }
 

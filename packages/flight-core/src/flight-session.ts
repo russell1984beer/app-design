@@ -7,7 +7,7 @@ import { distanceM, toLocal, type LatLng } from "./geo.ts";
 import { emptyProgress, remainingWaypoints, type Mission, type ScanProgress, type Waypoint } from "./mission.ts";
 import { batteryNeededToReturn, insideGeofence, type SafetySettings } from "./safety.ts";
 
-export type SessionState =
+type SessionState =
   | "ready"
   | "takingOff"
   | "climbing"
@@ -21,7 +21,7 @@ export type SessionState =
   | "signalLost"
   | "landed";
 
-export type ReturnReason =
+type ReturnReason =
   | "complete"
   | "lowBattery"
   | "wind"
@@ -47,9 +47,9 @@ export type FlightSessionOptions = {
 };
 
 /** The drone's sensors see something this close while scanning: stop, hover and wait for the pilot. */
-export const OBSTACLE_STOP_M = 3;
+const OBSTACLE_STOP_M = 3;
 /** Roof circles keep only 2 m from the roof (MIN_ROOF_DISTANCE_M), so they stop for something nearer than that. */
-export const OBSTACLE_STOP_ORBIT_M = 1.5;
+const OBSTACLE_STOP_ORBIT_M = 1.5;
 /** After the pilot resumes, give them this long to fly clear before the obstacle rule applies again. */
 const OBSTACLE_RESUME_GRACE_S = 15;
 

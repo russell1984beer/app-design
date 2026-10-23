@@ -8,7 +8,6 @@ export const C = {
   line: "#CBD5C7",
   contour: "#9A6A3F",
   hivis: "#F0C419",
-  water: "#3D7EA6",
   leaf: "#5E7F4E",
   white: "#FFFFFF",
   segBg: "#E4EAE0",

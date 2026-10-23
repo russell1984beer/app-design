@@ -3,7 +3,7 @@
 
 import type { Plot } from "./plot.ts";
 
-export type Severity = 1 | 2 | 3;
+type Severity = 1 | 2 | 3;
 
 export type RoofIssue = {
   key: "slip" | "flash" | "ridge" | "gutter" | "moss";
