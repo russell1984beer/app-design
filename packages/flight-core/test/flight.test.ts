@@ -254,6 +254,31 @@ test("pilot presses Return in the app: drone comes home", () => {
   assert.ok(distanceM(sim.telemetry().position, home) < 1);
 });
 
+test("Return to Home on the controller, reported as the pilot's for a moment first: still the drone's own return", () => {
+  const { sim, session, home } = setup({ boundary: FIELD, home: FIELD_HOME });
+  session.start();
+  run(sim, session, { until: () => sim.photos.length >= 8 });
+  // What the phone saw: the app's control dropped (pilot), then the drone's own Return to Home.
+  sim.pilotTakesControl();
+  run(sim, session, { until: () => session.state === "pilotControl" });
+  sim.pilotPressesReturnHome();
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, "droneInitiated");
+  assert.ok(distanceM(sim.telemetry().position, home) < 1);
+});
+
+test("pilot takes over, then lands by holding the stick down: still the pilot's flight", () => {
+  const { sim, session } = setup({ boundary: FIELD, home: FIELD_HOME });
+  session.start();
+  run(sim, session, { until: () => sim.photos.length >= 8 });
+  sim.pilotTakesControl();
+  const tookOverAt = sim.timeS;
+  run(sim, session, { until: () => sim.timeS - tookOverAt > 20 });
+  sim.pilotLands(); // DJI shows its own auto-landing when the stick is held down
+  run(sim, session, { until: landed(sim, session) });
+  assert.equal(session.returnReason, undefined, "not reported as the drone returning by itself");
+});
+
 test("pilot presses Return to Home on the controller: the app follows and stops the scan", () => {
   const { sim, session, home } = setup({ boundary: FIELD, home: FIELD_HOME });
   session.start();

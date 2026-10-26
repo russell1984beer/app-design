@@ -3,6 +3,7 @@ package expo.modules.djidrone
 import android.util.Log
 import dji.sdk.keyvalue.key.BatteryKey
 import dji.sdk.keyvalue.key.CameraKey
+import dji.sdk.keyvalue.key.DJIFlightControllerKey
 import dji.sdk.keyvalue.key.DJIKey
 import dji.sdk.keyvalue.key.DJIKeyInfo
 import dji.sdk.keyvalue.key.FlightControllerKey
@@ -220,6 +221,8 @@ class DroneController(
     listen(FlightControllerKey.KeyCompassHeading) { compassHeading = it ?: compassHeading }
     listen(FlightControllerKey.KeyFlightMode) { if (it != null) onFlightMode(it) }
     listen(FlightControllerKey.KeyLowBatteryRTHInfo) { lowBatteryInfo = it }
+    // Why the drone last started Return to Home by itself (overheating, strong wind, battery...).
+    listen(DJIFlightControllerKey.KeyAutoRTHReason) { autoRthReason = it?.name; Log.i(TAG, "Drone's own return reason: ${it?.name}") }
     listen(FlightControllerKey.KeyIsFlying) { if (it != null) isFlying = it }
     listen(FlightControllerKey.KeyAreMotorsOn) { if (it != null) motorsOn = it }
     listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
@@ -831,6 +834,7 @@ class DroneController(
 
   private var lowBatteryInfo: dji.sdk.keyvalue.value.flightcontroller.LowBatteryRTHInfo? = null
   private var appAskedReturnAtMs = 0L
+  private var autoRthReason: String? = null
   private var appRequested: String? = null
 
   /** The app's return or landing, for up to 10 s until the drone's mode shows it (then the drone's mode counts). */
@@ -854,6 +858,7 @@ class DroneController(
     if (mode == FlightMode.GO_HOME && scheduler.nowMs() - appAskedReturnAtMs > 5000) {
       val b = lowBatteryInfo
       val why = buildString {
+        autoRthReason?.let { append("drone's reason $it, ") }
         append("battery ${battery ?: "?"}%")
         b?.batteryPercentNeededToGoHome?.let { append(", needs $it% to get home") }
         b?.lowBatteryRTHStatus?.let { append(", low-battery return ${it.name}") }

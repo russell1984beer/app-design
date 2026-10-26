@@ -53,6 +53,8 @@ const OBSTACLE_STOP_ORBIT_M = 1.5;
 /** After the pilot resumes, give them this long to fly clear before the obstacle rule applies again. */
 const OBSTACLE_RESUME_GRACE_S = 15;
 
+/** A return or landing this soon after "pilot" is the drone's own (DJI reports "pilot" for a moment first). */
+const PILOT_BLIP_S = 5;
 const ARRIVED_M = 0.5;
 const ARRIVED_ALT_M = 0.3;
 const MAX_PHOTO_ATTEMPTS = 3;
@@ -179,6 +181,9 @@ export class FlightSession {
     if (this.holdStart) this.holdEnded.add(this.holdStart.index);
   }
 
+  /** When the pilot (as far as the app can tell) last took control. */
+  private pilotSinceS = 0;
+
   private now(): number {
     return this.o.clock ? this.o.clock() : performance.now() / 1000;
   }
@@ -237,6 +242,19 @@ export class FlightSession {
 
     if (t.flightMode === "pilot" && this.state !== "pilotControl") {
       this.setState("pilotControl");
+      return;
+    }
+
+    // The drone's own return, seen just after a moment of "pilot" (DJI drops the app's control a
+    // moment before it shows Return to Home, and near home it lands instead). Still hands off.
+    // Later on, a landing is the pilot's own (holding the stick down makes DJI land by itself).
+    if (
+      this.state === "pilotControl" &&
+      (t.flightMode === "returning" || t.flightMode === "landing") &&
+      this.now() - this.pilotSinceS < PILOT_BLIP_S
+    ) {
+      this.returnReason ??= "droneInitiated";
+      this.setState("returning");
       return;
     }
 
@@ -495,6 +513,7 @@ export class FlightSession {
     if (s === this.state) return;
     // Whatever ends the flight (the app, the pilot or the drone itself) also ends the film.
     if (s === "returning" || s === "landing" || s === "landed") this.stopFilming();
+    if (s === "pilotControl") this.pilotSinceS = this.now();
     this.log.push(`${this.state} -> ${s}${s === "returning" && this.returnReason ? ` (${this.returnReason})` : ""}`);
     this.state = s;
   }
