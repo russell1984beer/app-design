@@ -5,10 +5,9 @@ const { withAndroidManifest, withMainApplication, withDangerousMod } = require("
 const { addDjiToMainApplication, addDjiToManifest, ACCESSORY_FILTER_XML, readApiKey } = require("./dji-mods");
 
 function withDji(config) {
-  const apiKey = readApiKey(process.env);
-
   config = withAndroidManifest(config, (c) => {
-    c.modResults = addDjiToManifest(c.modResults, apiKey);
+    // Read only when the Android project is made, so iPad builds (no DJI) need no key.
+    c.modResults = addDjiToManifest(c.modResults, readApiKey(process.env));
     return c;
   });
 

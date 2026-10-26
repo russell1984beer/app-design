@@ -47,6 +47,16 @@
       "config": {
         "usesNonExemptEncryption": false
       }
-    }
+    },
+    "extra": {
+      "expo-navigation-bar": {
+        "style": "dark",
+        "hidden": true
+      },
+      "eas": {
+        "projectId": "dcebb96c-b51c-4959-a098-506b8cec4305"
+      }
+    },
+    "owner": "russells1984"
   }
 }
