@@ -44,10 +44,10 @@ class DjiDroneModule : Module() {
       )
     }
 
-    Function("configureFailsafe") { homeLat: Double, homeLng: Double, returnHeightM: Int, action: String ->
-      controller?.configureFailsafe(homeLat, homeLng, returnHeightM, action)
+    Function("configureFailsafe") { homeLat: Double, homeLng: Double, returnHeightM: Int, action: String, heightLimitM: Int, distanceLimitM: Int ->
+      controller?.configureFailsafe(homeLat, homeLng, returnHeightM, action, heightLimitM, distanceLimitM)
     }
-    Function("takeOff") { controller?.takeOff() }
+    Function("takeOff") { simulated: Boolean -> controller?.takeOff(simulated) }
     Function("goTo") { lat: Double, lng: Double, altitudeM: Double, speedMs: Double, headingDeg: Double? ->
       controller?.goTo(lat, lng, altitudeM, speedMs, headingDeg)
     }

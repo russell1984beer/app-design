@@ -9,7 +9,7 @@ import type { LatLng } from "../../../packages/flight-core/src/geo.ts";
 import type { Mission } from "../../../packages/flight-core/src/mission.ts";
 import { planFirstFlight, planSurvey, surveyPhotoChoice, withFilm } from "../../../packages/flight-core/src/planner.ts";
 import { planRoofScan, type RoofScan } from "../../../packages/flight-core/src/roof.ts";
-import { preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
+import { droneHealthChecks, preflightCheck, type CheckItem, type PreflightResult } from "../../../packages/flight-core/src/safety.ts";
 import { clipToY, plotOutline, pointInside, spanAtX, sunElevationAt, type Pt } from "../../../packages/garden-core/src/index.ts";
 
 import { SIM_HOME, drone, useDrone } from "./drone";
@@ -236,6 +236,8 @@ export function prepareFlight(kind: FlightKind, s: AppState, t: Telemetry | null
       extra.push({ id: "simTests", status: "block", message: `Run all ${SIM_TEST_COUNT} simulator tests first (${s.testsPassed.length} passed so far).` });
     }
     if (weather && "error" in weather) extra.push({ id: "forecast", status: "block", message: weather.error });
+    // The drone itself: simulator off, a good GPS fix, no compass or IMU warnings.
+    if (linked) extra.push(...droneHealthChecks(t?.health ?? {}));
     const sun = sunElevationAt(anchor.lat, anchor.lng, new Date());
     if (sun < SUN_BLOCK_DEG)
       extra.push({ id: "light", status: "block", message: "Too dark for sharp photos: the sun is too low. Fly when it is higher (late morning to mid afternoon is best)." });
@@ -309,7 +311,7 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
   if (!resume && kind !== "check") delete S.resume[kind];
   const flownAt = new Date().toISOString();
   const photoIndices = new Set(plan.mission.waypoints.filter((w) => w.photo).map((w) => w.index));
-  drone.startJob(plan.kind, plan.anchor, plan.home, {
+  drone.startJob(plan.kind, plan.anchor, plan.home, S.mode === "sim", {
     mission: plan.mission,
     boundary: plan.boundary,
     settings: S.safety,
@@ -326,6 +328,8 @@ export async function launch(plan: FlightPlan, resume: boolean): Promise<void> {
       commitNow();
     },
   });
+  // The "Before you fly" ticks are for this flight: they are ticked again before the next real one.
+  if (S.mode === "real") S.checks = S.checks.map(() => false);
   commit();
 }
 

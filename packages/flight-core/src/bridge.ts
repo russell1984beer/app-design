@@ -5,7 +5,7 @@
 // FlightSession reads telemetry and events on every update and decides the next command.
 
 import type { LatLng } from "./geo.ts";
-import type { SignalLossAction, Wind } from "./safety.ts";
+import type { DroneHealth, SignalLossAction, Wind } from "./safety.ts";
 
 export type FlightMode =
   | "onGround"
@@ -42,6 +42,8 @@ export type Telemetry = {
   speedMs?: number;
   /** How far the drone leans (the larger of pitch and roll), degrees (none: not reported). */
   tiltDeg?: number;
+  /** GPS strength, the drone's own warnings and whether DJI's simulator is running (none: not reported). */
+  health?: DroneHealth;
 };
 
 export type DroneEvent =
@@ -52,6 +54,10 @@ export type FailsafeConfig = {
   home: LatLng;
   returnHeightM: number;
   signalLossAction: SignalLossAction;
+  /** The drone's own height limit, metres above take-off: it will not climb higher, whatever it is told. */
+  heightLimitM: number;
+  /** The drone's own distance limit from home, metres. */
+  distanceLimitM: number;
 };
 
 export interface DroneBridge {
@@ -59,7 +65,7 @@ export interface DroneBridge {
   /** Events since the last call (photos taken etc). */
   drainEvents(): DroneEvent[];
 
-  /** Store the home point, return height and signal-loss action ON THE DRONE, so they work without the app. */
+  /** Store the home point, return height, signal-loss action and limits ON THE DRONE, so they work without the app. */
   configureFailsafe(config: FailsafeConfig): void;
   takeOff(): void;
   /** Fly in a straight line to a point and hover there. */
@@ -71,7 +77,7 @@ export interface DroneBridge {
   /** Stop recording and switch the camera back to photos. */
   stopVideo(): void;
   hover(): void;
-  /** Use the drone's own Return to Home: climb to return height, fly home, land. */
+  /** Climb to the return height (the drone's own Return to Home does not, within 50 m of home), then use it to fly home and land. */
   returnHome(): void;
   land(): void;
 }

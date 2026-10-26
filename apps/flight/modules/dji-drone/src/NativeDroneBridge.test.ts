@@ -70,13 +70,13 @@ class FakeNative implements DjiDroneNative {
   getStatus() {
     return { registered: true, productConnected: true, lastKind: null, lastMessage: null };
   }
-  configureFailsafe(homeLat: number, homeLng: number, returnHeightM: number, action: SignalLossAction) {
-    this.calls.push(`configureFailsafe ${returnHeightM} ${action}`);
-    this.sim.configureFailsafe({ home: { lat: homeLat, lng: homeLng }, returnHeightM, signalLossAction: action });
+  configureFailsafe(homeLat: number, homeLng: number, returnHeightM: number, action: SignalLossAction, heightLimitM: number, distanceLimitM: number) {
+    this.calls.push(`configureFailsafe ${returnHeightM} ${action} height<=${heightLimitM} distance<=${distanceLimitM}`);
+    this.sim.configureFailsafe({ home: { lat: homeLat, lng: homeLng }, returnHeightM, signalLossAction: action, heightLimitM, distanceLimitM });
     this.emit("onStatus", { kind: "failsafeConfigured", message: "stored" });
   }
-  takeOff() {
-    this.calls.push("takeOff");
+  takeOff(simulated: boolean) {
+    this.calls.push(simulated ? "takeOff simulated" : "takeOff");
     this.sim.takeOff();
   }
   goTo(lat: number, lng: number, altitudeM: number, speedMs: number, headingDeg: number | null) {
@@ -154,6 +154,10 @@ test("full scan through the native bridge: every photo, lands at home", () => {
   assert.equal(native.sim.photos.length, mission.waypoints.length);
   assert.ok(distanceM(native.sim.telemetry().position, HOME) < 1);
   assert.ok(native.calls[0].startsWith("configureFailsafe 30 returnHome"), "failsafe stored before take-off");
+  // Height and distance limits are stored on the drone too, whole metres above the flight.
+  const [, height, distance] = native.calls[0].match(/height<=(\d+) distance<=(\d+)$/) ?? [];
+  assert.ok(Number(height) >= 35 && Number(height) <= 120, native.calls[0]);
+  assert.ok(Number(distance) >= 15, native.calls[0]);
   assert.equal(native.calls[1], "takeOff");
   assert.ok(native.calls.includes("gimbal -90"));
   assert.ok(native.calls.some((c) => c === "goTo heading=0" || /goTo heading=\d/.test(c)), "headings passed through");

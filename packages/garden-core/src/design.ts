@@ -348,6 +348,11 @@ export class History {
     if (this.undoStack.length > 60) this.undoStack.shift();
     this.redoStack = [];
   }
+  /** Forget everything (another property was opened). */
+  clear(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
   /** How many changes can be undone (to take back an entry pushed by mistake, see `dropTo`). */
   get depth() {
     return this.undoStack.length;

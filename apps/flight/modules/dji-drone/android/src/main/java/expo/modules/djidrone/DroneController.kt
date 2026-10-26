@@ -67,7 +67,10 @@ interface Scheduler {
  * are made by FlightSession in JavaScript; this class only carries them out and reports back.
  *
  * Safety rules kept here, because they must hold even if the JavaScript side stops:
- * - no take-off until the home point, return height and signal-loss action are stored on the drone;
+ * - no take-off until the home point, return height, signal-loss action and height and distance
+ *   limits are stored on the drone;
+ * - no take-off when the DJI simulator is on and a real flight was asked for, or the other way round;
+ * - Return home climbs to the return height first (DJI's own return does not, within 50 m of home);
  * - once the pilot takes control (pause button, mode switch), the app never takes it back by itself;
  * - if the drone is not moving towards its target, stop and hover;
  * - virtual stick commands are only sent while the app has control.
@@ -103,6 +106,8 @@ class DroneController(
   private var velocity: Velocity3D? = null
   /** GPS satellites the drone sees, for the log: tells "no fix yet" from "position not coming through". */
   private var satellites: Int? = null
+  /** DJI's GPS signal level (LEVEL_0 to LEVEL_5, LEVEL_10 with RTK). */
+  private var gpsLevel: String? = null
   private var attitude: Attitude? = null
   private var virtualStickEnabled = false
   private var authority: FlightControlAuthority? = null
@@ -111,6 +116,12 @@ class DroneController(
   private enum class Failsafe { NONE, PENDING, CONFIGURED, FAILED }
   private var failsafe = Failsafe.NONE
   private var takeoffRequestedAtMs: Long? = null
+  /** Whether the take-off asked for is a simulator flight; it must match the drone's simulator state. */
+  private var takeoffSimulated = false
+  /** The return height stored on the drone, metres. */
+  private var returnHeightM = 0
+  /** Return home asked for below the return height: climbing straight up first, since when. */
+  private var homeClimbStartedAtMs: Long? = null
   private var appTakeoffInProgress = false
   private var takeoffStartedAtMs = 0L
   /** Take-off finished, waiting for virtual sticks to come on. */
@@ -213,6 +224,7 @@ class DroneController(
     listen(FlightControllerKey.KeyAreMotorsOn) { if (it != null) motorsOn = it }
     listen(FlightControllerKey.KeyConnection) { aircraftConnected = it == true; Log.i(TAG, "Drone link: ${if (aircraftConnected) "connected" else "not connected"}") }
     listen(FlightControllerKey.KeyGPSSatelliteCount) { satellites = it }
+    listen(FlightControllerKey.KeyGPSSignalLevel) { gpsLevel = it?.name }
     listen(FlightControllerKey.KeyAircraftVelocity) { velocity = it }
     listen(FlightControllerKey.KeyAircraftAttitude) { attitude = it }
     listen(FlightControllerKey.KeyWindSpeed) { windSpeed = it }
@@ -264,6 +276,7 @@ class DroneController(
     }
 
     override fun onChangeReasonUpdate(reason: FlightControlAuthorityChangeReason) = scheduler.post {
+      Log.i(TAG, "Control changed: ${reason.name}")
       if (reason.name in TelemetryRules.PILOT_TAKEOVER_REASONS) {
         pilotTookOver = true
         target = null
@@ -274,15 +287,19 @@ class DroneController(
 
   // ---- Commands from FlightSession ---------------------------------------------------------------
 
-  fun configureFailsafe(homeLat: Double, homeLng: Double, returnHeightM: Int, action: String) = scheduler.post {
+  fun configureFailsafe(homeLat: Double, homeLng: Double, returnHeightM: Int, action: String, heightLimitM: Int, distanceLimitM: Int) = scheduler.post {
     if (!sdkReady()) return@post
     failsafe = Failsafe.PENDING
+    this.returnHeightM = returnHeightM
     val failsafeAction = when (action) {
       "hover" -> FailsafeAction.HOVER
       "land" -> FailsafeAction.LANDING
       else -> FailsafeAction.GOHOME
     }
-    var remaining = 3
+    // Within the range the drone accepts, so the message below says what is really stored.
+    val heightLimit = clampTo(FlightControllerKey.KeyHeightLimitRange, heightLimitM)
+    val distanceLimit = clampTo(FlightControllerKey.KeyDistanceLimitRange, distanceLimitM)
+    var remaining = 4
     var failed = false
     val done = { what: String -> { error: IDJIError? ->
       scheduler.post {
@@ -298,14 +315,22 @@ class DroneController(
         remaining--
         if (remaining == 0 && !failed) {
           failsafe = Failsafe.CONFIGURED
-          status("failsafeConfigured", "Home point, return height $returnHeightM m and signal-loss action stored on the drone.")
+          status(
+            "failsafeConfigured",
+            "Home point, return height $returnHeightM m, height limit $heightLimit m, distance limit $distanceLimit m and signal-loss action stored on the drone. The limits stay set in DJI Fly too.",
+          )
           if (takeoffRequestedAtMs != null) doTakeOff()
         }
       }
     } }
     setHomePoint(LocationCoordinate2D(homeLat, homeLng), ++failsafeRequest, HOME_POINT_TRIES, done("home point"))
-    set(FlightControllerKey.KeyGoHomeHeight, returnHeightM, done("return height ($returnHeightM m)"))
+    setHeights(returnHeightM, heightLimit, done)
+    setDistanceLimit(distanceLimit, done)
     set(FlightControllerKey.KeyFailsafeAction, failsafeAction, done("signal-loss action"))
+    // The drone's own return when the battery runs low. The app has its own rule too, so a failure only warns.
+    set(FlightControllerKey.KeyLowBatteryRTHEnabled, true) { e ->
+      if (e != null) status("warning", "Could not switch on the drone's own low-battery return: ${e.text()}. The app still brings it home.")
+    }
     setObstacleBraking()
     // Photo mode for the scan; a failure here shows up later as failed photos.
     set(CameraKey.KeyCameraMode, CameraMode.PHOTO_NORMAL) { e ->
@@ -314,6 +339,56 @@ class DroneController(
   }
 
   private var failsafeRequest = 0
+
+  /**
+   * The return height and the height limit. The drone refuses a return height above its height limit,
+   * so whichever keeps that true goes first: raising the limit before the return height, or setting
+   * the return height before lowering the limit to just above it.
+   */
+  private fun setHeights(returnHeightM: Int, heightLimitM: Int, done: (String) -> (IDJIError?) -> Unit) {
+    val limit = heightLimitM
+    val failed = done("return height ($returnHeightM m) and height limit ($limit m)")
+    val setReturn = { next: () -> Unit ->
+      set(FlightControllerKey.KeyGoHomeHeight, returnHeightM) { e -> if (e != null) failed(e) else next() }
+    }
+    val setLimit = { next: () -> Unit ->
+      set(FlightControllerKey.KeyHeightLimit, limit) { e ->
+        if (e != null && e.errorCode() != "UNSUPPORTED") failed(e)
+        else {
+          if (e != null) status("warning", "This drone does not take a height limit from the app. Set Max Altitude in DJI Fly.")
+          next()
+        }
+      }
+    }
+    val current = try { keys.getValue(KeyTools.createKey(FlightControllerKey.KeyHeightLimit)) } catch (_: Exception) { null }
+    if (current == null || returnHeightM <= current) setReturn { setLimit { failed(null) } }
+    else setLimit { setReturn { failed(null) } }
+  }
+
+  /** The distance limit from home, switched on. */
+  private fun setDistanceLimit(distanceLimitM: Int, done: (String) -> (IDJIError?) -> Unit) {
+    val limit = distanceLimitM
+    val finished = done("distance limit ($limit m)")
+    val unsupported = { e: IDJIError? -> e != null && e.errorCode() == "UNSUPPORTED" }
+    set(FlightControllerKey.KeyDistanceLimit, limit) { e ->
+      if (e != null && !unsupported(e)) return@set finished(e)
+      set(FlightControllerKey.KeyDistanceLimitEnabled, true) { e2 ->
+        if (unsupported(e) || unsupported(e2)) {
+          status("warning", "This drone does not take a distance limit from the app. Set Max Distance in DJI Fly.")
+          finished(null)
+        } else finished(e2)
+      }
+    }
+  }
+
+  /** A value within the range the drone accepts for a setting, when it says what that is. */
+  private fun clampTo(range: DJIKeyInfo<dji.sdk.keyvalue.value.common.IntValueConfig>, value: Int): Int {
+    val r = try { keys.getValue(KeyTools.createKey(range)) } catch (_: Exception) { null }
+    val min = r?.min
+    val max = r?.max
+    if (min == null || max == null || min > max) return value
+    return value.coerceIn(min, max)
+  }
 
   /** Return or land asked for during take-off: the take-off is over, never hand control to the app after it. */
   private fun endAppTakeoff() {
@@ -339,8 +414,9 @@ class DroneController(
     }
   }
 
-  fun takeOff() = scheduler.post {
+  fun takeOff(simulated: Boolean) = scheduler.post {
     if (!sdkReady()) return@post
+    takeoffSimulated = simulated
     when (failsafe) {
       Failsafe.CONFIGURED -> doTakeOff()
       Failsafe.PENDING -> takeoffRequestedAtMs = scheduler.nowMs() // goes when the settings are stored
@@ -350,6 +426,16 @@ class DroneController(
 
   private fun doTakeOff() {
     takeoffRequestedAtMs = null
+    // The simulator state is asked from the drone each time: it is off again after the drone restarts.
+    val simOn = simulatorOn()
+    if (simOn != takeoffSimulated) {
+      status(
+        "error",
+        if (simOn) "Take-off refused: the DJI simulator is still on, so the drone's position is made up. Stop the simulator (test bench) or switch the drone off and on again."
+        else "Take-off refused: the DJI simulator is not running (was the drone restarted?). Start the simulator again, propellers OFF.",
+      )
+      return
+    }
     pilotTookOver = false
     // Marked before the command is sent: the motors can start before DJI confirms it, and a
     // take-off the app did not ask for counts as the pilot flying.
@@ -366,10 +452,21 @@ class DroneController(
   fun goTo(lat: Double, lng: Double, altitudeM: Double, speedMs: Double, headingDeg: Double?) = scheduler.post {
     if (!sdkReady()) return@post
     if (!appInControl()) return@post
+    cancelHomeClimb()
     target = Target(lat, lng, altitudeM, speedMs, headingDeg)
   }
 
-  fun hover() = scheduler.post { target = null }
+  fun hover() = scheduler.post {
+    cancelHomeClimb()
+    target = null
+  }
+
+  /** A new command from the app (stop, fly on) ends a climb before returning home. */
+  private fun cancelHomeClimb() {
+    if (homeClimbStartedAtMs == null) return
+    homeClimbStartedAtMs = null
+    appRequested = null
+  }
 
   fun setGimbalPitch(deg: Double) = scheduler.post {
     if (!sdkReady()) return@post
@@ -448,17 +545,54 @@ class DroneController(
     }
   }
 
+  /**
+   * Within 50 m of home DJI's Return to Home flies back at the height it is at (Mini 4 Pro manual),
+   * which over a garden can be below the trees. So while the app has control, it first climbs straight
+   * up to the return height, then starts DJI's return. The pilot can stop the climb like any other move.
+   */
   fun returnHome() = scheduler.post {
     if (!sdkReady()) return@post
-    target = null
     appAskedReturnAtMs = scheduler.nowMs()
     appRequested = "returning"
     endAppTakeoff()
+    val loc = location
+    if (appInControl() && isFlying && loc != null && returnHeightM > 0 && loc.altitude < returnHeightM - HOME_CLIMB_TOLERANCE_M) {
+      target = Target(loc.latitude, loc.longitude, returnHeightM.toDouble(), HOME_CLIMB_HOLD_SPEED_MS, null)
+      homeClimbStartedAtMs = scheduler.nowMs()
+      status("returning", "Climbing to the return height ($returnHeightM m), then flying home.")
+      return@post
+    }
+    startGoHome()
+  }
+
+  private fun startGoHome() {
+    homeClimbStartedAtMs = null
+    target = null
+    appAskedReturnAtMs = scheduler.nowMs()
+    appRequested = "returning"
     releaseSticksThen { action(FlightControllerKey.KeyStartGoHome) { e -> if (e != null) { appRequested = null; status("error", "Return to home failed: ${e.text()}. Use the controller's RTH button.") } } }
+  }
+
+  /** The climb before returning home: on to DJI's return once high enough, or if it takes too long or the app loses the sticks. */
+  private fun checkHomeClimb(now: Long) {
+    val started = homeClimbStartedAtMs ?: return
+    if (pilotTookOver) {
+      // The pilot has the sticks: the app does nothing more.
+      homeClimbStartedAtMs = null
+      appRequested = null
+      target = null
+      return
+    }
+    val high = (location?.altitude ?: 0.0) >= returnHeightM - HOME_CLIMB_TOLERANCE_M
+    if (high || !appInControl() || now - started > HOME_CLIMB_MAX_MS) {
+      if (!high) Log.w(TAG, "Did not reach the return height before flying home (${location?.altitude} m).")
+      startGoHome()
+    }
   }
 
   fun land() = scheduler.post {
     if (!sdkReady()) return@post
+    cancelHomeClimb()
     target = null
     appAskedReturnAtMs = scheduler.nowMs()
     appRequested = "landing"
@@ -548,6 +682,7 @@ class DroneController(
       renewListeners()
     }
     trackLinkLoss(now)
+    checkHomeClimb(now)
     sendSticks(now)
     pendingPhoto?.let {
       if (now > it.deadlineMs) {
@@ -618,17 +753,25 @@ class DroneController(
 
   // The drone's own warnings (the ones DJI Fly shows at the top of the screen).
   private var warnings: List<String> = emptyList()
+  /** The same, for the pre-flight check: text and DJI's level (NOTICE, CAUTION, WARNING, SERIOUS_WARNING). */
+  private var warningItems: List<Map<String, String>> = emptyList()
 
   private val healthListener = DJIDeviceHealthInfoChangeListener { infos ->
     scheduler.post {
-      val now = infos.orEmpty().map { i ->
-        listOf(i.title(), i.description()).filter { !it.isNullOrBlank() }.distinct().joinToString(": ").ifBlank { "code ${i.informationCode()}" } +
-          " [${i.informationCode()}, ${i.warningLevel()?.name}]"
+      val list = infos.orEmpty()
+      val text = list.map { i ->
+        listOf(i.title(), i.description()).filter { !it.isNullOrBlank() }.distinct().joinToString(": ").ifBlank { "code ${i.informationCode()}" }
       }
+      val now = list.mapIndexed { n, i -> "${text[n]} [${i.informationCode()}, ${i.warningLevel()?.name}]" }
       for (w in now - warnings.toSet()) status("droneWarning", "Drone warning: $w")
       warnings = now
+      warningItems = list.mapIndexed { n, i -> mapOf("text" to text[n], "level" to (i.warningLevel()?.name ?: "UNKNOWN")) }
     }
   }
+
+  /** DJI's simulator is running on the drone (asked each time: a restarted drone has it off). */
+  private fun simulatorOn(): Boolean =
+    DjiSdk.initialized && try { SimulatorManager.getInstance().isSimulatorEnabled } catch (_: Exception) { false }
 
   // ---- Obstacle sensing ---------------------------------------------------------------------------
 
@@ -665,7 +808,7 @@ class DroneController(
     obstacleRaw = "h=${horizontal.filter { TelemetryRules.obstacleM(it) != null }.minOrNull() ?: "-"}/${horizontal.size}@${data.horizontalAngleInterval} up=$up"
     // In DJI's simulator the real sensors still look round the room (the table, walls: 0.3 m seen on
     // the phone), which says nothing about the simulated flight, so their distances are not used there.
-    val simulating = try { SimulatorManager.getInstance().isSimulatorEnabled } catch (_: Exception) { false }
+    val simulating = simulatorOn()
     if (simulating) obstacleRaw += " (simulator: ignored)"
     obstacleM = if (simulating) null else TelemetryRules.nearestObstacleM(horizontal, up)
     obstacleAtMs = scheduler.nowMs()
@@ -680,6 +823,9 @@ class DroneController(
     try { DeviceHealthManager.getInstance().removeDJIDeviceHealthInfoChangeListener(healthListener) } catch (_: Exception) {}
   }
 
+  /** "LEVEL_4" -> 4; null when not reported or not a number. */
+  private fun gpsLevelNumber(): Int? = gpsLevel?.removePrefix("LEVEL_")?.toIntOrNull()
+
   private fun droneFlyingItself(): Boolean =
     djiFlightMode == FlightMode.GO_HOME || djiFlightMode == FlightMode.AUTO_LANDING || djiFlightMode == FlightMode.FORCE_LANDING
 
@@ -690,6 +836,8 @@ class DroneController(
   /** The app's return or landing, for up to 10 s until the drone's mode shows it (then the drone's mode counts). */
   private fun pendingRequest(now: Long): String? {
     val req = appRequested ?: return null
+    // Still climbing before the return: that is the app's return, however long it takes.
+    if (homeClimbStartedAtMs != null) return req
     if (droneFlyingItself() || now - appAskedReturnAtMs > REQUEST_WAIT_MS) {
       appRequested = null
       return null
@@ -758,7 +906,7 @@ class DroneController(
     // A short summary in the phone's log every 5 seconds, to see what is and is not connected.
     if (now - lastLogMs >= 5000) {
       lastLogMs = now
-      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} satellites=${satellites ?: "-"} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw photosLeft=$photosLeft mode=${djiFlightMode?.name}")
+      Log.i(TAG, "Telemetry: listening=$listening controller=$rcConnected drone=$aircraftConnected gps=${location != null} satellites=${satellites ?: "-"} gpsLevel=${gpsLevel ?: "-"} positionAge=${if (location == null) "-" else "${(now - locationAtMs) / 1000}s"} flying=$isFlying motors=$motorsOn battery=$battery product=$productType wind=$windSpeed/${windDirection?.name}/${windWarning?.name} obstacle=$obstacleRaw photosLeft=$photosLeft mode=${djiFlightMode?.name}")
     }
     try {
       sendTelemetry(now)
@@ -796,6 +944,10 @@ class DroneController(
         "rcConnected" to rcConnected,
         "aircraftConnected" to aircraftConnected,
         "sdkListening" to listening,
+        "simulatorOn" to simulatorOn(),
+        "gpsSatellites" to satellites,
+        "gpsLevel" to gpsLevelNumber(),
+        "droneWarnings" to warningItems,
       ),
     )
   }
@@ -937,5 +1089,11 @@ class DroneController(
     const val OBSTACLE_FRESH_MS = 1_000L
     const val RENEW_EVERY_MS = 5_000L
     const val SIMULATOR_SATELLITES = 15
+    /** Within this of the return height counts as there. */
+    const val HOME_CLIMB_TOLERANCE_M = 1.0
+    /** Give up climbing and start DJI's return after this long (30 m at 3 m/s takes about 10 s). */
+    const val HOME_CLIMB_MAX_MS = 25_000L
+    /** Sideways speed while climbing: only enough to hold the spot. */
+    const val HOME_CLIMB_HOLD_SPEED_MS = 1.0
   }
 }

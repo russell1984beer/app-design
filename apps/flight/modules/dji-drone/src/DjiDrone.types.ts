@@ -28,6 +28,13 @@ export type NativeTelemetry = {
   rcConnected?: boolean;
   aircraftConnected?: boolean;
   sdkListening?: boolean;
+  /** DJI's simulator is running on the drone (missing from older builds). */
+  simulatorOn?: boolean;
+  /** GPS satellites seen and DJI's signal level 0-5 (10 with RTK); null when not reported. */
+  gpsSatellites?: number | null;
+  gpsLevel?: number | null;
+  /** The drone's own warnings, with DJI's level: NOTICE, CAUTION, WARNING or SERIOUS_WARNING. */
+  droneWarnings?: { text: string; level: string }[];
 };
 
 export type NativeDroneEvent =
@@ -62,8 +69,9 @@ export interface DjiDroneNative {
 
   getStatus(): { registered: boolean; productConnected: boolean; lastKind: string | null; lastMessage: string | null };
 
-  configureFailsafe(homeLat: number, homeLng: number, returnHeightM: number, action: SignalLossAction): void;
-  takeOff(): void;
+  configureFailsafe(homeLat: number, homeLng: number, returnHeightM: number, action: SignalLossAction, heightLimitM: number, distanceLimitM: number): void;
+  /** Refused by the drone module unless DJI's simulator is on exactly when `simulated` is true. */
+  takeOff(simulated: boolean): void;
   goTo(lat: number, lng: number, altitudeM: number, speedMs: number, headingDeg: number | null): void;
   setGimbalPitch(deg: number): void;
   takePhoto(waypointIndex: number): void;

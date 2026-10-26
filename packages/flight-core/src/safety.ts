@@ -5,6 +5,8 @@ import type { Mission } from "./mission.ts";
 
 /** UK legal maximum height above the surface. */
 export const UK_MAX_ALTITUDE_M = 120;
+/** The lowest Return to Home height DJI drones accept. */
+export const DJI_MIN_RETURN_HEIGHT_M = 20;
 /** DJI Mini 4 Pro rated maximum wind resistance (Level 5), rounded down. */
 export const MINI_4_PRO_MAX_WIND_MS = 10.5;
 
@@ -71,6 +73,8 @@ export function validateSettings(s: SafetySettings): CheckItem[] {
   items.push(
     s.returnHeightM < needed
       ? block("returnHeight", `Return height ${s.returnHeightM} m is too low: it must be at least ${needed} m to clear obstacles.`)
+      : s.returnHeightM < DJI_MIN_RETURN_HEIGHT_M
+        ? block("returnHeight", `Return height ${s.returnHeightM} m is too low: the drone needs at least ${DJI_MIN_RETURN_HEIGHT_M} m.`)
       : s.returnHeightM > UK_MAX_ALTITUDE_M
         ? block("returnHeight", `Return height ${s.returnHeightM} m is above the UK limit of ${UK_MAX_ALTITUDE_M} m.`)
         : pass("returnHeight", `Return height ${s.returnHeightM} m clears obstacles.`),
@@ -308,3 +312,67 @@ function noFlyZoneChecks(zones: NoFlyZone[], boundary: LatLng[], marginM: number
 const pass = (id: string, message: string): CheckItem => ({ id, status: "pass", message });
 const warn = (id: string, message: string): CheckItem => ({ id, status: "warn", message });
 const block = (id: string, message: string): CheckItem => ({ id, status: "block", message });
+
+/** Extra height above the highest point of the flight before the drone's own height limit stops it. */
+const HEIGHT_LIMIT_SPARE_M = 5;
+/**
+ * Extra distance beyond the flight area before the drone's own distance limit. Generous on purpose:
+ * DJI takes automatic control away ("NEAR_BOUNDARY") well before the limit itself. Tested in DJI's
+ * simulator on the Mini 4 Pro: a 32 m limit stopped a scan that stayed within 17 m of home; 100 m did not.
+ */
+const DISTANCE_LIMIT_SPARE_M = 50;
+/** The shortest distance limit DJI drones accept. */
+const DJI_MIN_DISTANCE_LIMIT_M = 15;
+
+/**
+ * Height and distance limits stored ON THE DRONE, so it stays near the garden even if the app stops.
+ * Height: the highest the flight goes (the scan or the return height) plus a little, 20-120 m.
+ * Distance from home: the furthest point of the flight area or the mission, plus the geofence margin and a little.
+ */
+export function droneLimits(home: LatLng, mission: Mission, boundary: LatLng[], s: SafetySettings): { heightLimitM: number; distanceLimitM: number } {
+  const highest = Math.max(s.returnHeightM, ...mission.waypoints.map((w) => w.altitudeM));
+  const heightLimitM = Math.min(UK_MAX_ALTITUDE_M, Math.max(DJI_MIN_RETURN_HEIGHT_M, Math.ceil(highest + HEIGHT_LIMIT_SPARE_M)));
+  const furthest = Math.max(0, ...[...boundary, ...mission.waypoints.map((w) => w.position)].map((p) => distanceM(home, p)));
+  const distanceLimitM = Math.max(DJI_MIN_DISTANCE_LIMIT_M, Math.ceil(furthest + s.geofenceMarginM + DISTANCE_LIMIT_SPARE_M));
+  return { heightLimitM, distanceLimitM };
+}
+
+/** What the drone reports about itself before take-off (all optional: older builds do not send them). */
+export type DroneHealth = {
+  /** GPS satellites the drone sees. */
+  gpsSatellites?: number;
+  /** DJI's GPS signal level, 0 (none) to 5 (strong); 10 with RTK. */
+  gpsLevel?: number;
+  /** The drone's own warnings, as DJI Fly shows them at the top of the screen. */
+  warnings?: { text: string; level: string }[];
+  /** DJI's simulator is running on the drone, so its position is made up. */
+  simulatorOn?: boolean;
+};
+
+/** Fewer satellites than this, or a GPS level below GPS_LEVEL_MIN, and the drone may drift or come home to the wrong place. */
+export const GPS_SATELLITES_MIN = 10;
+export const GPS_LEVEL_MIN = 3;
+
+/** Pre-flight checks on the drone itself, for a real flight: no simulator, a good GPS fix, no serious warnings. */
+export function droneHealthChecks(h: DroneHealth): CheckItem[] {
+  const items: CheckItem[] = [];
+  if (h.simulatorOn)
+    items.push(
+      block(
+        "simulator",
+        "The DJI simulator is still running on the drone, so its position is made up. Tap Stop simulator on the test bench, or switch the drone off and on again.",
+      ),
+    );
+  const weakGps = "Wait in the open, away from the house and trees, until the drone has a strong GPS signal.";
+  if (h.gpsSatellites === undefined && h.gpsLevel === undefined) items.push(warn("gps", "The drone has not reported its GPS strength. Check it in DJI Fly before you fly."));
+  else if (h.gpsSatellites !== undefined && h.gpsSatellites < GPS_SATELLITES_MIN)
+    items.push(block("gps", `The drone sees only ${h.gpsSatellites} GPS satellites (at least ${GPS_SATELLITES_MIN} needed). ${weakGps}`));
+  else if (h.gpsLevel !== undefined && h.gpsLevel < GPS_LEVEL_MIN) items.push(block("gps", `The drone's GPS signal is weak (level ${h.gpsLevel} of 5). ${weakGps}`));
+  else items.push(pass("gps", `GPS signal good${h.gpsSatellites !== undefined ? ` (${h.gpsSatellites} satellites)` : ""}.`));
+  for (const w of h.warnings ?? []) {
+    if (w.level === "WARNING" || w.level === "SERIOUS_WARNING")
+      items.push(block("droneWarning", `The drone reports: ${w.text}. Fix this first (DJI Fly explains it; often the compass or IMU needs calibrating).`));
+    else if (w.level === "CAUTION" || w.level === "NOTICE") items.push(warn("droneWarning", `The drone reports: ${w.text}.`));
+  }
+  return items;
+}

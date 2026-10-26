@@ -5,7 +5,7 @@
 import type { DroneBridge, Telemetry } from "./bridge.ts";
 import { distanceM, toLocal, type LatLng } from "./geo.ts";
 import { emptyProgress, remainingWaypoints, type Mission, type ScanProgress, type Waypoint } from "./mission.ts";
-import { batteryNeededToReturn, insideGeofence, type SafetySettings } from "./safety.ts";
+import { batteryNeededToReturn, droneLimits, insideGeofence, type SafetySettings } from "./safety.ts";
 
 type SessionState =
   | "ready"
@@ -125,11 +125,12 @@ export class FlightSession {
   /** Configure the drone's own failsafes, then take off. Run the pre-flight check first. */
   start(): void {
     if (this.state !== "ready") throw new Error(`Cannot start from state ${this.state}`);
-    const { bridge, home, settings } = this.o;
+    const { bridge, home, settings, mission, boundary } = this.o;
     bridge.configureFailsafe({
       home,
       returnHeightM: settings.returnHeightM,
       signalLossAction: settings.signalLossAction,
+      ...droneLimits(home, mission, boundary, settings),
     });
     bridge.takeOff();
     this.setState("takingOff");

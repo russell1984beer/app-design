@@ -18,6 +18,7 @@ import {
   commit,
   currentProject,
   freshProjectData,
+  history,
   newProject,
   type AppState,
   type Project,
@@ -35,6 +36,9 @@ export async function openProject(id: string): Promise<void> {
   S.projectId = id;
   // Nothing selected or half-drawn carries over from the other property.
   Object.assign(S, { sel: null, vsel: null, pts: [], closed: false, placing: null, drawing: null, layer: "contours" } satisfies Partial<AppState>);
+  // The pre-flight ticks are for this property's flight, and Undo must not bring back the other property's design.
+  S.checks = S.checks.map(() => false);
+  history.clear();
   commit();
   await loadSavedSurvey();
   commit();

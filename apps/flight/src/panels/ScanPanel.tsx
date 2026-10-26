@@ -28,6 +28,8 @@ export function DroneStatus() {
           if (d.flying) return;
           S.mode = m;
           commit();
+          // A real flight must not start with the simulator's made-up position.
+          if (m === "real" && d.simOn) d.setSimulator(false).catch(() => {});
         }}
       />
       {s.mode === "sim" ? (

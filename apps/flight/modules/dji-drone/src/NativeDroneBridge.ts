@@ -71,6 +71,14 @@ export class NativeDroneBridge implements DroneBridge {
       photosLeft: t?.photosLeft ?? undefined,
       speedMs: fresh && t!.speedMs != null ? t!.speedMs : undefined,
       tiltDeg: fresh && t!.tiltDeg != null ? t!.tiltDeg : undefined,
+      health: fresh
+        ? {
+            gpsSatellites: t!.gpsSatellites ?? undefined,
+            gpsLevel: t!.gpsLevel ?? undefined,
+            warnings: t!.droneWarnings,
+            simulatorOn: t!.simulatorOn,
+          }
+        : undefined,
     };
   }
 
@@ -117,11 +125,21 @@ export class NativeDroneBridge implements DroneBridge {
 
   configureFailsafe(config: FailsafeConfig): void {
     this.home = config.home;
-    this.native.configureFailsafe(config.home.lat, config.home.lng, Math.ceil(config.returnHeightM), config.signalLossAction);
+    this.native.configureFailsafe(
+      config.home.lat,
+      config.home.lng,
+      Math.ceil(config.returnHeightM),
+      config.signalLossAction,
+      Math.ceil(config.heightLimitM),
+      Math.ceil(config.distanceLimitM),
+    );
   }
 
+  /** Set before each flight: whether it is meant for DJI's simulator. The drone module refuses a take-off that does not match. */
+  expectSimulator = false;
+
   takeOff(): void {
-    this.native.takeOff();
+    this.native.takeOff(this.expectSimulator);
   }
 
   goTo(position: LatLng, altitudeM: number, speedMs: number, headingDeg?: number): void {

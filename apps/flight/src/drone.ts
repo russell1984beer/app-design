@@ -1,6 +1,7 @@
 // One connection to the drone for the whole app. Screens subscribe to it; the flight in progress
 // (a garden scan, a roof scan or a simulator test) is driven from here on every telemetry update.
 
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { useEffect, useReducer } from "react";
 
 import type { Telemetry } from "../../../packages/flight-core/src/bridge.ts";
@@ -25,8 +26,11 @@ type Job = {
 class DroneHub {
   telemetry: Telemetry | null = null;
   status = "Starting DJI SDK…";
-  simOn = false;
   job: Job | null = null;
+  /** What the app last asked for, until the drone reports its simulator state itself. */
+  private simAsked = false;
+  /** The screen is being kept on (see keepAwake). */
+  private awake = false;
   readonly log: string[] = [];
 
   private listeners = new Set<() => void>();
@@ -63,6 +67,25 @@ class DroneHub {
   get flying(): boolean {
     const st = this.job?.session.state;
     return !!st && st !== "ready" && st !== "landed";
+  }
+
+  /**
+   * DJI's simulator is running. Asked from the drone: it is off again after the drone restarts,
+   * whatever the app last did.
+   */
+  get simOn(): boolean {
+    return this.telemetry?.health?.simulatorOn ?? this.simAsked;
+  }
+
+  /**
+   * Keep the phone's screen on while a flight runs or the drone is in the air, so Android does not
+   * put the app to sleep mid-flight. Off again once it has landed.
+   */
+  private keepAwake(): void {
+    const want = this.flying || (this.telemetry != null && this.telemetry.flightMode !== "onGround");
+    if (want === this.awake) return;
+    this.awake = want;
+    (want ? activateKeepAwakeAsync(KEEP_AWAKE_TAG) : deactivateKeepAwake(KEEP_AWAKE_TAG)).catch((e: Error) => this.addLog(`Keep screen on: ${e.message}`));
   }
 
   subscribe(fn: () => void): () => void {
@@ -108,7 +131,7 @@ class DroneHub {
         await DjiDrone.disableSimulator();
         this.addLog("Simulator off.");
       }
-      this.simOn = on;
+      this.simAsked = on;
     } catch (e) {
       this.addLog(`Simulator: ${(e as Error).message}`);
       throw e;
@@ -121,8 +144,10 @@ class DroneHub {
    * Start a flight. Run the pre-flight check first; FlightSession sets the drone's own failsafes.
    * `anchor` places the plan; `home` is where the drone stands, where it takes off and comes back to.
    */
-  startJob(kind: JobKind, anchor: LatLng, home: LatLng, options: Omit<FlightSessionOptions, "bridge" | "home">): FlightSession {
+  startJob(kind: JobKind, anchor: LatLng, home: LatLng, simulated: boolean, options: Omit<FlightSessionOptions, "bridge" | "home">): FlightSession {
     if (this.flying) throw new Error("A flight is already in progress");
+    // The drone module checks this against the drone's own simulator state before it takes off.
+    this.bridge.expectSimulator = simulated;
     // A test wind from the simulator test bench must never reach a real scan.
     if (kind !== "test") {
       this.bridge.setTestWind(null);
@@ -168,9 +193,12 @@ class DroneHub {
   }
 
   private emit(): void {
+    this.keepAwake();
     for (const l of this.listeners) l();
   }
 }
+
+const KEEP_AWAKE_TAG = "flight";
 
 export const drone = new DroneHub();
 

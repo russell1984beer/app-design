@@ -7,6 +7,8 @@ import { DEFAULT_GRID, PHOTO_INTERVAL_S, planGrid, planOrbit, planSurvey, survey
 import {
   DEFAULT_SAFETY,
   batteryNeededToReturn,
+  droneHealthChecks,
+  droneLimits,
   headwindMs,
   preflightCheck,
   type PreflightInput,
@@ -344,4 +346,42 @@ test("pre-flight: the drone's storage must have room for the flight's photos", (
   // Resuming needs room only for the photos still to take.
   assert.equal(item(10, 3)?.status, "pass");
   assert.ok(!preflightCheck({ ...input, photosLeft: 0 }).canTakeOff);
+});
+
+test("return height below DJI's 20 m minimum is blocked", () => {
+  const settings = { ...DEFAULT_SAFETY, returnHeightM: 19, tallestObstacleM: 4, obstacleClearanceM: 5 };
+  assert.ok(blocked({ ...goodPreflight(), settings }, "returnHeight"));
+  assert.ok(!blocked({ ...goodPreflight(), settings: { ...settings, returnHeightM: 20 } }, "returnHeight"));
+});
+
+test("drone limits: height above the highest point of the flight, distance beyond the furthest", () => {
+  const mission = planGrid(PLOT);
+  const highest = Math.max(DEFAULT_SAFETY.returnHeightM, ...mission.waypoints.map((w) => w.altitudeM));
+  const { heightLimitM, distanceLimitM } = droneLimits(PLOT_HOME, mission, PLOT, DEFAULT_SAFETY);
+  assert.ok(heightLimitM >= highest + 5 && heightLimitM <= 120, `height limit ${heightLimitM}`);
+  const furthest = Math.max(...PLOT.map((p) => distanceM(PLOT_HOME, p)));
+  assert.ok(distanceLimitM >= furthest + DEFAULT_SAFETY.geofenceMarginM, `distance limit ${distanceLimitM}`);
+  // Room beyond the flight area: DJI stops automatic flight well before the limit itself.
+  assert.ok(distanceLimitM >= furthest + DEFAULT_SAFETY.geofenceMarginM + 50);
+  assert.ok(distanceLimitM <= furthest + DEFAULT_SAFETY.geofenceMarginM + 51);
+  // Never above the UK limit, never below DJI's minimums.
+  const high = droneLimits(PLOT_HOME, mission, PLOT, { ...DEFAULT_SAFETY, returnHeightM: 118 });
+  assert.equal(high.heightLimitM, 120);
+  const tiny = droneLimits(PLOT_HOME, { ...mission, waypoints: [] }, [PLOT_HOME], { ...DEFAULT_SAFETY, returnHeightM: 5, geofenceMarginM: 0 });
+  assert.equal(tiny.heightLimitM, 20);
+  assert.equal(tiny.distanceLimitM, 50);
+});
+
+test("drone health: simulator on, weak GPS and serious warnings block a real take-off", () => {
+  const ids = (items: ReturnType<typeof droneHealthChecks>, status: string) => items.filter((i) => i.status === status).map((i) => i.id);
+  const good = { gpsSatellites: 18, gpsLevel: 5, warnings: [], simulatorOn: false };
+  assert.deepEqual(ids(droneHealthChecks(good), "block"), []);
+  assert.deepEqual(ids(droneHealthChecks({ ...good, simulatorOn: true }), "block"), ["simulator"]);
+  assert.deepEqual(ids(droneHealthChecks({ ...good, gpsSatellites: 7 }), "block"), ["gps"]);
+  assert.deepEqual(ids(droneHealthChecks({ ...good, gpsLevel: 2 }), "block"), ["gps"]);
+  assert.deepEqual(ids(droneHealthChecks({ ...good, warnings: [{ text: "Compass error", level: "SERIOUS_WARNING" }] }), "block"), ["droneWarning"]);
+  assert.deepEqual(ids(droneHealthChecks({ ...good, warnings: [{ text: "IMU warming up", level: "WARNING" }] }), "block"), ["droneWarning"]);
+  assert.deepEqual(ids(droneHealthChecks({ ...good, warnings: [{ text: "Wind", level: "CAUTION" }] }), "warn"), ["droneWarning"]);
+  // An older build that does not report GPS: told, not blocked.
+  assert.deepEqual(ids(droneHealthChecks({}), "warn"), ["gps"]);
 });

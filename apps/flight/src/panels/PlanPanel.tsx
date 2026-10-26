@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 
-import { MINI_4_PRO_MAX_WIND_MS, UK_MAX_ALTITUDE_M, validateSettings, type SignalLossAction } from "../../../../packages/flight-core/src/safety.ts";
+import { DJI_MIN_RETURN_HEIGHT_M, MINI_4_PRO_MAX_WIND_MS, UK_MAX_ALTITUDE_M, validateSettings, type SignalLossAction } from "../../../../packages/flight-core/src/safety.ts";
 import { PHOTO_INTERVAL_S } from "../../../../packages/flight-core/src/planner.ts";
 import { compass } from "../../../../packages/garden-core/src/index.ts";
 
@@ -11,7 +11,7 @@ import { Btn, Check, H2, Lead, Note, Seg, Stats, Status, Stepper } from "../ui";
 
 const CHECKS: [string, string][] = [
   ["Operator ID and Flyer ID registered", "Required by the CAA for drones with a camera"],
-  ["Airspace checked in DJI Fly", "No restrictions here today. The app also checks DJI FlySafe zones before take-off; DJI Fly has the latest"],
+  ["Airspace checked today", "Check Drone Assist (NATS) or DJI Fly for today's restrictions. The app only checks DJI's own no-fly zones"],
   ["Neighbours told about the flight", "Recommended for privacy"],
 ];
 
@@ -98,7 +98,7 @@ export function PlanPanel() {
       <Stepper
         label="Return height"
         value={s.safety.returnHeightM}
-        min={s.safety.tallestObstacleM + s.safety.obstacleClearanceM}
+        min={Math.max(DJI_MIN_RETURN_HEIGHT_M, s.safety.tallestObstacleM + s.safety.obstacleClearanceM)}
         max={UK_MAX_ALTITUDE_M}
         step={1}
         format={(v) => `${v} m`}
