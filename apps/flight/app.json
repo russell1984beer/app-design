@@ -43,7 +43,7 @@
       "expo-sharing"
     ],
     "ios": {
-      "bundleIdentifier": "com.plotwise.app",
+      "bundleIdentifier": "com.russells1984.plotwise",
       "supportsTablet": true,
       "config": {
         "usesNonExemptEncryption": false

@@ -6,8 +6,10 @@ const { addDjiToMainApplication, addDjiToManifest, ACCESSORY_FILTER_XML, readApi
 
 function withDji(config) {
   config = withAndroidManifest(config, (c) => {
-    // Read only when the Android project is made, so iPad builds (no DJI) need no key.
-    c.modResults = addDjiToManifest(c.modResults, readApiKey(process.env));
+    // Read only when the Android project is made, so iPad builds (no DJI) need no key. When a tool
+    // only inspects the config (EAS does this before an iPad build), no real key is needed.
+    const key = c.modRequest.introspect && !process.env.DJI_API_KEY ? "not-needed-for-inspection" : readApiKey(process.env);
+    c.modResults = addDjiToManifest(c.modResults, key);
     return c;
   });
 

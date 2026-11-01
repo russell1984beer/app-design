@@ -32,7 +32,8 @@ The first time, it asks a few questions. The answers:
   iPhone or iPad.
 - **Generate a new Apple distribution certificate / provisioning profile?** Yes to each. Expo
   stores them for you.
-- **Bundle identifier:** keep `com.plotwise.app`.
+- **Bundle identifier:** keep `com.russells1984.plotwise`. (The Android app is `com.plotwise.app`,
+  but another Apple developer already owns that name, so the iPad app has its own.)
 
 The build then runs on Expo's computers. When it finishes, it is sent to Apple automatically.
 Apple checks it (10–60 minutes), then you get an email.
