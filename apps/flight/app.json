@@ -39,7 +39,8 @@
           "hidden": true,
           "style": "dark"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "ios": {
       "bundleIdentifier": "com.plotwise.app",
